@@ -1,0 +1,19 @@
+# Logs
+logs/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+# Project-specific configs (these live in the project, not here)
+# But keep templates
+!templates/
+
