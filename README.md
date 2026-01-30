@@ -12,14 +12,38 @@ Copy and paste this into your terminal to get started immediately:
 bash <(gh api repos/W508153_wexinc/ralph-loop/contents/install.sh --jq '.content' | base64 -d)
 ```
 
-> **Note:** This requires the [GitHub CLI](https://cli.github.com/) (`gh`) to be installed and authenticated, since this is a private repository.
+### What it does
 
-This will:
-1. Ask where to install ralph-loop
-2. Clone the repository
-3. Launch the interactive setup wizard
-4. Configure your project
-5. Give you the exact command to run
+1. **Downloads** the installer script from the private GitHub repo (using `gh` CLI for authentication)
+2. **Asks** where to install ralph-loop (suggests a sensible default based on your current directory)
+3. **Clones** the ralph-loop repository to that location
+4. **Launches** the interactive setup wizard which:
+   - Asks for your project path
+   - Detects project type (iOS, React, Python, Node.js, etc.)
+   - Auto-detects Xcode schemes for iOS projects
+   - Configures build and test commands
+   - Lets you choose an AI agent (Cursor, Augment, or custom)
+   - Creates a feature branch in your project
+   - Generates all `.ralph/` configuration files
+5. **Outputs** the exact command to run Ralph Loop on your project
+
+### Requirements
+
+- **GitHub CLI (`gh`)** - Required because this is a private repository
+  ```bash
+  # Install with Homebrew
+  brew install gh
+
+  # Authenticate
+  gh auth login
+  ```
+
+### If the repo becomes public
+
+If this repo is made public, you can use the simpler curl command:
+```bash
+curl -fsSL https://raw.githubusercontent.com/W508153_wexinc/ralph-loop/main/install.sh | bash
+```
 
 ## Features
 
