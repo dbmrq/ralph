@@ -4,45 +4,63 @@
 
 Ralph Loop is a shell script that repeatedly calls an AI coding agent to complete tasks from a checklist. It handles iteration limits, build verification, automatic commits, and graceful error recovery.
 
-## 🚀 One-Liner Install
+## 🚀 Get Started (One Command)
 
-Copy and paste this into your terminal to get started immediately:
+Copy and paste this into your terminal:
 
 ```bash
 bash <(gh api repos/W508153_wexinc/ralph-loop/contents/install.sh --jq '.content' | base64 -d)
 ```
 
-### What it does
+**That's it!** This single command handles everything from start to finish.
 
-1. **Downloads** the installer script from the private GitHub repo (using `gh` CLI for authentication)
-2. **Asks** where to install ralph-loop (suggests a sensible default based on your current directory)
-3. **Clones** the ralph-loop repository to that location
-4. **Launches** the interactive setup wizard which:
-   - Asks for your project path
-   - Detects project type (iOS, React, Python, Node.js, etc.)
-   - Auto-detects Xcode schemes for iOS projects
-   - Configures build and test commands
-   - Lets you choose an AI agent (Cursor, Augment, or custom)
-   - Creates a feature branch in your project
-   - Generates all `.ralph/` configuration files
-5. **Outputs** the exact command to run Ralph Loop on your project
+### What Happens
 
-### Requirements
+The script guides you through 100% of the setup:
 
-- **GitHub CLI (`gh`)** - Required because this is a private repository
-  ```bash
-  # Install with Homebrew
-  brew install gh
+1. **Checks prerequisites** - Installs Homebrew and GitHub CLI if needed
+2. **Authenticates** - Logs you into GitHub if not already authenticated
+3. **Installs ralph-loop** - Clones to your preferred location
+4. **Configures your project** - Detects project type, sets up build commands
+5. **Adds your tasks** - Interactive prompts to add tasks and custom instructions
+6. **Creates a branch** - Sets up a feature branch for safety
+7. **Runs Ralph Loop** - Starts the automation when you're ready
 
-  # Authenticate
-  gh auth login
-  ```
+### First Time? No Problem!
 
-### If the repo becomes public
+The installer handles everything, even if you have nothing installed:
 
-If this repo is made public, you can use the simpler curl command:
+```
+┌─────────────────────────────────────────────────┐
+│  Don't have Homebrew?  → Offers to install it   │
+│  Don't have gh CLI?    → Installs via Homebrew  │
+│  Not authenticated?    → Walks you through it   │
+│  Don't have ralph-loop? → Clones it for you     │
+└─────────────────────────────────────────────────┘
+```
+
+### Already Have ralph-loop?
+
+Just run the installer again from anywhere:
+
 ```bash
-curl -fsSL https://raw.githubusercontent.com/W508153_wexinc/ralph-loop/main/install.sh | bash
+# From within the ralph-loop directory
+./install.sh
+
+# Or use the one-liner from anywhere
+bash <(gh api repos/W508153_wexinc/ralph-loop/contents/install.sh --jq '.content' | base64 -d)
+```
+
+It detects the existing installation and shows you a menu:
+
+```
+What would you like to do?
+  1) Set up a new project
+  2) Add/edit tasks for an existing project
+  3) Add custom instructions for an existing project
+  4) Run Ralph Loop on a project
+  5) Update ralph-loop to latest version
+  6) Exit
 ```
 
 ## Features
@@ -54,86 +72,72 @@ curl -fsSL https://raw.githubusercontent.com/W508153_wexinc/ralph-loop/main/inst
 - 🛡️ **Safety limits** - Max iterations, consecutive failure detection
 - 📊 **Detailed logging** - Per-run and per-iteration logs
 - 🌿 **Branch protection** - Prevents running on main/master
+- 🧙 **Smart installer** - Handles all prerequisites automatically
 
-## Quick Start
+## How It Works
 
-### Option A: One-Liner Install (Recommended)
+### The Single Entry Point
 
-```bash
-bash <(gh api repos/W508153_wexinc/ralph-loop/contents/install.sh --jq '.content' | base64 -d)
+`install.sh` is designed to be THE entry point for Ralph Loop. You never need to remember multiple commands - just run the installer and it figures out what to do:
+
+| Situation | What the installer does |
+|-----------|------------------------|
+| Fresh install | Installs prerequisites, clones repo, sets up project |
+| Already installed | Shows menu of actions |
+| Project not configured | Runs the setup wizard |
+| Project already configured | Offers to reconfigure or run |
+| On main/master branch | Offers to create a feature branch |
+
+### Adding Tasks
+
+When setting up a project, you can add tasks interactively:
+
+```
+Enter your tasks one by one.
+Format: Brief description of what the agent should do
+Type 'done' when finished.
+
+Task 1: Implement the login button action
+  Details (optional): Connect to AuthService.login()
+✓ Added TASK-001
+
+Task 2: Add form validation for email field
+  Details (optional): Use regex validation, show inline errors
+✓ Added TASK-002
+
+Task 3: done
 ```
 
-### Option B: Interactive Setup Wizard
+### Adding Custom Instructions
 
-If you prefer to clone manually first:
+You can also add project-specific instructions for the AI agent:
+
+```
+Enter your custom instructions for the AI agent.
+
+These could include:
+  - Coding standards and conventions
+  - Project architecture overview
+  - Important files or patterns to follow
+  - Testing requirements
+  - Any warnings or things to avoid
+
+Type your instructions below. When finished, type 'END' on a new line.
+```
+
+## Manual Usage (Advanced)
+
+If you prefer to run commands directly:
 
 ```bash
-# Clone Ralph Loop
-cd ~/projects
-git clone https://github.com/W508153_wexinc/ralph-loop.git
+# Run Ralph Loop on a project
+./ralph-loop/ralph_loop.sh /path/to/your/project
 
-# Run the setup wizard
+# With a specific agent
+./ralph-loop/ralph_loop.sh /path/to/your/project auggie
+
+# Just run the setup wizard
 ./ralph-loop/setup.sh
-```
-
-The wizard will:
-- Ask for your project location
-- Detect your project type (iOS, React, Python, etc.)
-- Configure build commands automatically
-- Create a feature branch
-- Generate all configuration files
-- Provide exact commands to run
-
-### Option C: Manual Setup
-
-#### 1. Clone Ralph Loop
-
-```bash
-cd ~/projects
-git clone https://github.com/W508153_wexinc/ralph-loop.git
-```
-
-#### 2. Set Up Your Project
-
-```bash
-# In your project directory
-cd my-ios-app
-mkdir -p .ralph
-
-# Copy template files
-cp ../ralph-loop/templates/ios/config.sh .ralph/
-cp ../ralph-loop/templates/ios/prompt.txt .ralph/
-cp ../ralph-loop/templates/ios/TASKS.md .ralph/
-```
-
-#### 3. Customize Configuration
-
-Edit `.ralph/config.sh`:
-```bash
-PROJECT_NAME="My iOS App"
-XCODE_SCHEME="MyApp"
-COMMIT_SCOPE="ios"
-```
-
-Edit `.ralph/prompt.txt` with your project-specific instructions.
-
-Edit `.ralph/TASKS.md` with your task list.
-
-#### 4. Create a Feature Branch
-
-```bash
-git checkout -b feature/ralph-tasks
-```
-
-#### 5. Run Ralph Loop
-
-```bash
-# From parent directory containing both repos
-cd ~/projects
-./ralph-loop/ralph_loop.sh ./my-ios-app
-
-# Or specify an agent
-./ralph-loop/ralph_loop.sh ./my-ios-app auggie
 ```
 
 ## Directory Structure
