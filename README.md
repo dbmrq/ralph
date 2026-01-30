@@ -9,8 +9,10 @@ Ralph Loop is a shell script that repeatedly calls an AI coding agent to complet
 Copy and paste this into your terminal to get started immediately:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/W508153_wexinc/ralph-loop/main/install.sh | bash
+bash <(gh api repos/W508153_wexinc/ralph-loop/contents/install.sh --jq '.content' | base64 -d)
 ```
+
+> **Note:** This requires the [GitHub CLI](https://cli.github.com/) (`gh`) to be installed and authenticated, since this is a private repository.
 
 This will:
 1. Ask where to install ralph-loop
@@ -34,7 +36,7 @@ This will:
 ### Option A: One-Liner Install (Recommended)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/W508153_wexinc/ralph-loop/main/install.sh | bash
+bash <(gh api repos/W508153_wexinc/ralph-loop/contents/install.sh --jq '.content' | base64 -d)
 ```
 
 ### Option B: Interactive Setup Wizard

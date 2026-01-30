@@ -2,7 +2,11 @@
 #
 # Ralph Loop - One-liner Installer
 #
-# Usage: curl -fsSL https://raw.githubusercontent.com/W508153_wexinc/ralph-loop/main/install.sh | bash
+# For PUBLIC repos:
+#   curl -fsSL https://raw.githubusercontent.com/W508153_wexinc/ralph-loop/main/install.sh | bash
+#
+# For PRIVATE repos (requires gh CLI):
+#   bash <(gh api repos/W508153_wexinc/ralph-loop/contents/install.sh --jq '.content' | base64 -d)
 #
 # This script:
 #   1. Asks where to install ralph-loop
