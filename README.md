@@ -16,15 +16,37 @@ Ralph Loop is a shell script that repeatedly calls an AI coding agent to complet
 
 ## Quick Start
 
-### 1. Clone Ralph Loop
+### Option A: Interactive Setup Wizard (Recommended)
+
+The easiest way to get started is with the interactive setup wizard:
 
 ```bash
-# Clone alongside your project
+# Clone Ralph Loop
+cd ~/projects
+git clone https://github.com/your-org/ralph-loop.git
+
+# Run the setup wizard
+./ralph-loop/setup.sh
+```
+
+The wizard will:
+- Ask for your project location
+- Detect your project type (iOS, React, Python, etc.)
+- Configure build commands automatically
+- Create a feature branch
+- Generate all configuration files
+- Provide exact commands to run
+
+### Option B: Manual Setup
+
+#### 1. Clone Ralph Loop
+
+```bash
 cd ~/projects
 git clone https://github.com/your-org/ralph-loop.git
 ```
 
-### 2. Set Up Your Project
+#### 2. Set Up Your Project
 
 ```bash
 # In your project directory
@@ -37,7 +59,7 @@ cp ../ralph-loop/templates/ios/prompt.txt .ralph/
 cp ../ralph-loop/templates/ios/TASKS.md .ralph/
 ```
 
-### 3. Customize Configuration
+#### 3. Customize Configuration
 
 Edit `.ralph/config.sh`:
 ```bash
@@ -50,13 +72,13 @@ Edit `.ralph/prompt.txt` with your project-specific instructions.
 
 Edit `.ralph/TASKS.md` with your task list.
 
-### 4. Create a Feature Branch
+#### 4. Create a Feature Branch
 
 ```bash
 git checkout -b feature/ralph-tasks
 ```
 
-### 5. Run Ralph Loop
+#### 5. Run Ralph Loop
 
 ```bash
 # From parent directory containing both repos
