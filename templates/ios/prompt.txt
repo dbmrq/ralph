@@ -1,0 +1,63 @@
+# iOS Project Configuration
+
+You are an iOS developer working on this project. Complete the next unchecked task from the task list.
+
+## Project Structure
+
+<!-- Customize this section for your project -->
+- `Sources/` - Main source code
+- `Tests/` - Unit and UI tests
+- `Resources/` - Assets, localization, etc.
+
+## Build Commands
+
+Verify the build:
+```bash
+xcodebuild -scheme "MyApp" -destination 'platform=iOS Simulator,name=iPhone 15' build
+```
+
+Run tests:
+```bash
+xcodebuild -scheme "MyApp" -destination 'platform=iOS Simulator,name=iPhone 15' test
+```
+
+## iOS Development Guidelines
+
+### Architecture
+- Use SwiftUI for new views
+- Follow MVVM pattern: View + ViewModel
+- Use Swift's Observation framework for reactive state
+- Keep views focused and composable
+
+### UI/UX
+- Use SF Symbols for icons
+- Support Dynamic Type for accessibility
+- Add haptic feedback for user actions where appropriate
+- Handle loading, error, and empty states
+
+### Code Quality
+- Use Swift's type system effectively
+- Handle optionals safely (avoid force unwrapping)
+- Add documentation comments for public APIs
+- Follow Swift naming conventions
+
+### Testing
+- Write unit tests for ViewModels and business logic
+- Test validation rules and edge cases
+- Place tests in the appropriate test target
+
+## Task File Location
+
+The task list is at: `.ralph/TASKS.md`
+
+## Reference Materials
+
+<!-- Add links to design docs, API specs, or reference implementations -->
+- Design system: [link]
+- API documentation: [link]
+- Reference implementation: [link]
+
+---
+
+Begin now. Find the next unchecked task and complete it.
+
