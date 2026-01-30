@@ -4,6 +4,21 @@
 
 Ralph Loop is a shell script that repeatedly calls an AI coding agent to complete tasks from a checklist. It handles iteration limits, build verification, automatic commits, and graceful error recovery.
 
+## 🚀 One-Liner Install
+
+Copy and paste this into your terminal to get started immediately:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/W508153_wexinc/ralph-loop/main/install.sh | bash
+```
+
+This will:
+1. Ask where to install ralph-loop
+2. Clone the repository
+3. Launch the interactive setup wizard
+4. Configure your project
+5. Give you the exact command to run
+
 ## Features
 
 - 🔄 **Automated task loop** - Runs until all tasks complete or limits reached
@@ -16,14 +31,20 @@ Ralph Loop is a shell script that repeatedly calls an AI coding agent to complet
 
 ## Quick Start
 
-### Option A: Interactive Setup Wizard (Recommended)
+### Option A: One-Liner Install (Recommended)
 
-The easiest way to get started is with the interactive setup wizard:
+```bash
+curl -fsSL https://raw.githubusercontent.com/W508153_wexinc/ralph-loop/main/install.sh | bash
+```
+
+### Option B: Interactive Setup Wizard
+
+If you prefer to clone manually first:
 
 ```bash
 # Clone Ralph Loop
 cd ~/projects
-git clone https://github.com/your-org/ralph-loop.git
+git clone https://github.com/W508153_wexinc/ralph-loop.git
 
 # Run the setup wizard
 ./ralph-loop/setup.sh
@@ -37,13 +58,13 @@ The wizard will:
 - Generate all configuration files
 - Provide exact commands to run
 
-### Option B: Manual Setup
+### Option C: Manual Setup
 
 #### 1. Clone Ralph Loop
 
 ```bash
 cd ~/projects
-git clone https://github.com/your-org/ralph-loop.git
+git clone https://github.com/W508153_wexinc/ralph-loop.git
 ```
 
 #### 2. Set Up Your Project
