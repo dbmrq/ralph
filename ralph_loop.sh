@@ -41,6 +41,7 @@ MAX_ITERATIONS=50
 PAUSE_SECONDS=5
 MAX_CONSECUTIVE_FAILURES=3
 DEFAULT_AGENT="cursor"
+DEFAULT_MODEL=""  # Empty means use agent's default; can be set in config.sh
 REQUIRE_BRANCH=true
 ALLOWED_BRANCHES=""  # Empty means any non-main branch
 AUTO_COMMIT=true
@@ -164,6 +165,100 @@ validate_agent() {
 validate_agent
 
 #==============================================================================
+# MODEL SELECTION
+#==============================================================================
+
+# Get available models for the current agent
+get_available_models() {
+    case "$AGENT_TYPE" in
+        cursor)
+            # Parse cursor agent models, extracting just the model IDs
+            agent --list-models 2>/dev/null | grep -E "^[a-z]" | awk '{print $1}' | grep -v "^Tip:" | grep -v "^Available"
+            ;;
+        auggie)
+            # Auggie models list (may not be available)
+            auggie models list 2>/dev/null | grep -E "^[a-z]" | awk '{print $1}' || echo "default"
+            ;;
+        *)
+            echo ""
+            ;;
+    esac
+}
+
+# Get the default/current model for the agent
+get_default_model() {
+    case "$AGENT_TYPE" in
+        cursor)
+            # Look for (current) or (default) marker
+            agent --list-models 2>/dev/null | grep -E "\(current\)|\(default\)" | head -1 | awk '{print $1}'
+            ;;
+        auggie)
+            echo "default"
+            ;;
+        *)
+            echo ""
+            ;;
+    esac
+}
+
+# Prompt user to select a model
+select_model() {
+    echo -e "${CYAN}Fetching available models for $AGENT_TYPE...${NC}"
+
+    local models_list=$(get_available_models)
+    local default_model=$(get_default_model)
+
+    if [ -z "$models_list" ] || [ "$models_list" = "default" ]; then
+        echo -e "Using default model for $AGENT_TYPE"
+        SELECTED_MODEL=""
+        return
+    fi
+
+    local model_count=$(echo "$models_list" | wc -l | tr -d ' ')
+
+    echo ""
+    echo -e "${GREEN}Available models ($model_count):${NC}"
+    echo ""
+
+    local i=1
+    local default_index=1
+    while IFS= read -r model; do
+        if [ "$model" = "$default_model" ]; then
+            echo -e "  $i) $model ${YELLOW}(current)${NC}"
+            default_index=$i
+        else
+            echo "  $i) $model"
+        fi
+        ((i++))
+    done <<< "$models_list"
+
+    echo ""
+    echo -en "${CYAN}Select model [$default_index]: ${NC}"
+    read -r model_choice </dev/tty
+
+    if [ -z "$model_choice" ]; then
+        model_choice=$default_index
+    fi
+
+    SELECTED_MODEL=$(echo "$models_list" | sed -n "${model_choice}p")
+
+    if [ -z "$SELECTED_MODEL" ]; then
+        SELECTED_MODEL="$default_model"
+    fi
+
+    echo -e "Selected: ${GREEN}$SELECTED_MODEL${NC}"
+    echo ""
+}
+
+# Select model if not already set
+if [ -z "$DEFAULT_MODEL" ]; then
+    select_model
+else
+    SELECTED_MODEL="$DEFAULT_MODEL"
+    echo -e "Using configured model: ${GREEN}$SELECTED_MODEL${NC}"
+fi
+
+#==============================================================================
 # SETUP LOGGING
 #==============================================================================
 
@@ -282,7 +377,12 @@ run_agent_cursor() {
         return 1
     fi
 
-    echo "$prompt" | agent --print --model "claude-4.5-opus" > "$log_file" 2>&1
+    # Use selected model if set, otherwise let agent use its default
+    if [ -n "$SELECTED_MODEL" ]; then
+        echo "$prompt" | agent --print --model "$SELECTED_MODEL" > "$log_file" 2>&1
+    else
+        echo "$prompt" | agent --print > "$log_file" 2>&1
+    fi
     cat "$log_file"
 }
 
@@ -295,7 +395,12 @@ run_agent_auggie() {
         return 1
     fi
 
-    auggie --print --quiet "$prompt" > "$log_file" 2>&1
+    # Use selected model if set (auggie may not support model selection)
+    if [ -n "$SELECTED_MODEL" ] && [ "$SELECTED_MODEL" != "default" ]; then
+        auggie --print --quiet --model "$SELECTED_MODEL" "$prompt" > "$log_file" 2>&1
+    else
+        auggie --print --quiet "$prompt" > "$log_file" 2>&1
+    fi
     cat "$log_file"
 }
 
@@ -730,6 +835,7 @@ main() {
     log "Run ID:         ${RUN_ID}"
     log "Project:        ${PROJECT_DIR}"
     log "Agent:          ${AGENT_TYPE}"
+    log "Model:          ${SELECTED_MODEL:-default}"
     log "Max iterations: ${MAX_ITERATIONS}"
     log "Task file:      ${TASK_FILE}"
     log "Log directory:  ${LOG_DIR}"
