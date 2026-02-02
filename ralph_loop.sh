@@ -368,38 +368,51 @@ build_prompt() {
 #==============================================================================
 
 # Progress monitor - runs in background to show activity
+# Uses ANSI escape codes to update multiple lines in place
 start_progress_monitor() {
     local log_file="$1"
     local start_time=$(date +%s)
-    local last_size=0
-    local dots=""
+    local spinner_chars='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+    local spinner_idx=0
+
+    # Hide cursor
+    printf "\033[?25l"
 
     while true; do
-        sleep 3
+        sleep 1
 
-        # Check if log file exists and get size
+        local elapsed=$(($(date +%s) - start_time))
+        local mins=$((elapsed / 60))
+        local secs=$((elapsed % 60))
+
+        # Count modified files
+        local changed_files=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+
+        # Get last meaningful line from log (skip empty lines)
+        local last_line=""
         if [ -f "$log_file" ]; then
-            local current_size=$(wc -c < "$log_file" 2>/dev/null || echo 0)
-            local elapsed=$(($(date +%s) - start_time))
-            local mins=$((elapsed / 60))
-            local secs=$((elapsed % 60))
+            last_line=$(tail -20 "$log_file" 2>/dev/null | grep -v '^$' | tail -1 | head -c 60)
+        fi
 
-            # Count modified files
-            local changed_files=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+        # Spinner animation
+        local spinner="${spinner_chars:$spinner_idx:1}"
+        spinner_idx=$(( (spinner_idx + 1) % ${#spinner_chars} ))
 
-            # Build status line
-            if [ "$current_size" -gt "$last_size" ]; then
-                dots=""  # Reset dots when there's new output
-                last_size=$current_size
-            else
-                dots="${dots}."
-                if [ ${#dots} -gt 3 ]; then
-                    dots="."
-                fi
-            fi
+        # Move cursor up 3 lines, clear them, and redraw
+        # (On first iteration, these lines don't exist yet, but that's OK)
+        printf "\033[3A\033[J"
 
-            # Print status on same line (carriage return to overwrite)
-            printf "\r${CYAN}⏳ Agent working${dots} [%02d:%02d elapsed, %d files changed]${NC}    " "$mins" "$secs" "$changed_files"
+        # Line 1: Status with spinner
+        printf "${CYAN}%s Agent working...${NC}\n" "$spinner"
+
+        # Line 2: Stats
+        printf "  ${YELLOW}⏱${NC}  %02d:%02d elapsed  ${YELLOW}📁${NC}  %d files changed\n" "$mins" "$secs" "$changed_files"
+
+        # Line 3: Last output (truncated)
+        if [ -n "$last_line" ]; then
+            printf "  ${YELLOW}💬${NC}  %.60s\n" "$last_line"
+        else
+            printf "  ${YELLOW}💬${NC}  (waiting for output...)\n"
         fi
     done
 }
@@ -408,34 +421,61 @@ stop_progress_monitor() {
     if [ -n "$PROGRESS_PID" ] && kill -0 "$PROGRESS_PID" 2>/dev/null; then
         kill "$PROGRESS_PID" 2>/dev/null
         wait "$PROGRESS_PID" 2>/dev/null
-        printf "\r%80s\r" ""  # Clear the progress line
     fi
+    # Show cursor again
+    printf "\033[?25h"
+    # Clear the progress lines
+    printf "\033[3A\033[J"
+}
+
+# Show summary after agent completes
+show_agent_summary() {
+    local log_file="$1"
+    local start_time="$2"
+    local end_time=$(date +%s)
+    local elapsed=$((end_time - start_time))
+    local mins=$((elapsed / 60))
+    local secs=$((elapsed % 60))
+
+    # Count changes
+    local changed_files=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+    local lines_in_log=$(wc -l < "$log_file" 2>/dev/null | tr -d ' ')
+
+    echo -e "${GREEN}✓ Agent completed in ${mins}m ${secs}s${NC}"
+    echo -e "  Files changed: $changed_files | Log lines: $lines_in_log"
 }
 
 # Default agent commands - can be overridden in config.sh
 run_agent_cursor() {
     local prompt="$1"
     local log_file="$2"
+    local start_time=$(date +%s)
 
     if ! command -v agent &> /dev/null; then
         log "${RED}ERROR: 'agent' command not found. Please install Cursor CLI.${NC}"
         return 1
     fi
 
+    # Print 3 blank lines for the progress monitor to use
+    echo ""
+    echo ""
+    echo ""
+
     # Start progress monitor in background
     start_progress_monitor "$log_file" &
     PROGRESS_PID=$!
 
-    # Use selected model if set, otherwise let agent use its default
+    # Run agent, output goes to log file only (progress monitor shows status)
     if [ -n "$SELECTED_MODEL" ]; then
-        echo "$prompt" | agent --print --model "$SELECTED_MODEL" 2>&1 | tee "$log_file"
+        echo "$prompt" | agent --print --model "$SELECTED_MODEL" > "$log_file" 2>&1
     else
-        echo "$prompt" | agent --print 2>&1 | tee "$log_file"
+        echo "$prompt" | agent --print > "$log_file" 2>&1
     fi
-    local exit_code=${PIPESTATUS[1]}
+    local exit_code=$?
 
-    # Stop progress monitor
+    # Stop progress monitor and show summary
     stop_progress_monitor
+    show_agent_summary "$log_file" "$start_time"
 
     return $exit_code
 }
@@ -443,27 +483,33 @@ run_agent_cursor() {
 run_agent_auggie() {
     local prompt="$1"
     local log_file="$2"
+    local start_time=$(date +%s)
 
     if ! command -v auggie &> /dev/null; then
         log "${RED}ERROR: 'auggie' command not found. Please install Augment CLI.${NC}"
         return 1
     fi
 
+    # Print 3 blank lines for the progress monitor to use
+    echo ""
+    echo ""
+    echo ""
+
     # Start progress monitor in background
     start_progress_monitor "$log_file" &
     PROGRESS_PID=$!
 
-    # Use selected model if set (auggie may not support model selection)
-    # Note: removed --quiet to show more progress
+    # Run agent, output goes to log file only
     if [ -n "$SELECTED_MODEL" ] && [ "$SELECTED_MODEL" != "default" ]; then
-        auggie --print --model "$SELECTED_MODEL" "$prompt" 2>&1 | tee "$log_file"
+        auggie --print --quiet --model "$SELECTED_MODEL" "$prompt" > "$log_file" 2>&1
     else
-        auggie --print "$prompt" 2>&1 | tee "$log_file"
+        auggie --print --quiet "$prompt" > "$log_file" 2>&1
     fi
-    local exit_code=${PIPESTATUS[0]}
+    local exit_code=$?
 
-    # Stop progress monitor
+    # Stop progress monitor and show summary
     stop_progress_monitor
+    show_agent_summary "$log_file" "$start_time"
 
     return $exit_code
 }
