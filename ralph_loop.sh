@@ -367,6 +367,51 @@ build_prompt() {
 # AGENT COMMANDS
 #==============================================================================
 
+# Progress monitor - runs in background to show activity
+start_progress_monitor() {
+    local log_file="$1"
+    local start_time=$(date +%s)
+    local last_size=0
+    local dots=""
+
+    while true; do
+        sleep 3
+
+        # Check if log file exists and get size
+        if [ -f "$log_file" ]; then
+            local current_size=$(wc -c < "$log_file" 2>/dev/null || echo 0)
+            local elapsed=$(($(date +%s) - start_time))
+            local mins=$((elapsed / 60))
+            local secs=$((elapsed % 60))
+
+            # Count modified files
+            local changed_files=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+
+            # Build status line
+            if [ "$current_size" -gt "$last_size" ]; then
+                dots=""  # Reset dots when there's new output
+                last_size=$current_size
+            else
+                dots="${dots}."
+                if [ ${#dots} -gt 3 ]; then
+                    dots="."
+                fi
+            fi
+
+            # Print status on same line (carriage return to overwrite)
+            printf "\r${CYAN}⏳ Agent working${dots} [%02d:%02d elapsed, %d files changed]${NC}    " "$mins" "$secs" "$changed_files"
+        fi
+    done
+}
+
+stop_progress_monitor() {
+    if [ -n "$PROGRESS_PID" ] && kill -0 "$PROGRESS_PID" 2>/dev/null; then
+        kill "$PROGRESS_PID" 2>/dev/null
+        wait "$PROGRESS_PID" 2>/dev/null
+        printf "\r%80s\r" ""  # Clear the progress line
+    fi
+}
+
 # Default agent commands - can be overridden in config.sh
 run_agent_cursor() {
     local prompt="$1"
@@ -377,13 +422,22 @@ run_agent_cursor() {
         return 1
     fi
 
+    # Start progress monitor in background
+    start_progress_monitor "$log_file" &
+    PROGRESS_PID=$!
+
     # Use selected model if set, otherwise let agent use its default
     if [ -n "$SELECTED_MODEL" ]; then
-        echo "$prompt" | agent --print --model "$SELECTED_MODEL" > "$log_file" 2>&1
+        echo "$prompt" | agent --print --model "$SELECTED_MODEL" 2>&1 | tee "$log_file"
     else
-        echo "$prompt" | agent --print > "$log_file" 2>&1
+        echo "$prompt" | agent --print 2>&1 | tee "$log_file"
     fi
-    cat "$log_file"
+    local exit_code=${PIPESTATUS[1]}
+
+    # Stop progress monitor
+    stop_progress_monitor
+
+    return $exit_code
 }
 
 run_agent_auggie() {
@@ -395,13 +449,23 @@ run_agent_auggie() {
         return 1
     fi
 
+    # Start progress monitor in background
+    start_progress_monitor "$log_file" &
+    PROGRESS_PID=$!
+
     # Use selected model if set (auggie may not support model selection)
+    # Note: removed --quiet to show more progress
     if [ -n "$SELECTED_MODEL" ] && [ "$SELECTED_MODEL" != "default" ]; then
-        auggie --print --quiet --model "$SELECTED_MODEL" "$prompt" > "$log_file" 2>&1
+        auggie --print --model "$SELECTED_MODEL" "$prompt" 2>&1 | tee "$log_file"
     else
-        auggie --print --quiet "$prompt" > "$log_file" 2>&1
+        auggie --print "$prompt" 2>&1 | tee "$log_file"
     fi
-    cat "$log_file"
+    local exit_code=${PIPESTATUS[0]}
+
+    # Stop progress monitor
+    stop_progress_monitor
+
+    return $exit_code
 }
 
 run_agent() {
