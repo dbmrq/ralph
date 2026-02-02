@@ -686,85 +686,50 @@ create_prompt_file() {
 
     local prompt_file="$ralph_dir/project_prompt.txt"
 
-    if [ "$project_type" = "ios" ]; then
-        cat > "$prompt_file" << EOF
-# Project-Specific Instructions for $project_name
+    cat > "$prompt_file" << 'EOF'
+# Project-Specific Instructions
+
+<!--
+  This file provides context about your project to AI agents.
+  Fill in each section to help agents understand your codebase.
+  The AI setup assistant will help populate this automatically.
+-->
 
 ## Project Overview
-This is an iOS application built with Swift and SwiftUI.
+<!-- Brief description of what this project does -->
+
 
 ## Architecture
-- **Pattern**: MVVM with Coordinators (adjust if different)
-- **UI Framework**: SwiftUI (adjust if using UIKit)
-- **Dependency Injection**: Use protocol-based DI
-- **Modular Structure**: Features are organized in Swift Packages under \`Packages/\`
+<!-- Describe the architecture pattern (MVC, MVVM, Clean Architecture, etc.) -->
+<!-- List key frameworks and libraries used -->
+
 
 ## Key Directories
-- \`Sources/\` - Main app source code
-- \`Packages/\` - Feature modules as Swift Packages
-- \`Tests/\` - Unit and UI tests
-- \`Resources/\` - Assets, localization files
+<!-- Map out the important directories and their purposes -->
+<!-- Example:
+- `src/` - Main source code
+- `tests/` - Test files
+- `docs/` - Documentation
+-->
+
 
 ## Coding Standards
-- Use Swift's native naming conventions (camelCase for variables, PascalCase for types)
-- Prefer \`struct\` over \`class\` unless reference semantics are needed
-- Use \`@MainActor\` for UI-related code
-- Mark classes as \`final\` unless inheritance is intended
-- Use \`async/await\` for asynchronous code
-- Avoid force unwrapping (\`!\`) - use \`guard let\` or \`if let\`
+<!-- Describe naming conventions, formatting rules, and style guidelines -->
+<!-- Reference any linter configs or style guides -->
 
-## SwiftUI Guidelines
-- Keep views small and composable
-- Extract reusable components to separate files
-- Use \`@StateObject\` for owned objects, \`@ObservedObject\` for passed objects
-- Prefer \`@Environment\` for dependency injection in views
 
 ## Testing Requirements
-- Write unit tests for ViewModels and business logic
-- Use mocks/stubs for network and database dependencies
-- Test edge cases and error handling
-- Aim for 80%+ code coverage on new code
+<!-- How to run tests, what should be tested, coverage expectations -->
+
 
 ## Things to Avoid
-- Do NOT modify \`.xcodeproj\` files directly if using XcodeGen
-- Do NOT commit \`.DS_Store\` or \`xcuserdata/\`
-- Avoid massive view controllers/views - break them up
-- Don't use singletons for testable code
+<!-- Files that shouldn't be modified, anti-patterns, known pitfalls -->
+
 
 ## Additional Documentation
-Check \`.ralph/docs/\` for additional project documentation.
+Check `.ralph/docs/` for additional project documentation.
+
 EOF
-    else
-        cat > "$prompt_file" << EOF
-# Project-Specific Instructions for $project_name
-
-## Project Overview
-This is a $project_type project. Add a description of your project here.
-
-## Key Directories
-- List important directories and their purposes
-- Explain the project structure
-
-## Coding Standards
-- Describe your coding conventions
-- Naming patterns, architecture guidelines
-- Code formatting preferences
-
-## Testing Requirements
-- How to run tests
-- What should be tested
-- Coverage expectations
-
-## Things to Avoid
-- Known pitfalls
-- Files that should not be modified
-- Anti-patterns specific to this project
-
-## Additional Documentation
-Check \`.ralph/docs/\` for additional project documentation.
-Add files there to provide more context for AI agents.
-EOF
-    fi
 }
 
 create_tasks_file() {
@@ -1063,31 +1028,111 @@ run_setup_wizard() {
     echo -e "     ${CYAN}.ralph/ralph_loop.sh .${NC}"
     echo ""
 
-    # Show agent status
-    if [ "$agent_type" = "cursor" ] && ! is_cursor_available; then
-        echo -e "${YELLOW}⚠ Action required:${NC} Install Cursor CLI to use the 'agent' command."
-        echo "  Visit: https://cursor.sh"
-        echo ""
-    elif [ "$agent_type" = "auggie" ] && ! is_auggie_available; then
-        echo -e "${YELLOW}⚠ Action required:${NC} Install Augment CLI to use the 'auggie' command."
-        echo "  Visit: https://augmentcode.com"
-        echo ""
-    elif [ "$agent_type" = "custom" ]; then
-        echo -e "${YELLOW}Note:${NC} Define run_agent_custom() in .ralph/config.sh"
-        echo ""
-    else
-        echo -e "${GREEN}✓ Agent '$agent_type' is ready to use!${NC}"
-        echo ""
+    # Check agent availability
+    local agent_available=false
+    if [ "$agent_type" = "cursor" ] && is_cursor_available; then
+        agent_available=true
+    elif [ "$agent_type" = "auggie" ] && is_auggie_available; then
+        agent_available=true
     fi
 
-    # Offer to run
+    if [ "$agent_available" = false ]; then
+        if [ "$agent_type" = "cursor" ]; then
+            echo -e "${YELLOW}⚠ Action required:${NC} Install Cursor CLI to use the 'agent' command."
+            echo "  Visit: https://cursor.sh"
+        elif [ "$agent_type" = "auggie" ]; then
+            echo -e "${YELLOW}⚠ Action required:${NC} Install Augment CLI to use the 'auggie' command."
+            echo "  Visit: https://augmentcode.com"
+        elif [ "$agent_type" = "custom" ]; then
+            echo -e "${YELLOW}Note:${NC} Define run_agent_custom() in .ralph/config.sh"
+        fi
+        echo ""
+        echo "Once your agent is set up, run the setup assistant manually:"
+        echo -e "  ${CYAN}cd $project_path${NC}"
+        echo -e "  ${CYAN}$agent_type \"$(cat "$ralph_dir/.setup_prompt.txt" 2>/dev/null || echo "Help me set up Ralph Loop")\"${NC}"
+        echo ""
+        echo "Happy automating! 🤖"
+        return
+    fi
+
+    echo -e "${GREEN}✓ Agent '$agent_type' is ready!${NC}"
     echo ""
-    if ask_yes_no "Start Ralph Loop now?" "n"; then
+
+    # Offer to run AI setup assistant
+    echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BOLD}AI Setup Assistant${NC}"
+    echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    echo "The AI agent can analyze your project and automatically fill in:"
+    echo "  • project_prompt.txt - Project-specific instructions"
+    echo "  • config.sh - Build and test commands"
+    echo ""
+    echo "It will also verify the setup is correct and show you how to run Ralph Loop."
+    echo ""
+
+    if ask_yes_no "Run AI setup assistant now?" "y"; then
         echo ""
-        print_step "Starting Ralph Loop..."
+        print_step "Starting AI setup assistant..."
         echo ""
+
         cd "$project_path"
-        exec "$ralph_dir/ralph_loop.sh" "."
+
+        # Create the setup prompt
+        local setup_prompt="You are helping set up Ralph Loop, an automated AI agent task runner.
+
+## Your Task
+
+Analyze this project and help configure Ralph Loop by:
+
+### 1. Fill in .ralph/project_prompt.txt
+Look at the codebase and fill in each section:
+- **Project Overview**: What does this project do?
+- **Architecture**: What patterns are used? (MVVM, MVC, Clean Architecture, etc.)
+- **Key Directories**: Map out the important folders and their purposes
+- **Coding Standards**: What conventions does this project follow?
+- **Testing Requirements**: How are tests structured and run?
+- **Things to Avoid**: Any files or patterns to stay away from?
+
+Be specific and accurate based on what you find in the code.
+
+### 2. Verify .ralph/config.sh
+Check that the build and test commands are correct for this project.
+Fix them if needed.
+
+### 3. Do NOT modify .ralph/TASKS.md
+Leave the task list for the user to fill in themselves.
+
+### 4. Final Instructions
+After completing the setup, tell the user:
+- What you configured
+- How to add tasks to .ralph/TASKS.md
+- How to run Ralph Loop: .ralph/ralph_loop.sh .
+
+Output DONE when finished."
+
+        # Run the agent
+        if [ "$agent_type" = "cursor" ]; then
+            agent "$setup_prompt"
+        elif [ "$agent_type" = "auggie" ]; then
+            auggie "$setup_prompt"
+        fi
+
+        echo ""
+        echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "${GREEN}Setup complete! 🎉${NC}"
+        echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    else
+        echo ""
+        echo "You can run the setup assistant later with:"
+        echo -e "  ${CYAN}cd $project_path${NC}"
+        if [ "$agent_type" = "cursor" ]; then
+            echo -e "  ${CYAN}agent \"Help me set up Ralph Loop by filling in .ralph/project_prompt.txt\"${NC}"
+        else
+            echo -e "  ${CYAN}auggie \"Help me set up Ralph Loop by filling in .ralph/project_prompt.txt\"${NC}"
+        fi
+        echo ""
+        echo "Or start Ralph Loop directly:"
+        echo -e "  ${CYAN}.ralph/ralph_loop.sh .${NC}"
     fi
 
     echo ""
