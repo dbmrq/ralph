@@ -49,10 +49,19 @@ COMMIT_SCOPE=""
 BUILD_GATE_ENABLED=true
 BUILD_FIX_ATTEMPTS=1
 
+# Test verification settings
+TEST_GATE_ENABLED=true
+TEST_FIX_ATTEMPTS=1
+
 # Test run mode settings
 # When enabled, runs first N tasks then pauses for user verification
 TEST_RUN_ENABLED=true
 TEST_RUN_TASKS=2
+
+# Review mode settings
+# When enabled, runs a review agent after every N tasks to check quality
+REVIEW_MODE_ENABLED=false
+REVIEW_EVERY_N_TASKS=3
 
 #==============================================================================
 # ARGUMENT PARSING
@@ -422,6 +431,199 @@ verify_build() {
 }
 
 #==============================================================================
+# TEST VERIFICATION
+#==============================================================================
+
+# Test gate settings (can be overridden in config.sh)
+TEST_GATE_ENABLED="${TEST_GATE_ENABLED:-true}"
+TEST_FIX_ATTEMPTS="${TEST_FIX_ATTEMPTS:-1}"
+
+verify_tests() {
+    if [ "$TEST_GATE_ENABLED" != "true" ]; then
+        return 0
+    fi
+
+    # Check if test command is defined
+    if ! type project_test &> /dev/null; then
+        log "${YELLOW}⚠ No test command defined - skipping test verification${NC}"
+        log "${YELLOW}  Define project_test() in config.sh to enable test gates${NC}"
+        return 0
+    fi
+
+    log "${CYAN}🧪 Running tests...${NC}"
+
+    cd "$PROJECT_DIR"
+    set +e
+    run_tests 2>&1 | tee -a "$MASTER_LOG"
+    local test_result=${PIPESTATUS[0]}
+    set -e
+    cd - > /dev/null
+
+    if [ $test_result -ne 0 ]; then
+        log "${RED}❌ Tests failed${NC}"
+        return 1
+    fi
+
+    log "${GREEN}✓ All tests passed${NC}"
+    return 0
+}
+
+TEST_FIX_PROMPT="CRITICAL: Tests are failing and must be fixed before continuing.
+
+Your ONLY task right now is to fix the failing tests. Do not work on any tasks from the task list.
+
+Steps:
+1. Run the test suite to see which tests are failing
+2. Analyze the test failures - understand what's expected vs actual
+3. Determine if the test is wrong or the implementation is wrong
+4. Fix the issue (either the test or the implementation)
+5. Run tests again to verify they pass
+6. If you fix implementation code, make sure the build still passes
+
+When all tests pass, output: FIXED
+If you cannot fix the tests, output: ERROR: <description of the problem>
+
+Do NOT output NEXT or DONE - only FIXED or ERROR."
+
+attempt_test_fix() {
+    local fix_log="$LOG_DIR/test_fix_${RUN_ID}_$(date +%H%M%S).log"
+
+    log "${YELLOW}🔧 Attempting to fix failing tests...${NC}"
+    log "   Log: $fix_log"
+
+    if run_agent "$fix_log" "$TEST_FIX_PROMPT"; then
+        local output=$(cat "$fix_log")
+
+        if echo "$output" | grep -q "^FIXED$\|FIXED$"; then
+            log "${GREEN}✓ Test fix reported success${NC}"
+
+            # Verify the fix actually worked
+            if verify_tests; then
+                # Also verify build still passes
+                if verify_build; then
+                    # Commit the fix
+                    if [ "$AUTO_COMMIT" = "true" ]; then
+                        commit_changes "TEST-FIX" "Fix failing tests"
+                    fi
+                    return 0
+                else
+                    log "${RED}❌ Build broken after test fix${NC}"
+                    return 1
+                fi
+            else
+                log "${RED}❌ Tests still failing after fix attempt${NC}"
+                return 1
+            fi
+        elif echo "$output" | grep -q "^ERROR:\|ERROR:"; then
+            local error_msg=$(echo "$output" | grep "ERROR:" | head -1)
+            log "${RED}❌ Test fix failed: $error_msg${NC}"
+            return 1
+        else
+            log "${YELLOW}⚠ No status marker from test fix attempt${NC}"
+            # Check if tests pass anyway
+            if verify_tests; then
+                return 0
+            fi
+            return 1
+        fi
+    else
+        log "${RED}❌ Test fix agent failed${NC}"
+        return 1
+    fi
+}
+
+#==============================================================================
+# REVIEW MODE
+#==============================================================================
+
+REVIEW_PROMPT="You are a code reviewer. Your job is to review recent changes and ensure quality.
+
+## Your Task
+
+Review the last few commits and check for:
+
+### 1. Code Quality
+- Is the code clean and readable?
+- Are there any TODO comments that should be resolved?
+- Is there dead code, unused imports, or commented-out code?
+- Is error handling appropriate?
+
+### 2. Consistency
+- Do the changes follow existing patterns in the codebase?
+- Is naming consistent with the rest of the project?
+- Does the code style match the project conventions?
+
+### 3. Completeness
+- Are there any incomplete implementations?
+- Are edge cases handled?
+- Is there appropriate test coverage?
+
+### 4. Documentation
+- Are public APIs documented?
+- Are complex algorithms explained?
+
+## What to Do
+
+1. Run: git log --oneline -5 to see recent commits
+2. Run: git diff HEAD~3 to see recent changes (adjust number as needed)
+3. Review the changes against the criteria above
+4. Fix any issues you find
+5. Run build and tests to verify your fixes
+
+## Output
+
+When review is complete:
+- If you made fixes: output FIXED
+- If no issues found: output CLEAN
+- If you found issues you cannot fix: output ERROR: <description>
+
+Do NOT output NEXT or DONE."
+
+run_review() {
+    if [ "$REVIEW_MODE_ENABLED" != "true" ]; then
+        return 0
+    fi
+
+    local review_log="$LOG_DIR/review_${RUN_ID}_$(date +%H%M%S).log"
+
+    log "${CYAN}🔍 Running code review...${NC}"
+    log "   Log: $review_log"
+
+    if run_agent "$review_log" "$REVIEW_PROMPT"; then
+        local output=$(cat "$review_log")
+
+        if echo "$output" | grep -q "^FIXED$\|FIXED$"; then
+            log "${GREEN}✓ Review found and fixed issues${NC}"
+
+            # Verify build and tests still pass
+            if verify_build && verify_tests; then
+                if [ "$AUTO_COMMIT" = "true" ]; then
+                    commit_changes "REVIEW" "Code review cleanup"
+                fi
+                return 0
+            else
+                log "${RED}❌ Build or tests broken after review fixes${NC}"
+                return 1
+            fi
+        elif echo "$output" | grep -q "^CLEAN$\|CLEAN$"; then
+            log "${GREEN}✓ Review passed - no issues found${NC}"
+            return 0
+        elif echo "$output" | grep -q "^ERROR:\|ERROR:"; then
+            local error_msg=$(echo "$output" | grep "ERROR:" | head -1)
+            log "${YELLOW}⚠ Review found issues: $error_msg${NC}"
+            # Don't fail the run, just log the warning
+            return 0
+        else
+            log "${YELLOW}⚠ No status marker from review${NC}"
+            return 0
+        fi
+    else
+        log "${YELLOW}⚠ Review agent failed - continuing anyway${NC}"
+        return 0
+    fi
+}
+
+#==============================================================================
 # BUILD FIX MODE
 #==============================================================================
 
@@ -565,6 +767,21 @@ main() {
         log ""
     fi
 
+    # Initial test check
+    if [ "$TEST_GATE_ENABLED" = "true" ]; then
+        log "${CYAN}Checking initial test state...${NC}"
+        if ! verify_tests; then
+            log "${YELLOW}Tests are failing - attempting fix before starting...${NC}"
+            if ! attempt_test_fix; then
+                log "${RED}═══════════════════════════════════════════════════════════════${NC}"
+                log "${RED}STOPPING: Could not fix initial test failures${NC}"
+                log "${RED}═══════════════════════════════════════════════════════════════${NC}"
+                exit 1
+            fi
+        fi
+        log ""
+    fi
+
     INITIAL_REMAINING=$(count_remaining)
     INITIAL_COMPLETED=$(count_completed)
     log "Initial state: ${INITIAL_COMPLETED} completed, ${INITIAL_REMAINING} remaining"
@@ -666,9 +883,31 @@ main() {
                     fi
                 fi
 
+                # Verify tests after task completion
+                if [ "$TEST_GATE_ENABLED" = "true" ]; then
+                    if ! verify_tests; then
+                        log "${YELLOW}Tests failing after task - attempting fix...${NC}"
+                        if ! attempt_test_fix; then
+                            log "${RED}═══════════════════════════════════════════════════════════════${NC}"
+                            log "${RED}STOPPING: Tests failing and could not be fixed${NC}"
+                            log "${RED}═══════════════════════════════════════════════════════════════${NC}"
+                            exit 1
+                        fi
+                    fi
+                fi
+
                 # Commit changes
                 if [ -n "$TASK_ID" ] && [ "$AUTO_COMMIT" = "true" ]; then
                     commit_changes "$TASK_ID" "$TASK_DESC"
+                fi
+
+                # Periodic review (every N tasks)
+                if [ "$REVIEW_MODE_ENABLED" = "true" ]; then
+                    if [ $((tasks_completed_this_run % REVIEW_EVERY_N_TASKS)) -eq 0 ]; then
+                        log ""
+                        log "${CYAN}Running periodic code review (every $REVIEW_EVERY_N_TASKS tasks)...${NC}"
+                        run_review
+                    fi
                 fi
 
             elif echo "$OUTPUT" | grep -q "^DONE$\|DONE$"; then
@@ -683,9 +922,21 @@ main() {
                     verify_build
                 fi
 
+                # Final test check
+                if [ "$TEST_GATE_ENABLED" = "true" ]; then
+                    verify_tests
+                fi
+
                 # Commit final changes
                 if [ -n "$TASK_ID" ] && [ "$AUTO_COMMIT" = "true" ]; then
                     commit_changes "$TASK_ID" "$TASK_DESC"
+                fi
+
+                # Final review
+                if [ "$REVIEW_MODE_ENABLED" = "true" ]; then
+                    log ""
+                    log "${CYAN}Running final code review...${NC}"
+                    run_review
                 fi
 
                 break

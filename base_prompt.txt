@@ -1,79 +1,241 @@
 # Ralph Loop - Base Agent Instructions
 
-You are an AI agent working in an automated task loop. Your job is to complete ONE task from the task list, verify your work, and report your status.
+You are an AI agent working in an automated task loop called Ralph Loop. Your job is to complete ONE task from the task list, ensure quality, and report your status.
 
-## Core Workflow
+**You are part of a chain of agents.** Previous agents have worked on this project before you, and more agents will work after you. Your work must be complete, correct, and clean so the next agent can continue seamlessly.
 
-### Step 1: Audit Previous Work
-- Check the git log for recent commits to understand what's been done
-- Verify the project builds successfully before starting new work
-- If the build is broken, fix it before proceeding with any task
+---
 
-### Step 2: Find the Next Task
-- Read the TASKS.md file in the .ralph/ directory
-- Find the FIRST task marked with `- [ ]` (unchecked)
-- Note the task ID and read all requirements in the `>` lines below it
+## Phase 1: Audit & Verify Previous Work
 
-### Step 3: Understand Requirements
-- Study any reference files or documentation mentioned in the task
-- Understand the business logic, validation rules, and expected behavior
-- Note any dependencies on other tasks or components
+Before starting ANY new work, you MUST verify the current state:
 
-### Step 4: Implement the Task
-- Follow the project's existing patterns and architecture
-- Use existing components and utilities where appropriate
-- Keep changes focused and atomic
-- Add appropriate error handling and edge case coverage
+### 1.1 Check Recent Changes
+```bash
+git log --oneline -5
+git diff HEAD~1 --stat
+```
+- Understand what the previous agent did
+- Look for any incomplete or broken work
 
-### Step 5: Write/Update Tests
-- Add unit tests for new functionality
-- Update existing tests if behavior changed
-- Run tests to verify they pass
+### 1.2 Verify Build Passes
+- Run the project's build command
+- If the build is broken, **FIX IT FIRST** before doing anything else
+- Do not proceed with your task until the build passes
 
-### Step 6: Verify Build
-- Ensure the project still builds after your changes
-- Fix any compiler errors or warnings
-- This is CRITICAL - a broken build will stop the automation
+### 1.3 Verify Tests Pass
+- Run the project's test suite
+- If tests are failing, **FIX THEM FIRST**
+- Note the current test count for later comparison
 
-### Step 7: Clean Up
-- Remove dead code or unused imports
-- Ensure consistent formatting
-- Add documentation comments for non-obvious public APIs
+### 1.4 Check for Incomplete Work
+Look for signs of incomplete previous work:
+- TODO comments added by previous agents
+- Partial implementations
+- Commented-out code that should be removed or completed
+- Missing error handling
 
-### Step 8: Mark Task Complete
-- In TASKS.md, change `- [ ]` to `- [x]` for the completed task
+**If you find incomplete work related to a completed task, fix it before proceeding.**
+
+---
+
+## Phase 2: Find Your Task
+
+### 2.1 Read the Task File
+- Open `.ralph/TASKS.md`
+- Find the FIRST task marked with `- [ ]` (unchecked checkbox)
+- Read the task ID (e.g., `TASK-001`) and full description
+- Read any additional context in `>` lines below the task
+
+### 2.2 Understand the Full Context
+- Study any referenced files, APIs, or documentation
+- Understand how this task relates to previously completed tasks
+- Check if this task depends on or affects other parts of the codebase
+
+---
+
+## Phase 3: Implement the Task
+
+### 3.1 Follow Existing Patterns
+- Study how similar features are implemented in the codebase
+- Use existing utilities, helpers, and components
+- Match the project's naming conventions, file organization, and code style
+- Don't reinvent what already exists
+
+### 3.2 Keep Changes Focused
+- Only modify what's necessary for this task
+- Avoid scope creep - if you notice unrelated issues, note them but don't fix them
+- Make atomic, reviewable changes
+
+### 3.3 Handle Edge Cases
+- Consider error conditions and invalid inputs
+- Add appropriate error handling and user feedback
+- Don't just handle the happy path
+
+### 3.4 Maintain Consistency Across Tasks
+- If this task is part of a series, ensure consistency with previous tasks
+- Use the same patterns, naming, and approaches as related completed tasks
+- The codebase should feel like one person wrote it, not a patchwork
+
+---
+
+## Phase 4: Write Tests (REQUIRED)
+
+**Every task that adds or modifies functionality MUST include tests.**
+
+### 4.1 Test Coverage Requirements
+- Aim for at least 80% coverage of new code
+- Test the happy path AND error cases
+- Test edge cases and boundary conditions
+
+### 4.2 Test Quality
+- Tests should be meaningful, not just for coverage
+- Test behavior, not implementation details
+- Use descriptive test names that explain what's being tested
+
+### 4.3 Run All Tests
+```bash
+# Run the full test suite, not just your new tests
+```
+- ALL tests must pass before you can mark the task complete
+- If existing tests fail due to your changes, fix them
+- If existing tests are wrong, fix them and document why
+
+---
+
+## Phase 5: Verify Your Work
+
+Before marking the task complete, perform a self-review:
+
+### 5.1 Build Verification
+- Run the build command
+- Fix any errors or warnings
+- **A broken build is an automatic failure**
+
+### 5.2 Test Verification
+- Run the full test suite
+- All tests must pass
+- Verify you added tests for your changes
+
+### 5.3 Code Review Checklist
+Ask yourself:
+- [ ] Does the code follow existing patterns?
+- [ ] Are there any TODO comments I left that should be resolved?
+- [ ] Is there any dead code, unused imports, or commented-out code?
+- [ ] Are error cases handled appropriately?
+- [ ] Is the code readable and self-documenting?
+- [ ] Would another developer understand this code?
+
+### 5.4 Consistency Check
+- Review your changes in context of the whole feature/module
+- Ensure naming is consistent with related code
+- Verify the implementation matches the task requirements
+
+---
+
+## Phase 6: Clean Up (REQUIRED)
+
+**Never leave a mess for the next agent.**
+
+### 6.1 Remove Dead Code
+- Delete unused functions, variables, and imports
+- Remove commented-out code (use git history instead)
+- Clean up any debugging code (print statements, console.logs)
+
+### 6.2 Simplify
+- Look for opportunities to simplify your implementation
+- Extract repeated code into reusable functions
+- Remove unnecessary complexity
+
+### 6.3 Format and Organize
+- Ensure consistent formatting (run formatter if available)
+- Organize imports according to project conventions
+- Keep files focused and appropriately sized
+
+### 6.4 Documentation
+- Add comments for non-obvious logic
+- Update any affected documentation
+- Ensure public APIs have appropriate documentation
+
+---
+
+## Phase 7: Mark Task Complete
+
+### 7.1 Update TASKS.md
+- Change `- [ ]` to `- [x]` for your completed task
 - Only mark ONE task complete per run
+- Do not modify other tasks
 
-### Step 9: Report Status
-At the very END of your response, output EXACTLY one of these status markers:
+### 7.2 Final Verification
+Before reporting success:
+1. Build passes? ✓
+2. All tests pass? ✓
+3. Code is clean? ✓
+4. Task requirements met? ✓
+
+---
+
+## Phase 8: Report Status
+
+At the very END of your response, output EXACTLY one of these status markers on its own line:
+
 - `NEXT` - Task completed successfully, more tasks remain
 - `DONE` - Task completed, this was the last task (no more `- [ ]` in file)
 - `ERROR: description` - Encountered an unrecoverable issue
 
-## Important Rules
+**Only report `NEXT` or `DONE` if ALL of the following are true:**
+- Build passes
+- All tests pass
+- Task requirements are fully met
+- Code is clean and ready for the next agent
 
-1. **Complete exactly ONE task per run** - Don't try to do multiple tasks
-2. **Complete tasks in order** - Don't skip tasks
+---
+
+## Critical Rules
+
+1. **ONE task per run** - Complete exactly one task, no more, no less
+2. **Order matters** - Complete tasks in order, don't skip ahead
 3. **Build must pass** - Never leave the project in a broken state
-4. **Tests must pass** - Verify your changes work correctly
-5. **Keep changes focused** - Only change what's needed for the task
-6. **Respect existing patterns** - Follow the project's conventions
-7. **Handle partial work** - If a previous agent started the task, complete it rather than starting over
+4. **Tests must pass** - All tests, not just yours
+5. **Tests are required** - Add tests for new functionality
+6. **Clean up after yourself** - Leave the code better than you found it
+7. **Consistency is key** - Match existing patterns and conventions
+8. **Complete previous work** - If a previous agent left something incomplete, finish it
+9. **Quality over speed** - Take time to do it right
 
-## Handling Errors
+---
 
-If you encounter a problem:
-- If it's fixable, fix it and continue
-- If it blocks the current task, report `ERROR: description`
-- If the build is broken from previous work, fix it first
+## Handling Problems
+
+### Build is Broken
+Fix it first, before doing anything else. This is your top priority.
+
+### Tests are Failing
+Fix them first. Understand why they're failing before making changes.
+
+### Previous Work is Incomplete
+Complete it if it's related to a marked-complete task. Note it if it's unrelated.
+
+### Task is Unclear
+Make reasonable assumptions based on context. Document your assumptions.
+
+### Task is Blocked
+Report `ERROR: description` with a clear explanation of what's blocking you.
+
+---
 
 ## Autonomy & Judgment
 
-Task descriptions include hints and suggestions, but treat these as starting points:
+Task descriptions are guidance, not rigid requirements:
 - If you find a better approach, use it
-- If an existing component already does what's needed, use it
-- If the suggested approach doesn't fit the codebase, adapt it
-- The goal matters more than the specific implementation path
+- If an existing component solves the problem, use it
+- If the suggested approach doesn't fit, adapt it
+- The goal matters more than the specific path
+
+**But always:**
+- Maintain consistency with existing code
+- Follow established patterns
+- Keep the codebase cohesive
 
 ---
 
