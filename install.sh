@@ -1,21 +1,24 @@
 #!/bin/bash
 #
-# Ralph Loop - Universal Entry Point
+# Ralph Loop - Universal Installer
 #
-# This is THE single entry point for Ralph Loop. Run this script to:
-#   - Install prerequisites (Homebrew, GitHub CLI)
-#   - Clone or update ralph-loop
-#   - Configure a project
-#   - Add tasks and custom instructions
+# Installs Ralph Loop directly into your project's .ralph/ directory.
+# The AI agent can see these files and understand the automation context.
 #
-# One-liner install (requires gh CLI already installed):
+# One-liner install (run from your project directory):
 #   bash <(gh api repos/W508153_wexinc/ralph-loop/contents/install.sh --jq '.content' | base64 -d)
 #
-# Or if you have ralph-loop cloned, just run:
-#   ./install.sh
+# What it does:
+#   1. Detects if you're in a git repository
+#   2. Downloads Ralph Loop files into .ralph/
+#   3. Configures the project (type, agent, build commands)
+#   4. Offers to run Ralph Loop when ready
 #
 
 set -e
+
+# Version
+RALPH_VERSION="2.0.0"
 
 # Colors
 RED='\033[0;31m'
@@ -27,8 +30,13 @@ MAGENTA='\033[0;35m'
 BOLD='\033[1m'
 NC='\033[0m'
 
-REPO_URL="https://github.com/W508153_wexinc/ralph-loop.git"
+# GitHub repo for downloading files
 REPO_NAME="W508153_wexinc/ralph-loop"
+
+# Default values
+DEFAULT_BRANCH="feature/ralph-automation"
+DEFAULT_AGENT="cursor"
+DEFAULT_MAX_ITERATIONS=50
 
 #==============================================================================
 # UTILITY FUNCTIONS
@@ -113,6 +121,86 @@ ask_yes_no() {
     fi
 
     [ "$result" = "y" ] || [ "$result" = "yes" ]
+}
+
+ask_choice() {
+    local prompt="$1"
+    shift
+    local options=("$@")
+    local i=1
+
+    echo "" >&2
+    echo "$prompt" >&2
+    for opt in "${options[@]}"; do
+        echo "  $i) $opt" >&2
+        ((i++))
+    done
+    echo "" >&2
+
+    local choice
+    echo -en "${BOLD}Select [1]: ${NC}" >&2
+    read choice </dev/tty
+
+    if [ -z "$choice" ]; then
+        choice=1
+    fi
+
+    # Return the selected option
+    echo "${options[$((choice-1))]}"
+}
+
+#==============================================================================
+# AGENT DETECTION
+#==============================================================================
+
+is_cursor_available() {
+    command -v agent &> /dev/null
+}
+
+is_auggie_available() {
+    command -v auggie &> /dev/null
+}
+
+detect_or_select_agent() {
+    local cursor_installed=false
+    local auggie_installed=false
+
+    if is_cursor_available; then
+        cursor_installed=true
+    fi
+
+    if is_auggie_available; then
+        auggie_installed=true
+    fi
+
+    # If only one is available, auto-select it
+    if [ "$cursor_installed" = true ] && [ "$auggie_installed" = false ]; then
+        echo -e "Auto-detected: ${BOLD}Cursor${NC} (agent CLI found)" >&2
+        echo "cursor"
+        return
+    fi
+
+    if [ "$auggie_installed" = true ] && [ "$cursor_installed" = false ]; then
+        echo -e "Auto-detected: ${BOLD}Augment${NC} (auggie CLI found)" >&2
+        echo "auggie"
+        return
+    fi
+
+    # If both are available, let user choose between them
+    if [ "$cursor_installed" = true ] && [ "$auggie_installed" = true ]; then
+        echo "Both Cursor and Augment are installed." >&2
+        local choice=$(ask_choice "Which AI agent do you want to use?" "cursor" "auggie")
+        echo "$choice"
+        return
+    fi
+
+    # Neither is installed - let user choose anyway (they can install later)
+    print_warning "No AI agent CLI detected." >&2
+    echo "You can still set up Ralph Loop - just install the agent before running." >&2
+    echo "" >&2
+
+    local choice=$(ask_choice "Which AI agent will you use?" "cursor" "auggie" "custom")
+    echo "$choice"
 }
 
 #==============================================================================
@@ -249,112 +337,89 @@ check_and_install_prerequisites() {
 
 
 #==============================================================================
-# DETECT CONTEXT
+# FILE DOWNLOAD FUNCTIONS
 #==============================================================================
 
-detect_ralph_loop_location() {
-    # Check if we're running from within a ralph-loop repo
-    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+download_file() {
+    local file_path="$1"
+    local dest_path="$2"
 
-    # If BASH_SOURCE is empty (piped from curl/gh), we're running remotely
-    if [ -z "$script_dir" ] || [ "$script_dir" = "." ]; then
-        echo ""
-        return
+    # Download file content from GitHub API
+    gh api "repos/$REPO_NAME/contents/$file_path" --jq '.content' 2>/dev/null | base64 -d > "$dest_path" 2>/dev/null
+
+    if [ $? -eq 0 ] && [ -s "$dest_path" ]; then
+        return 0
+    else
+        return 1
     fi
-
-    # Check if this directory is the ralph-loop repo
-    if [ -f "$script_dir/ralph_loop.sh" ] && [ -f "$script_dir/setup.sh" ]; then
-        echo "$script_dir"
-        return
-    fi
-
-    echo ""
 }
 
-#==============================================================================
-# INSTALLATION / UPDATE
-#==============================================================================
-
-install_or_update_ralph_loop() {
+download_ralph_files() {
     local ralph_dir="$1"
 
-    if [ -n "$ralph_dir" ]; then
-        # Already have ralph-loop, offer to update
-        print_success "Ralph Loop is installed at: $ralph_dir" >&2
-        echo "" >&2
-        if ask_yes_no "Check for updates?" "y"; then
-            print_step "Updating ralph-loop..." >&2
-            cd "$ralph_dir"
-            git pull origin main >/dev/null 2>&1 || git pull origin master >/dev/null 2>&1 || true
-            print_success "Updated to latest version!" >&2
-        fi
-        echo "$ralph_dir"
-        return
-    fi
+    print_step "Downloading Ralph Loop files..."
+    echo ""
 
-    # Need to clone ralph-loop
-    print_subheader "Installing Ralph Loop" >&2
+    # Create directory structure
+    mkdir -p "$ralph_dir"
+    mkdir -p "$ralph_dir/logs"
 
-    echo "Where should ralph-loop be installed?" >&2
-    echo "" >&2
-    echo "Enter a parent directory - ralph-loop will be created inside it." >&2
-    echo "For example, if you enter ~/Code, it will install to ~/Code/ralph-loop" >&2
-    echo "" >&2
+    # Download core files
+    local files=(
+        "ralph_loop.sh"
+        "base_prompt.txt"
+        "validate.sh"
+    )
 
-    # Suggest a default based on current directory
-    local current_dir=$(pwd)
-    local parent_dir=$(dirname "$current_dir")
-    local default_install="$parent_dir"
-
-    local install_parent=$(ask "Parent directory" "$default_install")
-
-    # Expand ~ if present
-    install_parent="${install_parent/#\~/$HOME}"
-
-    # Convert to absolute path
-    if [[ ! "$install_parent" = /* ]]; then
-        if [ -d "$install_parent" ]; then
-            install_parent="$(cd "$install_parent" && pwd)"
+    for file in "${files[@]}"; do
+        if download_file "$file" "$ralph_dir/$file"; then
+            print_success "Downloaded $file"
         else
-            mkdir -p "$install_parent"
-            install_parent="$(cd "$install_parent" && pwd)"
+            print_error "Failed to download $file"
+            return 1
         fi
-    fi
-
-    # The actual install path is parent/ralph-loop
-    local install_path="$install_parent/ralph-loop"
-
-    # Check if ralph-loop directory already exists
-    if [ -d "$install_path" ]; then
-        if [ -f "$install_path/ralph_loop.sh" ]; then
-            print_success "ralph-loop already installed at $install_path" >&2
-            cd "$install_path"
-            if ask_yes_no "Update to latest version?" "y"; then
-                git pull origin main >/dev/null 2>&1 || git pull origin master >/dev/null 2>&1 || true
-            fi
-            echo "$install_path"
-            return
-        else
-            print_error "Directory $install_path exists but is not a ralph-loop installation." >&2
-            echo "Please remove it or choose a different parent directory." >&2
-            exit 1
-        fi
-    fi
-
-    # Clone the repository
-    print_step "Cloning ralph-loop to $install_path..." >&2
-    echo "" >&2
-
-    mkdir -p "$install_parent"
-    git clone "$REPO_URL" "$install_path" >&2
+    done
 
     # Make scripts executable
-    chmod +x "$install_path/ralph_loop.sh"
-    chmod +x "$install_path/setup.sh"
-    chmod +x "$install_path/install.sh"
+    chmod +x "$ralph_dir/ralph_loop.sh" 2>/dev/null
+    chmod +x "$ralph_dir/validate.sh" 2>/dev/null
 
-    print_success "Installed to $install_path" >&2
-    echo "$install_path"
+    echo ""
+    return 0
+}
+
+download_template_files() {
+    local ralph_dir="$1"
+    local platform_type="$2"
+
+    # Map to template directory
+    local template_dir="templates/$platform_type"
+
+    # Create templates directory
+    mkdir -p "$ralph_dir/templates/$platform_type"
+
+    # Get list of files in template directory
+    local template_files=$(gh api "repos/$REPO_NAME/contents/$template_dir" --jq '.[].name' 2>/dev/null)
+
+    if [ -n "$template_files" ]; then
+        while IFS= read -r file; do
+            if download_file "$template_dir/$file" "$ralph_dir/templates/$platform_type/$file"; then
+                print_success "Downloaded templates/$platform_type/$file"
+            fi
+        done <<< "$template_files"
+    fi
+
+    # Also download generic templates as fallback
+    if [ "$platform_type" != "generic" ]; then
+        mkdir -p "$ralph_dir/templates/generic"
+        local generic_files=$(gh api "repos/$REPO_NAME/contents/templates/generic" --jq '.[].name' 2>/dev/null)
+
+        if [ -n "$generic_files" ]; then
+            while IFS= read -r file; do
+                download_file "templates/generic/$file" "$ralph_dir/templates/generic/$file" 2>/dev/null
+            done <<< "$generic_files"
+        fi
+    fi
 }
 
 #==============================================================================
@@ -393,547 +458,523 @@ detect_project_type() {
     fi
 }
 
-setup_project() {
-    local ralph_dir="$1"
+#==============================================================================
+# XCODE HELPERS
+#==============================================================================
 
-    print_subheader "Project Setup"
+detect_xcode_schemes() {
+    local project_dir="$1"
+    local xcodeproj xcworkspace
 
-    echo "Which project do you want to set up with Ralph Loop?"
-    echo ""
-    echo "Enter the path to your project directory:"
-    echo ""
+    # Prefer workspace over project
+    xcworkspace=$(find "$project_dir" -maxdepth 2 -name "*.xcworkspace" -type d 2>/dev/null | grep -v ".xcodeproj" | head -1)
+    xcodeproj=$(find "$project_dir" -maxdepth 2 -name "*.xcodeproj" -type d 2>/dev/null | head -1)
 
-    local default_project=$(pwd)
-    # Don't suggest ralph-loop itself as the project
-    if [ "$default_project" = "$ralph_dir" ]; then
-        default_project=$(dirname "$ralph_dir")
+    if [ -n "$xcworkspace" ]; then
+        xcodebuild -workspace "$xcworkspace" -list 2>/dev/null | grep -A 100 "Schemes:" | tail -n +2 | grep -v "^$" | sed 's/^[[:space:]]*//' | grep -v "^$"
+    elif [ -n "$xcodeproj" ]; then
+        xcodebuild -project "$xcodeproj" -list 2>/dev/null | grep -A 100 "Schemes:" | tail -n +2 | grep -v "^$" | sed 's/^[[:space:]]*//' | grep -v "^$"
+    fi
+}
+
+detect_xcode_project_dir() {
+    local project_dir="$1"
+    local xcodeproj xcworkspace project_yml
+
+    # Check for XcodeGen first
+    project_yml=$(find "$project_dir" -maxdepth 2 -name "project.yml" 2>/dev/null | head -1)
+    if [ -n "$project_yml" ]; then
+        dirname "$project_yml" | sed "s|^$project_dir/||" | sed "s|^$project_dir$|.|"
+        return
     fi
 
-    local project_path=$(ask "Project path" "$default_project")
-
-    # Expand ~ if present
-    project_path="${project_path/#\~/$HOME}"
-
-    # Convert to absolute path
-    if [[ ! "$project_path" = /* ]]; then
-        project_path="$(cd "$project_path" 2>/dev/null && pwd)"
+    # Check for workspace
+    xcworkspace=$(find "$project_dir" -maxdepth 2 -name "*.xcworkspace" -type d 2>/dev/null | grep -v ".xcodeproj" | head -1)
+    if [ -n "$xcworkspace" ]; then
+        dirname "$xcworkspace" | sed "s|^$project_dir/||" | sed "s|^$project_dir$|.|"
+        return
     fi
 
-    if [ ! -d "$project_path" ]; then
-        print_error "Directory does not exist: $project_path"
-        exit 1
+    # Check for project
+    xcodeproj=$(find "$project_dir" -maxdepth 2 -name "*.xcodeproj" -type d 2>/dev/null | head -1)
+    if [ -n "$xcodeproj" ]; then
+        dirname "$xcodeproj" | sed "s|^$project_dir/||" | sed "s|^$project_dir$|.|"
+        return
     fi
 
-    # Check if it's a git repository
-    if [ ! -d "$project_path/.git" ]; then
-        print_warning "This directory is not a git repository."
-        if ask_yes_no "Initialize git?" "y"; then
-            cd "$project_path"
-            git init
-            print_success "Git repository initialized"
-        else
-            print_error "Ralph Loop requires a git repository."
-            exit 1
-        fi
-    fi
-
-    # Detect project type
-    local project_type=$(detect_project_type "$project_path")
-    print_info "Detected project type: $project_type"
-    echo ""
-
-    # Check if .ralph already exists
-    if [ -d "$project_path/.ralph" ]; then
-        print_warning "This project already has a .ralph configuration."
-        if ask_yes_no "Reconfigure?" "n"; then
-            rm -rf "$project_path/.ralph"
-        else
-            echo "$project_path"
-            return
-        fi
-    fi
-
-    # Run the full setup wizard
-    export RALPH_PROJECT_PATH="$project_path"
-    export RALPH_PROJECT_TYPE="$project_type"
-    exec "$ralph_dir/setup.sh"
+    echo "."
 }
 
 
 
 #==============================================================================
-# MAIN MENU
+# CONFIG FILE GENERATION
 #==============================================================================
 
-show_menu() {
+create_config_file() {
     local ralph_dir="$1"
+    local project_name="$2"
+    local project_type="$3"
+    local agent_type="$4"
+    local xcode_scheme="$5"
+    local xcode_project_dir="$6"
+    local build_command="$7"
+    local test_command="$8"
+    local commit_scope="$9"
 
-    print_subheader "What would you like to do?"
+    local config_file="$ralph_dir/config.sh"
 
-    echo "  1) Set up a new project"
-    echo "  2) Add/edit tasks for an existing project"
-    echo "  3) Edit instructions (3-level system)"
-    echo "  4) Run Ralph Loop on a project"
-    echo "  5) Update ralph-loop to latest version"
-    echo "  6) Exit"
-    echo ""
-
-    local choice=$(ask "Choose an option" "1")
-
-    case "$choice" in
-        1)
-            setup_project "$ralph_dir"
-            ;;
-        2)
-            edit_tasks "$ralph_dir"
-            ;;
-        3)
-            edit_instructions "$ralph_dir"
-            ;;
-        4)
-            run_ralph_loop "$ralph_dir"
-            ;;
-        5)
-            print_step "Updating ralph-loop..."
-            cd "$ralph_dir"
-            git pull origin main 2>/dev/null || git pull origin master 2>/dev/null || true
-            print_success "Updated!"
-            show_menu "$ralph_dir"
-            ;;
-        6)
-            echo ""
-            print_success "Goodbye!"
-            exit 0
-            ;;
-        *)
-            print_error "Invalid choice"
-            show_menu "$ralph_dir"
-            ;;
-    esac
-}
-
-#==============================================================================
-# TASK EDITING
-#==============================================================================
-
-select_project() {
-    local ralph_dir="$1"
-    local prompt="${2:-Select a project}"
-
-    # Output prompts to stderr since this function returns a value via stdout
-    echo "$prompt" >&2
-    echo "" >&2
-
-    local default_project=$(pwd)
-    if [ "$default_project" = "$ralph_dir" ]; then
-        default_project=$(dirname "$ralph_dir")
-    fi
-
-    local project_path=$(ask "Project path" "$default_project")
-    project_path="${project_path/#\~/$HOME}"
-
-    if [[ ! "$project_path" = /* ]]; then
-        project_path="$(cd "$project_path" 2>/dev/null && pwd)"
-    fi
-
-    if [ ! -d "$project_path/.ralph" ]; then
-        print_error "This project doesn't have Ralph Loop set up." >&2
-        if ask_yes_no "Set it up now?" "y"; then
-            setup_project "$ralph_dir"
-            return
-        fi
-        exit 1
-    fi
-
-    echo "$project_path"
-}
-
-edit_tasks() {
-    local ralph_dir="$1"
-
-    print_subheader "Edit Tasks"
-
-    local project_path=$(select_project "$ralph_dir" "Which project's tasks do you want to edit?")
-    local tasks_file="$project_path/.ralph/TASKS.md"
-
-    echo ""
-    echo "You can:"
-    echo "  1) Open tasks file in your editor"
-    echo "  2) Add tasks interactively here"
-    echo "  3) View current tasks"
-    echo ""
-
-    local choice=$(ask "Choose an option" "2")
-
-    case "$choice" in
-        1)
-            local editor="${EDITOR:-${VISUAL:-nano}}"
-            print_step "Opening $tasks_file in $editor..."
-            "$editor" "$tasks_file"
-            ;;
-        2)
-            add_tasks_interactively "$tasks_file"
-            ;;
-        3)
-            echo ""
-            print_step "Current tasks:"
-            echo ""
-            cat "$tasks_file"
-            echo ""
-            if ask_yes_no "Edit tasks?" "y"; then
-                edit_tasks "$ralph_dir"
-            fi
-            ;;
-    esac
-
-    print_success "Tasks updated!"
-    show_menu "$ralph_dir"
-}
-
-add_tasks_interactively() {
-    local tasks_file="$1"
-
-    echo ""
-    echo "Enter your tasks one by one."
-    echo "Format: Brief description of what the agent should do"
-    echo "Type 'done' when finished."
-    echo ""
-
-    local task_num=1
-
-    # Find the highest existing task number
-    if [ -f "$tasks_file" ]; then
-        local max_num=$(grep -o 'TASK-[0-9]*' "$tasks_file" 2>/dev/null | grep -o '[0-9]*' | sort -n | tail -1)
-        if [ -n "$max_num" ]; then
-            task_num=$((max_num + 1))
-        fi
-    fi
-
-    while true; do
-        echo -en "${BOLD}Task $task_num${NC}: "
-        read task_desc </dev/tty
-
-        if [ "$task_desc" = "done" ] || [ -z "$task_desc" ]; then
-            break
-        fi
-
-        # Ask for optional details
-        echo -en "  ${CYAN}Details (optional, press Enter to skip)${NC}: "
-        read task_details </dev/tty
-
-        # Append to tasks file
-        echo "" >> "$tasks_file"
-        printf "- [ ] TASK-%03d: %s\n" "$task_num" "$task_desc" >> "$tasks_file"
-
-        if [ -n "$task_details" ]; then
-            echo "  > $task_details" >> "$tasks_file"
-        fi
-
-        print_success "Added TASK-$(printf '%03d' $task_num)"
-        task_num=$((task_num + 1))
-    done
-}
-
-
-#==============================================================================
-# INSTRUCTIONS (3-Level System)
-#==============================================================================
-
-edit_instructions() {
-    local ralph_dir="$1"
-
-    print_subheader "Edit Instructions (3-Level System)"
-
-    echo ""
-    echo "Ralph Loop uses a 3-level instruction system:"
-    echo ""
-    echo -e "  ${BOLD}Level 1: Global${NC} - Ralph Loop workflow (base_prompt.txt)"
-    echo "           Applies to all projects. Rarely needs editing."
-    echo ""
-    echo -e "  ${BOLD}Level 2: Platform${NC} - Platform guidelines (templates/{platform}/platform_prompt.txt)"
-    echo "           iOS, Python, generic, etc. Edit to customize platform standards."
-    echo ""
-    echo -e "  ${BOLD}Level 3: Project${NC} - Project-specific (.ralph/project_prompt.txt)"
-    echo "           Your project's unique requirements. Most commonly edited."
-    echo ""
-    echo "Which level do you want to edit?"
-    echo "  1) Project instructions (Level 3) - most common"
-    echo "  2) Platform instructions (Level 2)"
-    echo "  3) Global instructions (Level 1)"
-    echo "  4) View all levels combined"
-    echo ""
-
-    local level_choice=$(ask "Choose a level" "1")
-
-    case "$level_choice" in
-        1)
-            edit_project_instructions "$ralph_dir"
-            ;;
-        2)
-            edit_platform_instructions "$ralph_dir"
-            ;;
-        3)
-            edit_global_instructions "$ralph_dir"
-            ;;
-        4)
-            view_combined_instructions "$ralph_dir"
-            ;;
-        *)
-            edit_project_instructions "$ralph_dir"
-            ;;
-    esac
-
-    show_menu "$ralph_dir"
-}
-
-edit_project_instructions() {
-    local ralph_dir="$1"
-
-    print_subheader "Project Instructions (Level 3)"
-
-    local project_path=$(select_project "$ralph_dir" "Which project's instructions do you want to edit?")
-    local prompt_file="$project_path/.ralph/project_prompt.txt"
-
-    echo ""
-    echo "Project instructions describe YOUR project's unique requirements:"
-    echo "  - Project structure and key files"
-    echo "  - Coding conventions specific to this project"
-    echo "  - Things to avoid"
-    echo "  - Reference materials"
-    echo ""
-    echo "You can:"
-    echo "  1) Open in your editor"
-    echo "  2) Add instructions interactively"
-    echo "  3) View current instructions"
-    echo ""
-
-    local choice=$(ask "Choose an option" "1")
-
-    case "$choice" in
-        1)
-            local editor="${EDITOR:-${VISUAL:-nano}}"
-            print_step "Opening $prompt_file in $editor..."
-            "$editor" "$prompt_file"
-            print_success "Project instructions updated!"
-            ;;
-        2)
-            add_instructions_interactively "$prompt_file"
-            ;;
-        3)
-            echo ""
-            if [ -f "$prompt_file" ]; then
-                print_step "Current project instructions:"
-                echo ""
-                cat "$prompt_file"
-            else
-                print_warning "No project instructions file found at $prompt_file"
-            fi
-            echo ""
-            if ask_yes_no "Edit instructions?" "y"; then
-                edit_project_instructions "$ralph_dir"
-            fi
-            ;;
-    esac
-}
-
-edit_platform_instructions() {
-    local ralph_dir="$1"
-
-    print_subheader "Platform Instructions (Level 2)"
-
-    echo ""
-    echo "Available platforms:"
-    local platforms=()
-    for dir in "$ralph_dir/templates"/*/; do
-        if [ -d "$dir" ]; then
-            local platform=$(basename "$dir")
-            platforms+=("$platform")
-            echo "  - $platform"
-        fi
-    done
-    echo ""
-
-    local platform=$(ask "Which platform?" "ios")
-    local prompt_file="$ralph_dir/templates/$platform/platform_prompt.txt"
-
-    if [ ! -f "$prompt_file" ]; then
-        print_warning "Platform '$platform' not found."
-        if ask_yes_no "Create it?" "y"; then
-            mkdir -p "$ralph_dir/templates/$platform"
-            cp "$ralph_dir/templates/generic/platform_prompt.txt" "$prompt_file"
-            print_success "Created $prompt_file from generic template"
-        else
-            return
-        fi
-    fi
-
-    local editor="${EDITOR:-${VISUAL:-nano}}"
-    print_step "Opening $prompt_file in $editor..."
-    "$editor" "$prompt_file"
-    print_success "Platform instructions updated!"
-}
-
-edit_global_instructions() {
-    local ralph_dir="$1"
-
-    print_subheader "Global Instructions (Level 1)"
-
-    local prompt_file="$ralph_dir/base_prompt.txt"
-
-    echo ""
-    print_warning "Global instructions affect ALL projects using Ralph Loop."
-    echo "These define the core workflow: task format, status markers, rules."
-    echo ""
-
-    if ask_yes_no "Are you sure you want to edit global instructions?" "n"; then
-        local editor="${EDITOR:-${VISUAL:-nano}}"
-        print_step "Opening $prompt_file in $editor..."
-        "$editor" "$prompt_file"
-        print_success "Global instructions updated!"
-    fi
-}
-
-view_combined_instructions() {
-    local ralph_dir="$1"
-
-    print_subheader "View Combined Instructions"
-
-    local project_path=$(select_project "$ralph_dir" "Which project?")
-
-    # Get platform type from config
-    local config_file="$project_path/.ralph/config.sh"
+    # Map project type to platform type
     local platform_type="generic"
-    if [ -f "$config_file" ]; then
-        source "$config_file"
-        platform_type="${PLATFORM_TYPE:-generic}"
-    fi
+    case "$project_type" in
+        ios) platform_type="ios" ;;
+        python) platform_type="python" ;;
+        web-react|node) platform_type="generic" ;;
+        *) platform_type="generic" ;;
+    esac
 
-    echo ""
-    echo "Showing combined instructions for: $project_path"
-    echo "Platform type: $platform_type"
-    echo ""
-    echo -e "${CYAN}════════════════════════════════════════════════════════════════${NC}"
-    echo -e "${CYAN}  Level 1: Global Instructions${NC}"
-    echo -e "${CYAN}════════════════════════════════════════════════════════════════${NC}"
-    if [ -f "$ralph_dir/base_prompt.txt" ]; then
-        cat "$ralph_dir/base_prompt.txt"
-    else
-        echo "(not found)"
-    fi
-    echo ""
-    echo -e "${CYAN}════════════════════════════════════════════════════════════════${NC}"
-    echo -e "${CYAN}  Level 2: Platform Instructions ($platform_type)${NC}"
-    echo -e "${CYAN}════════════════════════════════════════════════════════════════${NC}"
-    if [ -f "$ralph_dir/templates/$platform_type/platform_prompt.txt" ]; then
-        cat "$ralph_dir/templates/$platform_type/platform_prompt.txt"
-    else
-        echo "(not found)"
-    fi
-    echo ""
-    echo -e "${CYAN}════════════════════════════════════════════════════════════════${NC}"
-    echo -e "${CYAN}  Level 3: Project Instructions${NC}"
-    echo -e "${CYAN}════════════════════════════════════════════════════════════════${NC}"
-    if [ -f "$project_path/.ralph/project_prompt.txt" ]; then
-        cat "$project_path/.ralph/project_prompt.txt"
-    else
-        echo "(not found)"
-    fi
-    echo ""
-
-    echo ""
-    read -p "Press Enter to continue..." </dev/tty
-}
-
-add_instructions_interactively() {
-    local prompt_file="$1"
-
-    echo ""
-    echo "Enter your custom instructions for the AI agent."
-    echo ""
-    echo "These could include:"
-    echo "  - Project structure and key files"
-    echo "  - Coding conventions specific to this project"
-    echo "  - Things to avoid"
-    echo "  - Reference materials"
-    echo ""
-    echo "Type your instructions below. When finished, type 'END' on a new line."
-    echo ""
-    print_step "Custom Instructions:"
-    echo ""
-
-    local instructions=""
-    while IFS= read -r line </dev/tty; do
-        if [ "$line" = "END" ]; then
-            break
-        fi
-        instructions+="$line"$'\n'
-    done
-
-    if [ -n "$instructions" ]; then
-        # Append to existing file with a separator
-        if [ -f "$prompt_file" ]; then
-            echo "" >> "$prompt_file"
-        fi
-        echo "# Custom Instructions (added $(date +%Y-%m-%d))" >> "$prompt_file"
-        echo "" >> "$prompt_file"
-        echo "$instructions" >> "$prompt_file"
-        print_success "Instructions added to $prompt_file"
-    else
-        print_warning "No instructions entered."
-    fi
-}
+    cat > "$config_file" << EOF
+#!/bin/bash
+#
+# Ralph Loop - Project Configuration
+# Generated by Ralph Loop installer v$RALPH_VERSION
+#
 
 #==============================================================================
-# RUN RALPH LOOP
+# PROJECT SETTINGS
 #==============================================================================
 
-run_ralph_loop() {
+PROJECT_NAME="$project_name"
+
+# Platform type - determines which platform_prompt.txt to use
+# Options: ios, python, generic (more can be added in templates/)
+PLATFORM_TYPE="$platform_type"
+
+#==============================================================================
+# AGENT SETTINGS
+#==============================================================================
+
+AGENT_TYPE="$agent_type"
+
+#==============================================================================
+# LOOP SETTINGS
+#==============================================================================
+
+MAX_ITERATIONS=$DEFAULT_MAX_ITERATIONS
+PAUSE_SECONDS=5
+MAX_CONSECUTIVE_FAILURES=3
+
+#==============================================================================
+# TEST RUN SETTINGS
+#==============================================================================
+
+# Pause after first N tasks for user verification
+TEST_RUN_ENABLED=true
+TEST_RUN_TASKS=2
+
+#==============================================================================
+# GIT SETTINGS
+#==============================================================================
+
+COMMIT_SCOPE="$commit_scope"
+PROTECTED_BRANCHES="main master develop"
+
+#==============================================================================
+# BUILD VERIFICATION
+#==============================================================================
+
+BUILD_GATE_ENABLED=true
+EOF
+
+    # Add platform-specific settings
+    if [ "$project_type" = "ios" ]; then
+        cat >> "$config_file" << EOF
+
+#==============================================================================
+# iOS SETTINGS
+#==============================================================================
+
+XCODE_SCHEME="$xcode_scheme"
+XCODE_PROJECT_DIR="$xcode_project_dir"
+
+# Build verification command
+verify_build() {
+    local project_dir="\$1"
+    cd "\$project_dir/\$XCODE_PROJECT_DIR"
+
+    # Generate project if using XcodeGen
+    if [ -f "project.yml" ]; then
+        xcodegen generate 2>/dev/null || true
+    fi
+
+    # Build
+    xcodebuild -scheme "\$XCODE_SCHEME" -destination 'platform=iOS Simulator,name=iPhone 16' build 2>&1
+}
+EOF
+    elif [ -n "$build_command" ]; then
+        cat >> "$config_file" << EOF
+
+#==============================================================================
+# BUILD SETTINGS
+#==============================================================================
+
+BUILD_COMMAND="$build_command"
+TEST_COMMAND="$test_command"
+
+verify_build() {
+    local project_dir="\$1"
+    cd "\$project_dir"
+    $build_command
+}
+EOF
+    fi
+}
+
+create_prompt_file() {
     local ralph_dir="$1"
+    local project_type="$2"
+    local project_name="$3"
 
-    print_subheader "Run Ralph Loop"
+    local prompt_file="$ralph_dir/project_prompt.txt"
 
-    local project_path=$(select_project "$ralph_dir" "Which project do you want to run Ralph Loop on?")
+    cat > "$prompt_file" << EOF
+# Project-Specific Instructions for $project_name
 
+## Project Overview
+This is a $project_type project. Describe your project here.
+
+## Key Files and Directories
+- List important files and directories
+- Explain the project structure
+
+## Coding Standards
+- Any project-specific conventions
+- Naming patterns, architecture guidelines
+
+## Things to Avoid
+- Known pitfalls
+- Files that should not be modified
+
+## Testing Requirements
+- How to run tests
+- What should be tested
+
+## Additional Context
+Add any other relevant information for the AI agent.
+EOF
+}
+
+create_tasks_file() {
+    local ralph_dir="$1"
+    local project_type="$2"
+
+    local tasks_file="$ralph_dir/TASKS.md"
+
+    cat > "$tasks_file" << 'EOF'
+# Ralph Loop Task List
+
+This is your task checklist. Each uncompleted task (marked with `- [ ]`) will be
+processed by the AI agent in order.
+
+## How to Write Tasks
+
+- Be specific and actionable
+- Each task should be completable in one AI session
+- Include relevant file paths or context
+- Break large tasks into smaller steps
+
+## Task Format
+
+```
+- [ ] Brief description of the task
+  > Optional: Additional context or requirements
+```
+
+## Your Tasks
+
+- [ ] TASK-001: Example task - Replace this with your first task
+  > Add any helpful context or requirements here
+
+- [ ] TASK-002: Second task - Add more tasks as needed
+
+EOF
+}
+
+
+#==============================================================================
+# SETUP WIZARD
+#==============================================================================
+
+run_setup_wizard() {
+    local project_path="$1"
+    local ralph_dir="$project_path/.ralph"
+    local step_num=1
+
+    print_header "Ralph Loop Setup"
+
+    #--------------------------------------------------------------------------
+    # Step 1: Project Type
+    #--------------------------------------------------------------------------
+    print_step "Step $step_num: Project Type"
+    ((step_num++))
     echo ""
-    print_step "Ready to run Ralph Loop!"
-    echo ""
-    echo "This will start the automated task runner on your project."
-    echo "The agent will work through tasks in .ralph/TASKS.md"
+
+    local project_type=$(detect_project_type "$project_path")
+    local project_name=$(basename "$project_path")
+
+    if [ "$project_type" != "generic" ]; then
+        echo -e "Detected project type: ${BOLD}$project_type${NC}"
+        if ! ask_yes_no "Is this correct?" "y"; then
+            project_type=$(ask_choice "Select project type:" "ios" "web-react" "python" "node" "go" "rust" "generic")
+        fi
+    else
+        project_type=$(ask_choice "Select project type:" "ios" "web-react" "python" "node" "go" "rust" "generic")
+    fi
+
+    print_success "Project type: $project_type"
     echo ""
 
-    # Check current branch
+    #--------------------------------------------------------------------------
+    # Step 2: Build Configuration (for supported types)
+    #--------------------------------------------------------------------------
+    local xcode_scheme=""
+    local xcode_project_dir="."
+    local build_command=""
+    local test_command=""
+    local commit_scope=""
+
+    if [ "$project_type" = "ios" ]; then
+        print_step "Step $step_num: iOS Build Configuration"
+        ((step_num++))
+        echo ""
+
+        # Auto-detect Xcode project directory
+        xcode_project_dir=$(detect_xcode_project_dir "$project_path")
+        echo -e "Xcode project directory: ${BOLD}$xcode_project_dir${NC}"
+        echo ""
+
+        # Detect available schemes and let user pick
+        local schemes_list=$(detect_xcode_schemes "$project_path")
+
+        if [ -n "$schemes_list" ]; then
+            local scheme_count=$(echo "$schemes_list" | wc -l | tr -d ' ')
+
+            if [ "$scheme_count" -eq 1 ]; then
+                xcode_scheme="$schemes_list"
+                echo -e "Xcode scheme: ${BOLD}$xcode_scheme${NC} (auto-detected)"
+            else
+                echo "Available schemes:" >&2
+                local i=1
+                while IFS= read -r scheme; do
+                    echo "  $i) $scheme" >&2
+                    ((i++))
+                done <<< "$schemes_list"
+                echo "" >&2
+
+                local scheme_choice
+                echo -en "${BOLD}Select scheme [1]: ${NC}" >&2
+                read scheme_choice </dev/tty
+
+                if [ -z "$scheme_choice" ]; then
+                    scheme_choice=1
+                fi
+
+                xcode_scheme=$(echo "$schemes_list" | sed -n "${scheme_choice}p")
+
+                if [ -z "$xcode_scheme" ]; then
+                    xcode_scheme=$(echo "$schemes_list" | head -1)
+                fi
+            fi
+        else
+            xcode_scheme=$(ask "Xcode scheme" "$project_name")
+        fi
+
+        commit_scope="ios"
+        print_success "Xcode scheme: $xcode_scheme"
+        echo ""
+
+    elif [ "$project_type" = "web-react" ] || [ "$project_type" = "node" ]; then
+        print_step "Step $step_num: Node.js Build Configuration"
+        ((step_num++))
+        echo ""
+
+        build_command=$(ask "Build command" "npm run build")
+        test_command=$(ask "Test command" "npm test")
+        commit_scope="web"
+        echo ""
+
+    elif [ "$project_type" = "python" ]; then
+        print_step "Step $step_num: Python Build Configuration"
+        ((step_num++))
+        echo ""
+
+        build_command=$(ask "Build/lint command" "python -m py_compile *.py")
+        test_command=$(ask "Test command" "pytest")
+        commit_scope="python"
+        echo ""
+    fi
+
+    #--------------------------------------------------------------------------
+    # Step 3: AI Agent
+    #--------------------------------------------------------------------------
+    print_step "Step $step_num: AI Agent"
+    ((step_num++))
+    echo ""
+
+    local agent_type=$(detect_or_select_agent)
+    print_success "Agent: $agent_type"
+    echo ""
+
+    #--------------------------------------------------------------------------
+    # Step 4: Git Branch
+    #--------------------------------------------------------------------------
+    print_step "Step $step_num: Git Branch"
+    ((step_num++))
+    echo ""
+
+    local current_branch=""
+    local create_branch=false
+    local branch_name=""
+
     cd "$project_path"
-    local current_branch=$(git branch --show-current)
+
+    current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+    echo -e "Current branch: ${BOLD}$current_branch${NC}"
 
     if [ "$current_branch" = "main" ] || [ "$current_branch" = "master" ]; then
-        print_warning "You're on the $current_branch branch."
-        echo "Ralph Loop won't run on main/master for safety."
-        echo ""
+        print_warning "You're on $current_branch. Ralph Loop requires a feature branch."
         if ask_yes_no "Create a new branch?" "y"; then
-            local new_branch=$(ask "Branch name" "feature/ralph-automation")
-            git checkout -b "$new_branch"
-            print_success "Created and switched to branch: $new_branch"
+            create_branch=true
+            branch_name=$(ask "Branch name" "$DEFAULT_BRANCH")
         else
-            print_error "Please switch to a feature branch first."
-            show_menu "$ralph_dir"
-            return
+            print_warning "You'll need to create a branch before running Ralph Loop."
         fi
+    else
+        print_success "Branch '$current_branch' looks good for Ralph Loop."
     fi
 
+    cd - > /dev/null
     echo ""
-    if ask_yes_no "Start Ralph Loop now?" "y"; then
+
+    #--------------------------------------------------------------------------
+    # Step 5: Task File
+    #--------------------------------------------------------------------------
+    print_step "Step $step_num: Task List"
+    ((step_num++))
+    echo ""
+
+    local create_sample_tasks=false
+
+    echo "Ralph Loop needs a TASKS.md file with your task checklist."
+    echo ""
+
+    if [ -f "$ralph_dir/TASKS.md" ]; then
+        echo "Found existing task file."
+        if ! ask_yes_no "Keep existing tasks?" "y"; then
+            create_sample_tasks=true
+        fi
+    else
+        if ask_yes_no "Create a sample TASKS.md to get started?" "y"; then
+            create_sample_tasks=true
+        else
+            print_warning "You'll need to create .ralph/TASKS.md before running."
+        fi
+    fi
+    echo ""
+
+    #--------------------------------------------------------------------------
+    # Create Files
+    #--------------------------------------------------------------------------
+    print_header "Creating Configuration Files"
+
+    # Create config.sh
+    create_config_file "$ralph_dir" "$project_name" "$project_type" "$agent_type" \
+        "$xcode_scheme" "$xcode_project_dir" "$build_command" "$test_command" "$commit_scope"
+    print_success "Created .ralph/config.sh"
+
+    # Create project_prompt.txt
+    create_prompt_file "$ralph_dir" "$project_type" "$project_name"
+    print_success "Created .ralph/project_prompt.txt"
+
+    # Create TASKS.md if requested
+    if [ "$create_sample_tasks" = true ]; then
+        create_tasks_file "$ralph_dir" "$project_type"
+        print_success "Created .ralph/TASKS.md"
+    fi
+
+    # Create branch if requested
+    if [ "$create_branch" = true ] && [ -n "$branch_name" ]; then
+        cd "$project_path"
+        git checkout -b "$branch_name" 2>/dev/null || git checkout "$branch_name"
+        print_success "Switched to branch: $branch_name"
+        cd - > /dev/null
+    fi
+
+    #--------------------------------------------------------------------------
+    # Final Instructions
+    #--------------------------------------------------------------------------
+    print_header "Setup Complete! 🎉"
+
+    echo "Ralph Loop is now configured for your project."
+    echo ""
+    echo -e "${BOLD}Files created:${NC}"
+    echo "  $ralph_dir/ralph_loop.sh"
+    echo "  $ralph_dir/config.sh"
+    echo "  $ralph_dir/project_prompt.txt"
+    echo "  $ralph_dir/base_prompt.txt"
+    if [ "$create_sample_tasks" = true ]; then
+        echo "  $ralph_dir/TASKS.md"
+    fi
+    echo ""
+
+    echo -e "${BOLD}Next steps:${NC}"
+    echo ""
+    echo "  1. Review and customize your configuration:"
+    echo -e "     ${CYAN}code $ralph_dir/${NC}"
+    echo ""
+
+    if [ "$create_sample_tasks" = true ]; then
+        echo "  2. Edit TASKS.md with your actual tasks:"
+        echo -e "     ${CYAN}code $ralph_dir/TASKS.md${NC}"
+        echo ""
+        echo "  3. Run Ralph Loop:"
+    else
+        echo "  2. Run Ralph Loop:"
+    fi
+
+    echo -e "     ${CYAN}cd $project_path${NC}"
+    echo -e "     ${CYAN}.ralph/ralph_loop.sh .${NC}"
+    echo ""
+
+    # Show agent status
+    if [ "$agent_type" = "cursor" ] && ! is_cursor_available; then
+        echo -e "${YELLOW}⚠ Action required:${NC} Install Cursor CLI to use the 'agent' command."
+        echo "  Visit: https://cursor.sh"
+        echo ""
+    elif [ "$agent_type" = "auggie" ] && ! is_auggie_available; then
+        echo -e "${YELLOW}⚠ Action required:${NC} Install Augment CLI to use the 'auggie' command."
+        echo "  Visit: https://augmentcode.com"
+        echo ""
+    elif [ "$agent_type" = "custom" ]; then
+        echo -e "${YELLOW}Note:${NC} Define run_agent_custom() in .ralph/config.sh"
+        echo ""
+    else
+        echo -e "${GREEN}✓ Agent '$agent_type' is ready to use!${NC}"
+        echo ""
+    fi
+
+    # Offer to run
+    echo ""
+    if ask_yes_no "Start Ralph Loop now?" "n"; then
         echo ""
         print_step "Starting Ralph Loop..."
         echo ""
-        exec "$ralph_dir/ralph_loop.sh" "$project_path"
-    else
-        echo ""
-        echo "To run Ralph Loop later, use:"
-        echo ""
-        echo -e "  ${BOLD}$ralph_dir/ralph_loop.sh $project_path${NC}"
-        echo ""
-        show_menu "$ralph_dir"
+        cd "$project_path"
+        exec "$ralph_dir/ralph_loop.sh" "."
     fi
+
+    echo ""
+    echo "Happy automating! 🤖"
 }
 
 #==============================================================================
@@ -941,23 +982,142 @@ run_ralph_loop() {
 #==============================================================================
 
 main() {
-    print_header "🤖 Ralph Loop"
+    print_header "🤖 Ralph Loop Installer"
 
-    echo "Ralph Loop is an automated AI agent task runner that helps"
-    echo "you automate repetitive development tasks."
+    echo "Ralph Loop is an automated AI agent task runner."
+    echo "Files will be installed into your project's .ralph/ directory."
     echo ""
 
-    # Step 1: Check and install prerequisites
+    # Step 1: Check prerequisites
     check_and_install_prerequisites
 
-    # Step 2: Detect if we're already in ralph-loop repo
-    local ralph_dir=$(detect_ralph_loop_location)
+    # Step 2: Detect project directory
+    print_subheader "Project Detection"
 
-    # Step 3: Install or update ralph-loop
-    ralph_dir=$(install_or_update_ralph_loop "$ralph_dir")
+    local project_path=$(pwd)
+    local is_git_repo=false
 
-    # Step 4: Show menu
-    show_menu "$ralph_dir"
+    # Check if current directory is a git repo
+    if [ -d "$project_path/.git" ]; then
+        is_git_repo=true
+        echo -e "Current directory: ${BOLD}$project_path${NC}"
+        echo -e "Git repository: ${GREEN}✓${NC}"
+        echo ""
+
+        if ! ask_yes_no "Set up Ralph Loop for this project?" "y"; then
+            # Let them specify a different path
+            project_path=$(ask "Enter project path" "$project_path")
+            project_path="${project_path/#\~/$HOME}"
+
+            if [[ ! "$project_path" = /* ]]; then
+                project_path="$(cd "$project_path" 2>/dev/null && pwd)"
+            fi
+
+            if [ ! -d "$project_path" ]; then
+                print_error "Directory does not exist: $project_path"
+                exit 1
+            fi
+        fi
+    else
+        print_warning "Current directory is not a git repository."
+        echo ""
+
+        project_path=$(ask "Enter path to your project" "")
+        project_path="${project_path/#\~/$HOME}"
+
+        if [ -z "$project_path" ]; then
+            print_error "Project path is required."
+            exit 1
+        fi
+
+        if [[ ! "$project_path" = /* ]]; then
+            project_path="$(cd "$project_path" 2>/dev/null && pwd)"
+        fi
+
+        if [ ! -d "$project_path" ]; then
+            print_error "Directory does not exist: $project_path"
+            exit 1
+        fi
+
+        # Check if that path is a git repo
+        if [ ! -d "$project_path/.git" ]; then
+            print_warning "This directory is not a git repository."
+            if ask_yes_no "Initialize git?" "y"; then
+                cd "$project_path"
+                git init
+                git checkout -b main
+                print_success "Git repository initialized"
+            else
+                print_error "Ralph Loop requires a git repository."
+                exit 1
+            fi
+        fi
+    fi
+
+    echo ""
+    print_success "Project: $project_path"
+    echo ""
+
+    # Step 3: Check for existing .ralph
+    local ralph_dir="$project_path/.ralph"
+
+    if [ -d "$ralph_dir" ]; then
+        print_warning "This project already has Ralph Loop installed."
+        echo ""
+        echo "Options:"
+        echo "  1) Update to latest version"
+        echo "  2) Reconfigure from scratch"
+        echo "  3) Exit"
+        echo ""
+
+        local choice=$(ask "Choose an option" "1")
+
+        case "$choice" in
+            1)
+                print_step "Updating Ralph Loop files..."
+                download_ralph_files "$ralph_dir"
+                print_success "Updated to version $RALPH_VERSION!"
+                echo ""
+                echo "To run Ralph Loop:"
+                echo -e "  ${CYAN}cd $project_path && .ralph/ralph_loop.sh .${NC}"
+                exit 0
+                ;;
+            2)
+                rm -rf "$ralph_dir"
+                print_success "Removed existing configuration"
+                ;;
+            3)
+                print_success "Goodbye!"
+                exit 0
+                ;;
+        esac
+    fi
+
+    # Step 4: Download Ralph Loop files
+    print_subheader "Installing Ralph Loop"
+
+    mkdir -p "$ralph_dir"
+
+    if ! download_ralph_files "$ralph_dir"; then
+        print_error "Failed to download Ralph Loop files."
+        echo "Check your network connection and GitHub authentication."
+        exit 1
+    fi
+
+    # Download templates for the detected project type
+    local project_type=$(detect_project_type "$project_path")
+    local platform_type="generic"
+    case "$project_type" in
+        ios) platform_type="ios" ;;
+        python) platform_type="python" ;;
+        *) platform_type="generic" ;;
+    esac
+
+    download_template_files "$ralph_dir" "$platform_type"
+    echo ""
+
+    # Step 5: Run setup wizard
+    run_setup_wizard "$project_path"
 }
 
 # Run main
