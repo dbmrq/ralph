@@ -469,10 +469,11 @@ run_agent_cursor() {
     PROGRESS_PID=$!
 
     # Run agent, output goes to log file only (progress monitor shows status)
+    # --force allows agents to run shell commands within their tasks
     if [ -n "$SELECTED_MODEL" ]; then
-        echo "$prompt" | agent --print --model "$SELECTED_MODEL" > "$log_file" 2>&1
+        echo "$prompt" | agent --print --force --model "$SELECTED_MODEL" > "$log_file" 2>&1
     else
-        echo "$prompt" | agent --print > "$log_file" 2>&1
+        echo "$prompt" | agent --print --force > "$log_file" 2>&1
     fi
     local exit_code=$?
 
