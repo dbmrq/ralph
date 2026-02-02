@@ -408,11 +408,14 @@ start_progress_monitor() {
         # Line 2: Stats
         printf "  ${YELLOW}⏱${NC}  %02d:%02d elapsed  ${YELLOW}📁${NC}  %d files changed\n" "$mins" "$secs" "$changed_files"
 
-        # Line 3: Last output (truncated)
+        # Line 3: Last output (truncated) or status message
         if [ -n "$last_line" ]; then
             printf "  ${YELLOW}💬${NC}  %.60s\n" "$last_line"
         else
-            printf "  ${YELLOW}💬${NC}  (waiting for output...)\n"
+            # No output yet - agent is initializing or thinking
+            local thinking_msgs=("Agent is thinking..." "Processing request..." "Analyzing codebase..." "Preparing response...")
+            local msg_idx=$(( (elapsed / 5) % 4 ))
+            printf "  ${YELLOW}💬${NC}  ${thinking_msgs[$msg_idx]}\n"
         fi
     done
 }
@@ -999,9 +1002,9 @@ main() {
         local COMPLETED=$(count_completed)
 
         log ""
-        log "${YELLOW}══════════════════════════════════════════════════════════════${NC}"
-        log "${YELLOW}  Iteration ${iteration}/${MAX_ITERATIONS} │ ✅ ${COMPLETED} done │ 📋 ${REMAINING} remaining${NC}"
-        log "${YELLOW}══════════════════════════════════════════════════════════════${NC}"
+        log "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        log "${YELLOW}  Iteration ${iteration}/${MAX_ITERATIONS}  •  ✅ ${COMPLETED} done  •  📋 ${REMAINING} remaining${NC}"
+        log "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
         if [ "$REMAINING" -eq 0 ]; then
             log "${GREEN}✓ All tasks completed!${NC}"
