@@ -297,32 +297,34 @@ install_or_update_ralph_loop() {
 
     echo "Where should ralph-loop be installed?" >&2
     echo "" >&2
-    echo "This should be a directory alongside your projects, for example:" >&2
-    echo "  ~/Code/ralph-loop" >&2
-    echo "  ~/Projects/ralph-loop" >&2
+    echo "Enter a parent directory - ralph-loop will be created inside it." >&2
+    echo "For example, if you enter ~/Code, it will install to ~/Code/ralph-loop" >&2
     echo "" >&2
 
     # Suggest a default based on current directory
     local current_dir=$(pwd)
     local parent_dir=$(dirname "$current_dir")
-    local default_install="$parent_dir/ralph-loop"
+    local default_install="$parent_dir"
 
-    local install_path=$(ask "Installation path" "$default_install")
+    local install_parent=$(ask "Parent directory" "$default_install")
 
     # Expand ~ if present
-    install_path="${install_path/#\~/$HOME}"
+    install_parent="${install_parent/#\~/$HOME}"
 
     # Convert to absolute path
-    if [[ ! "$install_path" = /* ]]; then
-        if [ -d "$(dirname "$install_path")" ]; then
-            install_path="$(cd "$(dirname "$install_path")" && pwd)/$(basename "$install_path")"
+    if [[ ! "$install_parent" = /* ]]; then
+        if [ -d "$install_parent" ]; then
+            install_parent="$(cd "$install_parent" && pwd)"
         else
-            mkdir -p "$(dirname "$install_path")"
-            install_path="$(cd "$(dirname "$install_path")" && pwd)/$(basename "$install_path")"
+            mkdir -p "$install_parent"
+            install_parent="$(cd "$install_parent" && pwd)"
         fi
     fi
 
-    # Check if directory already exists
+    # The actual install path is parent/ralph-loop
+    local install_path="$install_parent/ralph-loop"
+
+    # Check if ralph-loop directory already exists
     if [ -d "$install_path" ]; then
         if [ -f "$install_path/ralph_loop.sh" ]; then
             print_success "ralph-loop already installed at $install_path" >&2
@@ -333,17 +335,17 @@ install_or_update_ralph_loop() {
             echo "$install_path"
             return
         else
-            print_error "Directory exists but is not a ralph-loop installation: $install_path" >&2
-            echo "Please choose a different location or remove the existing directory." >&2
+            print_error "Directory $install_path exists but is not a ralph-loop installation." >&2
+            echo "Please remove it or choose a different parent directory." >&2
             exit 1
         fi
     fi
 
     # Clone the repository
-    print_step "Cloning ralph-loop repository..." >&2
+    print_step "Cloning ralph-loop to $install_path..." >&2
     echo "" >&2
 
-    mkdir -p "$(dirname "$install_path")"
+    mkdir -p "$install_parent"
     git clone "$REPO_URL" "$install_path" >&2
 
     # Make scripts executable
