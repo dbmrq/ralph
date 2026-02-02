@@ -70,9 +70,11 @@ What would you like to do?
 - 🤖 **Pluggable agents** - Supports Cursor, Augment (auggie), or custom agents
 - 📝 **Automatic commits** - Commits each completed task separately
 - 🛡️ **Safety limits** - Max iterations, consecutive failure detection
+- ✅ **Test run mode** - Pauses after first 2 tasks for verification before continuing
 - 📊 **Detailed logging** - Per-run and per-iteration logs
 - 🌿 **Branch protection** - Prevents running on main/master
 - 🧙 **Smart installer** - Handles all prerequisites automatically
+- 📋 **3-level prompts** - Separate global, platform, and project instructions
 
 ## How It Works
 
@@ -144,22 +146,75 @@ If you prefer to run commands directly:
 
 ```
 ~/projects/
-├── ralph-loop/              # This repo
-│   ├── ralph_loop.sh        # Main script
-│   ├── base_prompt.txt      # General agent instructions
-│   └── templates/           # Project templates
-│       └── ios/
+├── ralph-loop/                    # This repo
+│   ├── ralph_loop.sh              # Main script
+│   ├── base_prompt.txt            # Level 1: Global instructions
+│   └── templates/                 # Platform templates
+│       ├── ios/
+│       │   ├── config.sh
+│       │   ├── platform_prompt.txt  # Level 2: iOS guidelines
+│       │   └── project_prompt.txt   # Level 3 template
+│       └── generic/
 │           ├── config.sh
-│           ├── prompt.txt
-│           └── TASKS.md
+│           └── platform_prompt.txt  # Level 2: Generic guidelines
 │
-└── my-project/              # Your project
-    ├── .ralph/              # Ralph configuration
-    │   ├── config.sh        # Project settings
-    │   ├── prompt.txt       # Project-specific prompt
-    │   ├── TASKS.md         # Task checklist
-    │   └── logs/            # Run logs (auto-created)
+└── my-project/                    # Your project
+    ├── .ralph/                    # Ralph configuration
+    │   ├── config.sh              # Project settings
+    │   ├── project_prompt.txt     # Level 3: Project-specific instructions
+    │   ├── TASKS.md               # Task checklist
+    │   └── logs/                  # Run logs (auto-created)
     └── (your project files)
+```
+
+## 3-Level Prompt System
+
+Instructions are split into three layers that can be edited independently:
+
+| Level | File | Purpose | Examples |
+|-------|------|---------|----------|
+| 1. Global | `base_prompt.txt` | Ralph Loop workflow instructions | Task format, status markers, one-task-at-a-time rule |
+| 2. Platform | `templates/{platform}/platform_prompt.txt` | Platform-specific guidelines | iOS: SwiftUI, MVVM; Python: typing, pytest |
+| 3. Project | `.ralph/project_prompt.txt` | Your project's unique requirements | "Uses XcodeGen", "API calls go through NetworkService" |
+
+The platform is set via `PLATFORM_TYPE` in your project's `config.sh`:
+```bash
+PLATFORM_TYPE="ios"   # Uses templates/ios/platform_prompt.txt
+PLATFORM_TYPE="python" # Uses templates/python/platform_prompt.txt
+PLATFORM_TYPE="generic" # Uses templates/generic/platform_prompt.txt
+```
+
+This separation means:
+- **Update global rules** without touching project configs
+- **Add a new platform** without modifying existing ones
+- **Customize project instructions** without losing platform best practices
+
+## Test Run Mode
+
+By default, Ralph Loop pauses after completing the first 2 tasks:
+
+```
+═══════════════════════════════════════════════════
+   🔍 Test Run Checkpoint
+═══════════════════════════════════════════════════
+
+The first 2 tasks have been completed.
+Please review the changes and verify everything is going according to plan.
+
+You can check:
+  • Git log: git log --oneline -2
+  • Git diff: git diff HEAD~2
+  • Build: run your build command
+
+Continue with the remaining 5 tasks? [y/N]:
+```
+
+This gives you a chance to verify the agent is working correctly before letting it continue with more tasks.
+
+**Configure in config.sh:**
+```bash
+TEST_RUN_ENABLED=true   # Enable/disable checkpoint
+TEST_RUN_TASKS=2        # Tasks before checkpoint
 ```
 
 ## Configuration Reference
@@ -169,10 +224,13 @@ If you prefer to run commands directly:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PROJECT_NAME` | - | Display name for your project |
+| `PLATFORM_TYPE` | `generic` | Platform for Level 2 prompt: `ios`, `python`, `generic`, etc. |
 | `AGENT_TYPE` | `cursor` | Agent to use: `cursor`, `auggie`, `custom` |
 | `MAX_ITERATIONS` | `50` | Maximum loop iterations |
 | `PAUSE_SECONDS` | `5` | Pause between iterations |
 | `MAX_CONSECUTIVE_FAILURES` | `3` | Stop after N consecutive failures |
+| `TEST_RUN_ENABLED` | `true` | Pause for verification after first N tasks |
+| `TEST_RUN_TASKS` | `2` | Number of tasks before checkpoint |
 | `REQUIRE_BRANCH` | `true` | Require non-main branch |
 | `ALLOWED_BRANCHES` | `""` | Specific allowed branches (empty = any) |
 | `AUTO_COMMIT` | `true` | Auto-commit after each task |

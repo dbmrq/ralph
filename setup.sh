@@ -461,9 +461,9 @@ main() {
         "$commit_scope" "$max_iterations" "$build_gate_enabled"
     print_success "Created .ralph/config.sh"
 
-    # Create prompt.txt
+    # Create project_prompt.txt (Level 3: Project-specific instructions)
     create_prompt_file "$project_path" "$project_type" "$project_name"
-    print_success "Created .ralph/prompt.txt"
+    print_success "Created .ralph/project_prompt.txt"
 
     # Create TASKS.md if requested
     if [ "$create_sample_tasks" = true ]; then
@@ -491,7 +491,7 @@ main() {
     echo ""
     echo -e "${BOLD}Files created:${NC}"
     echo "  $project_path/.ralph/config.sh"
-    echo "  $project_path/.ralph/prompt.txt"
+    echo "  $project_path/.ralph/project_prompt.txt"
     if [ "$create_sample_tasks" = true ] || [ -n "$existing_tasks" ]; then
         echo "  $project_path/.ralph/TASKS.md"
     fi
@@ -654,36 +654,50 @@ create_prompt_file() {
     local project_type="$2"
     local project_name="$3"
 
-    local prompt_file="$project_path/.ralph/prompt.txt"
+    # New 3-level system uses project_prompt.txt (not prompt.txt)
+    local prompt_file="$project_path/.ralph/project_prompt.txt"
 
     # Check if template exists
-    local template_file="$RALPH_DIR/templates/$project_type/prompt.txt"
+    local template_file="$RALPH_DIR/templates/$project_type/project_prompt.txt"
 
     if [ -f "$template_file" ]; then
         # Use template and replace project name
-        sed "s/My iOS App/$project_name/g; s/MyApp/$project_name/g" "$template_file" > "$prompt_file"
+        sed "s/\[Your App Name\]/$project_name/g; s/My iOS App/$project_name/g; s/MyApp/$project_name/g" "$template_file" > "$prompt_file"
     else
-        # Create generic prompt
+        # Create generic project prompt
         cat > "$prompt_file" << EOF
-# $project_name - Project Configuration
+# $project_name - Project-Specific Instructions
 
-You are a developer working on $project_name. Complete the next unchecked task from the task list.
+<!--
+This file contains instructions specific to YOUR project.
+The platform-level guidelines are loaded automatically based on PLATFORM_TYPE in config.sh.
+Edit this file to describe your project's unique requirements.
+-->
+
+## Project Overview
+
+Project Name: $project_name
+Description: [Brief description of the project]
 
 ## Project Structure
 
-<!-- Describe your project structure here -->
+<!-- Describe your specific folder structure -->
 
-## Build Commands
+## Key Files & Patterns
 
-<!-- Add your build and test commands here -->
+<!-- Point the agent to important files to reference -->
 
-## Development Guidelines
+## Coding Conventions
 
-<!-- Add project-specific guidelines here -->
+<!-- Any project-specific conventions -->
 
-## Task File Location
+## Things to Avoid
 
-The task list is at: \`.ralph/TASKS.md\`
+<!-- Warn the agent about pitfalls -->
+
+## Reference Materials
+
+<!-- Links to docs, designs, etc. -->
 
 ---
 

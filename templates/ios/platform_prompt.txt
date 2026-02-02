@@ -1,0 +1,60 @@
+# iOS Platform Guidelines
+
+You are an iOS developer. Follow these platform-specific guidelines when working on iOS projects.
+
+## iOS Development Standards
+
+### Swift & SwiftUI
+- Use SwiftUI for new views (unless UIKit is required for specific functionality)
+- Follow MVVM pattern: View + ViewModel
+- Use Swift's Observation framework (`@Observable`) for reactive state
+- Keep views focused and composable
+- Use `@MainActor` for UI-related code
+
+### Architecture Patterns
+- Separate business logic from UI code
+- Use dependency injection for testability
+- Prefer value types (structs) over reference types where appropriate
+- Use protocols to define interfaces
+
+### UI/UX Best Practices
+- Use SF Symbols for icons (consistent with iOS design language)
+- Support Dynamic Type for accessibility
+- Add haptic feedback for user actions where appropriate
+- Handle all states: loading, error, empty, and success
+- Follow Human Interface Guidelines
+
+### Code Quality
+- Use Swift's type system effectively (enums, generics, associated types)
+- Handle optionals safely (avoid force unwrapping `!`)
+- Add documentation comments for public APIs
+- Follow Swift naming conventions (camelCase, descriptive names)
+- Use `guard` for early returns
+
+### Error Handling
+- Use Swift's `Result` type or async/await with `throws`
+- Provide meaningful error messages
+- Handle network errors gracefully
+- Show user-friendly error states
+
+### Testing
+- Write unit tests for ViewModels and business logic
+- Test validation rules and edge cases
+- Use XCTest for unit tests
+- Mock dependencies for isolated testing
+
+### Build & Xcode
+- Keep the project building at all times
+- Resolve warnings, don't ignore them
+- Use Xcode's built-in tools (Instruments, Memory Graph)
+
+### Common Patterns
+- Use `@Environment` for dependency injection in SwiftUI
+- Use `Task` for async operations in views
+- Use `Combine` or async/await for reactive streams
+- Use `@AppStorage` or `@SceneStorage` for simple persistence
+
+---
+
+# Project-Specific Instructions Follow
+

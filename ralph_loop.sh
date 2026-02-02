@@ -49,6 +49,11 @@ COMMIT_SCOPE=""
 BUILD_GATE_ENABLED=true
 BUILD_FIX_ATTEMPTS=1
 
+# Test run mode settings
+# When enabled, runs first N tasks then pauses for user verification
+TEST_RUN_ENABLED=true
+TEST_RUN_TASKS=2
+
 #==============================================================================
 # ARGUMENT PARSING
 #==============================================================================
@@ -72,13 +77,12 @@ AGENT_OVERRIDE="${2:-}"
 
 RALPH_CONFIG_DIR="$PROJECT_DIR/.ralph"
 CONFIG_FILE="$RALPH_CONFIG_DIR/config.sh"
-PROJECT_PROMPT_FILE="$RALPH_CONFIG_DIR/prompt.txt"
 TASK_FILE="$RALPH_CONFIG_DIR/TASKS.md"
 
 if [ ! -d "$RALPH_CONFIG_DIR" ]; then
     echo -e "${RED}ERROR: .ralph/ directory not found in $PROJECT_DIR${NC}"
     echo "Create it with: mkdir -p $PROJECT_DIR/.ralph"
-    echo "Then add config.sh, prompt.txt, and TASKS.md"
+    echo "Then add config.sh and TASKS.md"
     exit 1
 fi
 
@@ -101,15 +105,14 @@ fi
 # VALIDATE CONFIGURATION
 #==============================================================================
 
-if [ ! -f "$PROJECT_PROMPT_FILE" ]; then
-    echo -e "${RED}ERROR: Project prompt not found: $PROJECT_PROMPT_FILE${NC}"
-    exit 1
-fi
-
+# Task file is required
 if [ ! -f "$TASK_FILE" ]; then
     echo -e "${RED}ERROR: Task file not found: $TASK_FILE${NC}"
     exit 1
 fi
+
+# Prompt files are optional but we should have at least one
+# (base_prompt.txt is always available in ralph-loop repo)
 
 #==============================================================================
 # SETUP LOGGING
@@ -168,23 +171,57 @@ verify_branch() {
 }
 
 #==============================================================================
-# BUILD PROMPT
+# BUILD PROMPT (3-Level System)
 #==============================================================================
+#
+# Prompts are combined from 3 levels:
+#   1. Global (base_prompt.txt) - Ralph Loop workflow instructions
+#   2. Platform (templates/{platform}/platform_prompt.txt) - Platform guidelines
+#   3. Project (.ralph/project_prompt.txt) - Project-specific instructions
+#
+# Each level can be edited independently without affecting the others.
+#
 
 build_prompt() {
     local base_prompt_file="$RALPH_DIR/base_prompt.txt"
-    local project_prompt_file="$PROJECT_PROMPT_FILE"
+    local platform_prompt_file="$RALPH_DIR/templates/${PLATFORM_TYPE:-generic}/platform_prompt.txt"
+    local project_prompt_file="$RALPH_CONFIG_DIR/project_prompt.txt"
 
-    # Start with base prompt if it exists
+    # Legacy support: if old prompt.txt exists and project_prompt.txt doesn't, use it
+    if [ ! -f "$project_prompt_file" ] && [ -f "$RALPH_CONFIG_DIR/prompt.txt" ]; then
+        project_prompt_file="$RALPH_CONFIG_DIR/prompt.txt"
+    fi
+
+    # Level 1: Global/Ralph Loop instructions
     if [ -f "$base_prompt_file" ]; then
+        echo "# Level 1: Ralph Loop Instructions"
+        echo ""
         cat "$base_prompt_file"
         echo ""
         echo "---"
         echo ""
     fi
 
-    # Add project-specific prompt
-    cat "$project_prompt_file"
+    # Level 2: Platform-specific guidelines
+    if [ -f "$platform_prompt_file" ]; then
+        echo "# Level 2: Platform Guidelines (${PLATFORM_TYPE:-generic})"
+        echo ""
+        cat "$platform_prompt_file"
+        echo ""
+        echo "---"
+        echo ""
+    else
+        log "${YELLOW}Note: No platform prompt found for '${PLATFORM_TYPE:-generic}'${NC}"
+    fi
+
+    # Level 3: Project-specific instructions
+    if [ -f "$project_prompt_file" ]; then
+        echo "# Level 3: Project-Specific Instructions"
+        echo ""
+        cat "$project_prompt_file"
+    else
+        log "${YELLOW}Note: No project prompt found at $project_prompt_file${NC}"
+    fi
 }
 
 #==============================================================================
@@ -459,6 +496,9 @@ main() {
     log "Max iterations: ${MAX_ITERATIONS}"
     log "Task file:      ${TASK_FILE}"
     log "Log directory:  ${LOG_DIR}"
+    if [ "$TEST_RUN_ENABLED" = "true" ]; then
+        log "Test run mode:  ${GREEN}ON${NC} (checkpoint after ${TEST_RUN_TASKS} tasks)"
+    fi
     log ""
 
     # Initial build check
@@ -483,6 +523,8 @@ main() {
 
     local iteration=1
     local consecutive_failures=0
+    local tasks_completed_this_run=0
+    local checkpoint_passed=false
 
     while [ $iteration -le $MAX_ITERATIONS ]; do
         local REMAINING=$(count_remaining)
@@ -496,6 +538,39 @@ main() {
         if [ "$REMAINING" -eq 0 ]; then
             log "${GREEN}✓ All tasks completed!${NC}"
             break
+        fi
+
+        # Test run checkpoint: pause after first N tasks for user verification
+        if [ "$TEST_RUN_ENABLED" = "true" ] && [ "$checkpoint_passed" = "false" ]; then
+            if [ $tasks_completed_this_run -ge $TEST_RUN_TASKS ]; then
+                log ""
+                log "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+                log "${CYAN}   🔍 Test Run Checkpoint${NC}"
+                log "${CYAN}══════════════════════════════════════════════════════════════${NC}"
+                log ""
+                log "The first ${TEST_RUN_TASKS} tasks have been completed."
+                log "Please review the changes and verify everything is going according to plan."
+                log ""
+                log "You can check:"
+                log "  • Git log: git log --oneline -${TEST_RUN_TASKS}"
+                log "  • Git diff: git diff HEAD~${TEST_RUN_TASKS}"
+                log "  • Build: run your build command"
+                log ""
+                echo -en "${BOLD}Continue with the remaining ${REMAINING} tasks? [y/N]: ${NC}"
+                read -r checkpoint_response
+                checkpoint_response=$(echo "$checkpoint_response" | tr '[:upper:]' '[:lower:]')
+
+                if [ "$checkpoint_response" = "y" ] || [ "$checkpoint_response" = "yes" ]; then
+                    checkpoint_passed=true
+                    log ""
+                    log "${GREEN}✓ Checkpoint approved - continuing with remaining tasks${NC}"
+                else
+                    log ""
+                    log "${YELLOW}Checkpoint not approved - stopping run${NC}"
+                    log "You can review the changes and run Ralph Loop again when ready."
+                    break
+                fi
+            fi
         fi
 
         # Show next task
@@ -526,6 +601,7 @@ main() {
                 log ""
                 log "${GREEN}✅ SUCCESS: ${TASK_ID} completed in ${MINUTES}m ${SECONDS}s${NC}"
                 consecutive_failures=0
+                tasks_completed_this_run=$((tasks_completed_this_run + 1))
 
                 # Verify build after task completion
                 if [ "$BUILD_GATE_ENABLED" = "true" ]; then
@@ -550,6 +626,7 @@ main() {
                 local TASK_DESC=$(get_last_completed_task_description)
                 log ""
                 log "${GREEN}🎉 ALL DONE! Final task ${TASK_ID} completed in ${MINUTES}m ${SECONDS}s${NC}"
+                tasks_completed_this_run=$((tasks_completed_this_run + 1))
 
                 # Final build check
                 if [ "$BUILD_GATE_ENABLED" = "true" ]; then

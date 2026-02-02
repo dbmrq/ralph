@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Ralph Loop - iOS Project Configuration Template
+# Ralph Loop - Generic Project Configuration Template
 #
 # Copy this file to your project's .ralph/config.sh and customize it.
 #
@@ -10,20 +10,11 @@
 #==============================================================================
 
 # Project name (for display purposes)
-PROJECT_NAME="My iOS App"
+PROJECT_NAME="My Project"
 
 # Platform type - determines which platform_prompt.txt to use
 # Options: ios, android, dotnet, python, react, node, generic
-PLATFORM_TYPE="ios"
-
-# Xcode scheme name
-XCODE_SCHEME="MyApp"
-
-# Simulator destination
-SIMULATOR_DESTINATION="platform=iOS Simulator,name=iPhone 15"
-
-# Path to Xcode project/workspace directory (relative to project root)
-XCODE_PROJECT_DIR="."
+PLATFORM_TYPE="generic"
 
 #==============================================================================
 # AGENT SETTINGS
@@ -71,8 +62,8 @@ AUTO_COMMIT=true
 # Commit message prefix (e.g., "feat", "fix", "chore")
 COMMIT_PREFIX="feat"
 
-# Commit message scope (e.g., "ios", "android", "web")
-COMMIT_SCOPE="ios"
+# Commit message scope (e.g., "core", "api", "ui")
+COMMIT_SCOPE=""
 
 #==============================================================================
 # BUILD SETTINGS
@@ -89,23 +80,28 @@ BUILD_FIX_ATTEMPTS=1
 #==============================================================================
 
 # Build command - called to verify the project builds
+# Customize this for your project
 project_build() {
-    cd "$XCODE_PROJECT_DIR"
-    xcodebuild \
-        -scheme "$XCODE_SCHEME" \
-        -destination "$SIMULATOR_DESTINATION" \
-        build \
-        2>&1
+    # Examples:
+    # npm run build
+    # cargo build
+    # go build ./...
+    # dotnet build
+    # make
+    echo "Build command not configured - edit .ralph/config.sh"
+    return 0
 }
 
 # Test command - called to run tests (optional)
 project_test() {
-    cd "$XCODE_PROJECT_DIR"
-    xcodebuild \
-        -scheme "$XCODE_SCHEME" \
-        -destination "$SIMULATOR_DESTINATION" \
-        test \
-        2>&1
+    # Examples:
+    # npm test
+    # cargo test
+    # go test ./...
+    # dotnet test
+    # make test
+    echo "Test command not configured"
+    return 0
 }
 
 #==============================================================================
