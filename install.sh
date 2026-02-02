@@ -465,16 +465,25 @@ detect_project_type() {
 detect_xcode_schemes() {
     local project_dir="$1"
     local xcodeproj xcworkspace
+    local xcode_output
 
     # Prefer workspace over project
     xcworkspace=$(find "$project_dir" -maxdepth 2 -name "*.xcworkspace" -type d 2>/dev/null | grep -v ".xcodeproj" | head -1)
     xcodeproj=$(find "$project_dir" -maxdepth 2 -name "*.xcodeproj" -type d 2>/dev/null | head -1)
 
+    # Show a message while xcodebuild resolves packages (can take a while)
+    echo -e "${CYAN}Detecting Xcode schemes (this may take a moment)...${NC}" >&2
+
     if [ -n "$xcworkspace" ]; then
-        xcodebuild -workspace "$xcworkspace" -list 2>/dev/null | grep -A 100 "Schemes:" | tail -n +2 | grep -v "^$" | sed 's/^[[:space:]]*//' | grep -v "^$"
+        xcode_output=$(xcodebuild -workspace "$xcworkspace" -list 2>&1)
     elif [ -n "$xcodeproj" ]; then
-        xcodebuild -project "$xcodeproj" -list 2>/dev/null | grep -A 100 "Schemes:" | tail -n +2 | grep -v "^$" | sed 's/^[[:space:]]*//' | grep -v "^$"
+        xcode_output=$(xcodebuild -project "$xcodeproj" -list 2>&1)
+    else
+        return
     fi
+
+    # Extract schemes from output
+    echo "$xcode_output" | grep -A 100 "Schemes:" | tail -n +2 | grep -v "^$" | sed 's/^[[:space:]]*//' | grep -v "^$"
 }
 
 detect_xcode_project_dir() {
