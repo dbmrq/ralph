@@ -49,6 +49,7 @@ Look for signs of incomplete previous work:
 
 ### 2.2 Understand the Full Context
 - Study any referenced files, APIs, or documentation
+- Check `.ralph/docs/` for additional project documentation if you need more context
 - Understand how this task relates to previously completed tasks
 - Check if this task depends on or affects other parts of the codebase
 

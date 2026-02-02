@@ -363,6 +363,34 @@ download_ralph_files() {
     # Create directory structure
     mkdir -p "$ralph_dir"
     mkdir -p "$ralph_dir/logs"
+    mkdir -p "$ralph_dir/docs"
+
+    # Create docs README
+    cat > "$ralph_dir/docs/README.md" << 'DOCS_EOF'
+# Ralph Loop Documentation
+
+Place additional documentation files here to provide context for AI agents.
+
+## How It Works
+
+Files in this directory are **not automatically included** in agent prompts,
+but agents are instructed to check here when they need more context.
+
+## Suggested Files
+
+- `architecture.md` - High-level system architecture
+- `api-reference.md` - API documentation
+- `coding-standards.md` - Detailed coding conventions
+- `dependencies.md` - Third-party libraries and their usage
+- `troubleshooting.md` - Common issues and solutions
+
+## Tips
+
+- Keep files focused and concise
+- Use clear headings for easy scanning
+- Include code examples where helpful
+- Update docs when making significant changes
+DOCS_EOF
 
     # Download core files
     local files=(
@@ -646,31 +674,85 @@ create_prompt_file() {
 
     local prompt_file="$ralph_dir/project_prompt.txt"
 
-    cat > "$prompt_file" << EOF
+    if [ "$project_type" = "ios" ]; then
+        cat > "$prompt_file" << EOF
 # Project-Specific Instructions for $project_name
 
 ## Project Overview
-This is a $project_type project. Describe your project here.
+This is an iOS application built with Swift and SwiftUI.
 
-## Key Files and Directories
-- List important files and directories
+## Architecture
+- **Pattern**: MVVM with Coordinators (adjust if different)
+- **UI Framework**: SwiftUI (adjust if using UIKit)
+- **Dependency Injection**: Use protocol-based DI
+- **Modular Structure**: Features are organized in Swift Packages under \`Packages/\`
+
+## Key Directories
+- \`Sources/\` - Main app source code
+- \`Packages/\` - Feature modules as Swift Packages
+- \`Tests/\` - Unit and UI tests
+- \`Resources/\` - Assets, localization files
+
+## Coding Standards
+- Use Swift's native naming conventions (camelCase for variables, PascalCase for types)
+- Prefer \`struct\` over \`class\` unless reference semantics are needed
+- Use \`@MainActor\` for UI-related code
+- Mark classes as \`final\` unless inheritance is intended
+- Use \`async/await\` for asynchronous code
+- Avoid force unwrapping (\`!\`) - use \`guard let\` or \`if let\`
+
+## SwiftUI Guidelines
+- Keep views small and composable
+- Extract reusable components to separate files
+- Use \`@StateObject\` for owned objects, \`@ObservedObject\` for passed objects
+- Prefer \`@Environment\` for dependency injection in views
+
+## Testing Requirements
+- Write unit tests for ViewModels and business logic
+- Use mocks/stubs for network and database dependencies
+- Test edge cases and error handling
+- Aim for 80%+ code coverage on new code
+
+## Things to Avoid
+- Do NOT modify \`.xcodeproj\` files directly if using XcodeGen
+- Do NOT commit \`.DS_Store\` or \`xcuserdata/\`
+- Avoid massive view controllers/views - break them up
+- Don't use singletons for testable code
+
+## Additional Documentation
+Check \`.ralph/docs/\` for additional project documentation.
+EOF
+    else
+        cat > "$prompt_file" << EOF
+# Project-Specific Instructions for $project_name
+
+## Project Overview
+This is a $project_type project. Add a description of your project here.
+
+## Key Directories
+- List important directories and their purposes
 - Explain the project structure
 
 ## Coding Standards
-- Any project-specific conventions
+- Describe your coding conventions
 - Naming patterns, architecture guidelines
-
-## Things to Avoid
-- Known pitfalls
-- Files that should not be modified
+- Code formatting preferences
 
 ## Testing Requirements
 - How to run tests
 - What should be tested
+- Coverage expectations
 
-## Additional Context
-Add any other relevant information for the AI agent.
+## Things to Avoid
+- Known pitfalls
+- Files that should not be modified
+- Anti-patterns specific to this project
+
+## Additional Documentation
+Check \`.ralph/docs/\` for additional project documentation.
+Add files there to provide more context for AI agents.
 EOF
+    fi
 }
 
 create_tasks_file() {
@@ -927,30 +1009,41 @@ run_setup_wizard() {
     echo "Ralph Loop is now configured for your project."
     echo ""
     echo -e "${BOLD}Files created:${NC}"
-    echo "  $ralph_dir/ralph_loop.sh"
-    echo "  $ralph_dir/config.sh"
-    echo "  $ralph_dir/project_prompt.txt"
-    echo "  $ralph_dir/base_prompt.txt"
+    echo "  $ralph_dir/ralph_loop.sh      - Main automation script"
+    echo "  $ralph_dir/config.sh          - Build/test configuration"
+    echo "  $ralph_dir/project_prompt.txt - Project-specific AI instructions"
+    echo "  $ralph_dir/base_prompt.txt    - Core agent workflow"
+    echo "  $ralph_dir/docs/              - Additional documentation for agents"
     if [ "$create_sample_tasks" = true ]; then
-        echo "  $ralph_dir/TASKS.md"
+        echo "  $ralph_dir/TASKS.md           - Task checklist"
     fi
     echo ""
+
+    local step=1
 
     echo -e "${BOLD}Next steps:${NC}"
     echo ""
-    echo "  1. Review and customize your configuration:"
-    echo -e "     ${CYAN}code $ralph_dir/${NC}"
+    echo -e "  $step. ${YELLOW}Review project_prompt.txt${NC} - customize for your project:"
+    echo -e "     ${CYAN}code $ralph_dir/project_prompt.txt${NC}"
+    echo "     This file tells the AI agent about your project's architecture,"
+    echo "     coding standards, and things to avoid."
+    ((step++))
     echo ""
 
     if [ "$create_sample_tasks" = true ]; then
-        echo "  2. Edit TASKS.md with your actual tasks:"
+        echo "  $step. Edit TASKS.md with your actual tasks:"
         echo -e "     ${CYAN}code $ralph_dir/TASKS.md${NC}"
+        ((step++))
         echo ""
-        echo "  3. Run Ralph Loop:"
-    else
-        echo "  2. Run Ralph Loop:"
     fi
 
+    echo "  $step. (Optional) Add documentation to .ralph/docs/:"
+    echo "     Place architecture docs, API references, or coding guides there."
+    echo "     Agents will check this directory when they need more context."
+    ((step++))
+    echo ""
+
+    echo "  $step. Run Ralph Loop:"
     echo -e "     ${CYAN}cd $project_path${NC}"
     echo -e "     ${CYAN}.ralph/ralph_loop.sh .${NC}"
     echo ""
