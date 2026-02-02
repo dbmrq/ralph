@@ -5,17 +5,16 @@
 # This script repeatedly calls an AI agent to complete tasks from a task file
 # until all tasks are done, max iterations reached, or build failures occur.
 #
-# Usage: ./ralph_loop.sh <project_dir> [agent]
-#   project_dir: Path to project containing .ralph/ config directory
+# Usage: .ralph/ralph_loop.sh [agent]
 #   agent: Agent name (default: from config or 'cursor')
 #
 # Examples:
-#   ./ralph_loop.sh ../my-project
-#   ./ralph_loop.sh ../my-project cursor
-#   ./ralph_loop.sh ../my-project auggie
+#   .ralph/ralph_loop.sh           # Uses default agent from config
+#   .ralph/ralph_loop.sh cursor    # Uses Cursor
+#   .ralph/ralph_loop.sh auggie    # Uses Augment
 #
 # Project Setup:
-#   Your project needs a .ralph/ directory with:
+#   This script lives in your project's .ralph/ directory alongside:
 #   - config.sh           (required) - Project configuration
 #   - project_prompt.txt  (optional) - Project-specific instructions
 #   - TASKS.md            (required) - Task checklist
@@ -23,8 +22,11 @@
 
 set -e
 
-# Script directory (where ralph_loop.sh lives)
+# Script directory (where ralph_loop.sh lives, i.e., .ralph/)
 RALPH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Project directory is the parent of .ralph/
+PROJECT_DIR="$(dirname "$RALPH_DIR")"
 
 # Colors for output
 RED='\033[0;31m'
@@ -67,33 +69,17 @@ REVIEW_EVERY_N_TASKS=3
 # ARGUMENT PARSING
 #==============================================================================
 
-if [ $# -lt 1 ]; then
-    echo -e "${RED}Usage: $0 <project_dir> [agent]${NC}"
-    echo ""
-    echo "  project_dir: Path to project containing .ralph/ config directory"
-    echo "  agent:       Agent to use (default: cursor)"
-    echo ""
-    echo "Example: $0 ../my-ios-app auggie"
-    exit 1
-fi
-
-PROJECT_DIR="$(cd "$1" && pwd)"
-AGENT_OVERRIDE="${2:-}"
+# Optional: agent override as first argument
+AGENT_OVERRIDE="${1:-}"
 
 #==============================================================================
 # LOAD PROJECT CONFIGURATION
 #==============================================================================
 
-RALPH_CONFIG_DIR="$PROJECT_DIR/.ralph"
+# Config directory is where this script lives (.ralph/)
+RALPH_CONFIG_DIR="$RALPH_DIR"
 CONFIG_FILE="$RALPH_CONFIG_DIR/config.sh"
 TASK_FILE="$RALPH_CONFIG_DIR/TASKS.md"
-
-if [ ! -d "$RALPH_CONFIG_DIR" ]; then
-    echo -e "${RED}ERROR: .ralph/ directory not found in $PROJECT_DIR${NC}"
-    echo "Create it with: mkdir -p $PROJECT_DIR/.ralph"
-    echo "Then add config.sh and TASKS.md"
-    exit 1
-fi
 
 if [ ! -f "$CONFIG_FILE" ]; then
     echo -e "${RED}ERROR: Config file not found: $CONFIG_FILE${NC}"

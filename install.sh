@@ -1025,7 +1025,7 @@ run_setup_wizard() {
 
     echo "  $step. Run Ralph Loop:"
     echo -e "     ${CYAN}cd $project_path${NC}"
-    echo -e "     ${CYAN}.ralph/ralph_loop.sh .${NC}"
+    echo -e "     ${CYAN}.ralph/ralph_loop.sh${NC}"
     echo ""
 
     # Check agent availability
@@ -1106,7 +1106,7 @@ Leave the task list for the user to fill in themselves.
 After completing the setup, tell the user:
 - What you configured
 - How to add tasks to .ralph/TASKS.md
-- How to run Ralph Loop: .ralph/ralph_loop.sh .
+- How to run Ralph Loop: .ralph/ralph_loop.sh
 
 Output DONE when finished."
 
@@ -1132,7 +1132,7 @@ Output DONE when finished."
         fi
         echo ""
         echo "Or start Ralph Loop directly:"
-        echo -e "  ${CYAN}.ralph/ralph_loop.sh .${NC}"
+        echo -e "  ${CYAN}.ralph/ralph_loop.sh${NC}"
     fi
 
     echo ""
@@ -1241,7 +1241,7 @@ main() {
                 print_success "Updated to version $RALPH_VERSION!"
                 echo ""
                 echo "To run Ralph Loop:"
-                echo -e "  ${CYAN}cd $project_path && .ralph/ralph_loop.sh .${NC}"
+                echo -e "  ${CYAN}cd $project_path && .ralph/ralph_loop.sh${NC}"
                 exit 0
                 ;;
             2)
