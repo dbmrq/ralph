@@ -492,25 +492,37 @@ detect_project_type() {
 
 detect_xcode_schemes() {
     local project_dir="$1"
-    local xcodeproj xcworkspace
-    local xcode_output
+    local schemes=""
 
-    # Prefer workspace over project
+    # Method 1: Try XcodeGen project.yml first (fast, no xcodebuild needed)
+    local project_yml=$(find "$project_dir" -maxdepth 2 -name "project.yml" -type f 2>/dev/null | head -1)
+
+    if [ -n "$project_yml" ] && [ -f "$project_yml" ]; then
+        # Parse scheme names from XcodeGen project.yml
+        # Schemes are top-level keys under 'schemes:' (2-space indent, ending with just ':')
+        schemes=$(sed -n '/^schemes:/,/^[a-zA-Z]/p' "$project_yml" | grep -E "^  [A-Za-z0-9_-]+:$" | sed 's/:$//' | sed 's/^  //')
+
+        if [ -n "$schemes" ]; then
+            echo "$schemes"
+            return
+        fi
+    fi
+
+    # Method 2: Use xcodebuild -list (slower, needs to resolve packages)
+    local xcworkspace xcodeproj xcode_output
+
     xcworkspace=$(find "$project_dir" -maxdepth 2 -name "*.xcworkspace" -type d 2>/dev/null | grep -v ".xcodeproj" | head -1)
     xcodeproj=$(find "$project_dir" -maxdepth 2 -name "*.xcodeproj" -type d 2>/dev/null | head -1)
 
-    # Show a message while xcodebuild resolves packages (can take a while)
-    echo -e "${CYAN}Detecting Xcode schemes (this may take a moment)...${NC}" >&2
-
     if [ -n "$xcworkspace" ]; then
-        xcode_output=$(xcodebuild -workspace "$xcworkspace" -list 2>&1)
+        xcode_output=$(xcodebuild -workspace "$xcworkspace" -list 2>&1 </dev/null)
     elif [ -n "$xcodeproj" ]; then
-        xcode_output=$(xcodebuild -project "$xcodeproj" -list 2>&1)
+        xcode_output=$(xcodebuild -project "$xcodeproj" -list 2>&1 </dev/null)
     else
         return
     fi
 
-    # Extract schemes from output
+    # Extract schemes from xcodebuild output
     echo "$xcode_output" | grep -A 100 "Schemes:" | tail -n +2 | grep -v "^$" | sed 's/^[[:space:]]*//' | grep -v "^$"
 }
 
@@ -844,7 +856,8 @@ run_setup_wizard() {
         echo -e "Xcode project directory: ${BOLD}$xcode_project_dir${NC}"
         echo ""
 
-        # Detect available schemes and let user pick
+        # Detect available schemes
+        echo -e "${CYAN}Detecting Xcode schemes...${NC}"
         local schemes_list=$(detect_xcode_schemes "$project_path")
 
         if [ -n "$schemes_list" ]; then
@@ -854,16 +867,17 @@ run_setup_wizard() {
                 xcode_scheme="$schemes_list"
                 echo -e "Xcode scheme: ${BOLD}$xcode_scheme${NC} (auto-detected)"
             else
-                echo "Available schemes:" >&2
+                echo -e "${GREEN}Found $scheme_count schemes:${NC}"
+                echo ""
                 local i=1
                 while IFS= read -r scheme; do
-                    echo "  $i) $scheme" >&2
+                    echo "  $i) $scheme"
                     ((i++))
                 done <<< "$schemes_list"
-                echo "" >&2
+                echo ""
 
                 local scheme_choice
-                echo -en "${BOLD}Select scheme [1]: ${NC}" >&2
+                echo -en "${BOLD}Select scheme [1]: ${NC}"
                 read scheme_choice </dev/tty
 
                 if [ -z "$scheme_choice" ]; then
@@ -875,6 +889,7 @@ run_setup_wizard() {
                 if [ -z "$xcode_scheme" ]; then
                     xcode_scheme=$(echo "$schemes_list" | head -1)
                 fi
+                echo -e "Selected: ${BOLD}$xcode_scheme${NC}"
             fi
         else
             xcode_scheme=$(ask "Xcode scheme" "$project_name")
