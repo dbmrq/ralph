@@ -63,19 +63,21 @@ ask() {
     local prompt="$1"
     local default="$2"
     local result
-    
+
+    # Write prompt to stderr so it's visible even when stdout is captured
     if [ -n "$default" ]; then
-        echo -en "${BOLD}$prompt${NC} [${default}]: "
+        echo -en "${BOLD}$prompt${NC} [${default}]: " >&2
     else
-        echo -en "${BOLD}$prompt${NC}: "
+        echo -en "${BOLD}$prompt${NC}: " >&2
     fi
-    
-    read result
-    
+
+    # Read from /dev/tty to handle piped execution (e.g., bash <(...))
+    read result </dev/tty
+
     if [ -z "$result" ] && [ -n "$default" ]; then
         result="$default"
     fi
-    
+
     echo "$result"
 }
 
@@ -83,20 +85,22 @@ ask_yes_no() {
     local prompt="$1"
     local default="$2"
     local result
-    
+
+    # Write prompt to stderr so it's visible even when stdout is captured
     if [ "$default" = "y" ]; then
-        echo -en "${BOLD}$prompt${NC} [Y/n]: "
+        echo -en "${BOLD}$prompt${NC} [Y/n]: " >&2
     else
-        echo -en "${BOLD}$prompt${NC} [y/N]: "
+        echo -en "${BOLD}$prompt${NC} [y/N]: " >&2
     fi
-    
-    read result
+
+    # Read from /dev/tty to handle piped execution (e.g., bash <(...))
+    read result </dev/tty
     result=$(echo "$result" | tr '[:upper:]' '[:lower:]')
-    
+
     if [ -z "$result" ]; then
         result="$default"
     fi
-    
+
     [ "$result" = "y" ] || [ "$result" = "yes" ]
 }
 
@@ -105,18 +109,19 @@ ask_choice() {
     shift
     local options=("$@")
     local choice
-    
-    echo -e "${BOLD}$prompt${NC}"
+
+    echo -e "${BOLD}$prompt${NC}" >&2
     for i in "${!options[@]}"; do
-        echo "  $((i+1))) ${options[$i]}"
+        echo "  $((i+1))) ${options[$i]}" >&2
     done
-    echo -en "Enter choice [1]: "
-    read choice
-    
+    echo -en "Enter choice [1]: " >&2
+    # Read from /dev/tty to handle piped execution (e.g., bash <(...))
+    read choice </dev/tty
+
     if [ -z "$choice" ]; then
         choice=1
     fi
-    
+
     echo "${options[$((choice-1))]}"
 }
 
