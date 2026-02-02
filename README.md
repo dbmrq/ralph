@@ -9,7 +9,7 @@ Ralph Loop is a shell script that repeatedly calls an AI coding agent to complet
 Copy and paste this into your terminal:
 
 ```bash
-bash <(gh api repos/W508153_wexinc/ralph-loop/contents/install.sh --jq '.content' | base64 -d)
+bash <(gh api repos/dbmrq/ralph/contents/install.sh --jq '.content' | base64 -d)
 ```
 
 **That's it!** This single command handles everything from start to finish.
@@ -48,7 +48,7 @@ Just run the installer again from anywhere:
 ./install.sh
 
 # Or use the one-liner from anywhere
-bash <(gh api repos/W508153_wexinc/ralph-loop/contents/install.sh --jq '.content' | base64 -d)
+bash <(gh api repos/dbmrq/ralph/contents/install.sh --jq '.content' | base64 -d)
 ```
 
 It detects the existing installation and shows you a menu:

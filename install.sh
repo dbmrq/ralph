@@ -6,7 +6,7 @@
 # The AI agent can see these files and understand the automation context.
 #
 # One-liner install (run from your project directory):
-#   bash <(gh api repos/W508153_wexinc/ralph-loop/contents/install.sh --jq '.content' | base64 -d)
+#   bash <(gh api repos/dbmrq/ralph/contents/install.sh --jq '.content' | base64 -d)
 #
 # What it does:
 #   1. Detects if you're in a git repository
@@ -31,7 +31,7 @@ BOLD='\033[1m'
 NC='\033[0m'
 
 # GitHub repo for downloading files
-REPO_NAME="W508153_wexinc/ralph-loop"
+REPO_NAME="dbmrq/ralph"
 
 # Default values
 DEFAULT_BRANCH="feature/ralph-automation"
