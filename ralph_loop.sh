@@ -111,8 +111,62 @@ if [ ! -f "$TASK_FILE" ]; then
     exit 1
 fi
 
-# Prompt files are optional but we should have at least one
-# (base_prompt.txt is always available in ralph-loop repo)
+# Validate agent is available
+validate_agent() {
+    case "$AGENT_TYPE" in
+        cursor)
+            if ! command -v agent &> /dev/null; then
+                echo -e "${RED}ERROR: Cursor CLI not found!${NC}"
+                echo ""
+                echo "The 'agent' command is required to use Cursor as the AI agent."
+                echo ""
+                echo "To install Cursor CLI:"
+                echo "  1. Open Cursor"
+                echo "  2. Press Cmd+Shift+P (or Ctrl+Shift+P)"
+                echo "  3. Type 'Install cursor command' and select it"
+                echo ""
+                echo "Or switch to a different agent in .ralph/config.sh"
+                exit 1
+            fi
+            ;;
+        auggie)
+            if ! command -v auggie &> /dev/null; then
+                echo -e "${RED}ERROR: Augment CLI not found!${NC}"
+                echo ""
+                echo "The 'auggie' command is required to use Augment as the AI agent."
+                echo ""
+                echo "Visit https://augmentcode.com for installation instructions."
+                echo ""
+                echo "Or switch to a different agent in .ralph/config.sh"
+                exit 1
+            fi
+            ;;
+        custom)
+            if ! type run_agent_custom &> /dev/null; then
+                echo -e "${RED}ERROR: Custom agent selected but run_agent_custom() not defined!${NC}"
+                echo ""
+                echo "Define run_agent_custom() in .ralph/config.sh"
+                echo ""
+                echo "Example:"
+                echo "  run_agent_custom() {"
+                echo "      local prompt=\"\$1\""
+                echo "      local log_file=\"\$2\""
+                echo "      # Your custom agent command here"
+                echo "  }"
+                exit 1
+            fi
+            ;;
+        *)
+            echo -e "${RED}ERROR: Unknown agent type '$AGENT_TYPE'${NC}"
+            echo ""
+            echo "Valid options: cursor, auggie, custom"
+            echo "Set AGENT_TYPE in .ralph/config.sh"
+            exit 1
+            ;;
+    esac
+}
+
+validate_agent
 
 #==============================================================================
 # SETUP LOGGING

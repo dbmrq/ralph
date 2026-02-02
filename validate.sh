@@ -185,6 +185,36 @@ fi
 echo ""
 
 #------------------------------------------------------------------------------
+# Check 7: Agent availability (informational)
+#------------------------------------------------------------------------------
+echo "Checking available AI agents..."
+
+cursor_available=false
+auggie_available=false
+
+if command -v agent &> /dev/null; then
+    echo -e "${GREEN}✓ Cursor CLI (agent) is available${NC}"
+    cursor_available=true
+else
+    echo -e "${YELLOW}○ Cursor CLI (agent) not found${NC}"
+fi
+
+if command -v auggie &> /dev/null; then
+    echo -e "${GREEN}✓ Augment CLI (auggie) is available${NC}"
+    auggie_available=true
+else
+    echo -e "${YELLOW}○ Augment CLI (auggie) not found${NC}"
+fi
+
+if [ "$cursor_available" = false ] && [ "$auggie_available" = false ]; then
+    echo ""
+    echo -e "${YELLOW}⚠ No AI agent CLI detected. You'll need to install one before running Ralph Loop.${NC}"
+    ((WARNINGS++)) || true
+fi
+
+echo ""
+
+#------------------------------------------------------------------------------
 # Summary
 #------------------------------------------------------------------------------
 echo "═══════════════════════════════════════════════════════════════"

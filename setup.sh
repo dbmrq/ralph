@@ -126,6 +126,108 @@ ask_choice() {
 }
 
 #==============================================================================
+# AGENT DETECTION
+#==============================================================================
+
+# Check if Cursor CLI (agent command) is available
+is_cursor_available() {
+    command -v agent &> /dev/null
+}
+
+# Check if Augment CLI (auggie command) is available
+is_auggie_available() {
+    command -v auggie &> /dev/null
+}
+
+# Get list of available agents
+get_available_agents() {
+    local agents=()
+    if is_cursor_available; then
+        agents+=("cursor")
+    fi
+    if is_auggie_available; then
+        agents+=("auggie")
+    fi
+    # Custom is always available as an option
+    agents+=("custom")
+    echo "${agents[@]}"
+}
+
+# Detect and select agent automatically or with user input
+detect_or_select_agent() {
+    local cursor_available=false
+    local auggie_available=false
+
+    if is_cursor_available; then
+        cursor_available=true
+    fi
+    if is_auggie_available; then
+        auggie_available=true
+    fi
+
+    # If both are available, let user choose
+    if [ "$cursor_available" = true ] && [ "$auggie_available" = true ]; then
+        echo -e "Multiple AI agents detected:" >&2
+        echo -e "  ${GREEN}✓${NC} Cursor CLI (agent)" >&2
+        echo -e "  ${GREEN}✓${NC} Augment CLI (auggie)" >&2
+        echo "" >&2
+
+        echo -e "${BOLD}Select AI agent:${NC}" >&2
+        echo "  1) cursor" >&2
+        echo "  2) auggie" >&2
+        echo "  3) custom" >&2
+        echo -en "Enter choice [1]: " >&2
+        local choice
+        read choice </dev/tty
+
+        case "$choice" in
+            2) echo "auggie" ;;
+            3) echo "custom" ;;
+            *) echo "cursor" ;;
+        esac
+        return
+    fi
+
+    # If only Cursor is available, auto-select it
+    if [ "$cursor_available" = true ]; then
+        echo -e "Detected: ${GREEN}✓${NC} Cursor CLI (agent command)" >&2
+        echo "cursor"
+        return
+    fi
+
+    # If only Auggie is available, auto-select it
+    if [ "$auggie_available" = true ]; then
+        echo -e "Detected: ${GREEN}✓${NC} Augment CLI (auggie command)" >&2
+        echo "auggie"
+        return
+    fi
+
+    # Neither is available - warn and ask
+    echo -e "${YELLOW}⚠ No AI agent CLI detected!${NC}" >&2
+    echo "" >&2
+    echo "Ralph Loop requires one of the following:" >&2
+    echo "  • Cursor CLI ('agent' command) - https://cursor.sh" >&2
+    echo "  • Augment CLI ('auggie' command) - https://augmentcode.com" >&2
+    echo "" >&2
+    echo "You can still set up Ralph Loop and install an agent later." >&2
+    echo "" >&2
+
+    echo -e "${BOLD}Which agent do you plan to use?${NC}" >&2
+    echo "  1) cursor (will need to install Cursor CLI)" >&2
+    echo "  2) auggie (will need to install Augment CLI)" >&2
+    echo "  3) custom (define your own in config.sh)" >&2
+    echo -en "Enter choice [1]: " >&2
+    local choice
+    read choice </dev/tty
+
+    case "$choice" in
+        2) echo "auggie" ;;
+        3) echo "custom" ;;
+        *) echo "cursor" ;;
+    esac
+}
+
+#==============================================================================
 # PROJECT DETECTION
 #==============================================================================
 
@@ -419,13 +521,13 @@ main() {
     fi
 
     #--------------------------------------------------------------------------
-    # Agent Selection
+    # Agent Selection (auto-detect if possible)
     #--------------------------------------------------------------------------
     print_step "Step $step_num: AI Agent"
     ((step_num++))
     echo ""
 
-    local agent_type=$(ask_choice "Select AI agent:" "cursor" "auggie" "custom")
+    local agent_type=$(detect_or_select_agent)
     print_success "Agent: $agent_type"
     echo ""
 
@@ -455,11 +557,7 @@ main() {
                 print_warning "You'll need to create a branch before running Ralph Loop."
             fi
         else
-            echo "Branch looks good for Ralph Loop."
-            if ask_yes_no "Create a different branch instead?" "n"; then
-                create_branch=true
-                branch_name=$(ask "Branch name" "$DEFAULT_BRANCH")
-            fi
+            print_success "Branch '$current_branch' looks good for Ralph Loop."
         fi
     else
         print_warning "Not a git repository. Ralph Loop works best with git."
@@ -608,12 +706,23 @@ main() {
     echo -e "     ${CYAN}$RALPH_DIR/ralph_loop.sh $project_path${NC}"
     echo ""
 
-    if [ "$agent_type" = "cursor" ]; then
-        echo -e "${YELLOW}Note:${NC} Make sure Cursor CLI is installed and 'agent' command is available."
-    elif [ "$agent_type" = "auggie" ]; then
-        echo -e "${YELLOW}Note:${NC} Make sure Augment CLI is installed and 'auggie' command is available."
+    # Only show warning if the selected agent is not installed
+    if [ "$agent_type" = "cursor" ] && ! is_cursor_available; then
+        echo -e "${YELLOW}⚠ Action required:${NC} Install Cursor CLI to use the 'agent' command."
+        echo "  Visit: https://cursor.sh"
+        echo ""
+    elif [ "$agent_type" = "auggie" ] && ! is_auggie_available; then
+        echo -e "${YELLOW}⚠ Action required:${NC} Install Augment CLI to use the 'auggie' command."
+        echo "  Visit: https://augmentcode.com"
+        echo ""
+    elif [ "$agent_type" = "custom" ]; then
+        echo -e "${YELLOW}Note:${NC} Define run_agent_custom() in .ralph/config.sh"
+        echo ""
+    else
+        echo -e "${GREEN}✓ Agent '$agent_type' is ready to use!${NC}"
+        echo ""
     fi
-    echo ""
+
     echo "Happy automating! 🤖"
 }
 
