@@ -458,7 +458,7 @@ show_menu() {
 
     echo "  1) Set up a new project"
     echo "  2) Add/edit tasks for an existing project"
-    echo "  3) Add custom instructions for an existing project"
+    echo "  3) Edit instructions (3-level system)"
     echo "  4) Run Ralph Loop on a project"
     echo "  5) Update ralph-loop to latest version"
     echo "  6) Exit"
@@ -621,52 +621,212 @@ add_tasks_interactively() {
 
 
 #==============================================================================
-# CUSTOM INSTRUCTIONS
+# INSTRUCTIONS (3-Level System)
 #==============================================================================
 
 edit_instructions() {
     local ralph_dir="$1"
 
-    print_subheader "Custom Instructions"
+    print_subheader "Edit Instructions (3-Level System)"
+
+    echo ""
+    echo "Ralph Loop uses a 3-level instruction system:"
+    echo ""
+    echo "  ${BOLD}Level 1: Global${NC} - Ralph Loop workflow (base_prompt.txt)"
+    echo "           Applies to all projects. Rarely needs editing."
+    echo ""
+    echo "  ${BOLD}Level 2: Platform${NC} - Platform guidelines (templates/{platform}/platform_prompt.txt)"
+    echo "           iOS, Python, generic, etc. Edit to customize platform standards."
+    echo ""
+    echo "  ${BOLD}Level 3: Project${NC} - Project-specific (.ralph/project_prompt.txt)"
+    echo "           Your project's unique requirements. Most commonly edited."
+    echo ""
+    echo "Which level do you want to edit?"
+    echo "  1) Project instructions (Level 3) - most common"
+    echo "  2) Platform instructions (Level 2)"
+    echo "  3) Global instructions (Level 1)"
+    echo "  4) View all levels combined"
+    echo ""
+
+    local level_choice=$(ask "Choose a level" "1")
+
+    case "$level_choice" in
+        1)
+            edit_project_instructions "$ralph_dir"
+            ;;
+        2)
+            edit_platform_instructions "$ralph_dir"
+            ;;
+        3)
+            edit_global_instructions "$ralph_dir"
+            ;;
+        4)
+            view_combined_instructions "$ralph_dir"
+            ;;
+        *)
+            edit_project_instructions "$ralph_dir"
+            ;;
+    esac
+
+    show_menu "$ralph_dir"
+}
+
+edit_project_instructions() {
+    local ralph_dir="$1"
+
+    print_subheader "Project Instructions (Level 3)"
 
     local project_path=$(select_project "$ralph_dir" "Which project's instructions do you want to edit?")
-    local prompt_file="$project_path/.ralph/prompt.txt"
+    local prompt_file="$project_path/.ralph/project_prompt.txt"
 
     echo ""
-    echo "Custom instructions tell the AI agent about your project's specific"
-    echo "requirements, coding standards, and any important context."
+    echo "Project instructions describe YOUR project's unique requirements:"
+    echo "  - Project structure and key files"
+    echo "  - Coding conventions specific to this project"
+    echo "  - Things to avoid"
+    echo "  - Reference materials"
     echo ""
     echo "You can:"
-    echo "  1) Open instructions file in your editor"
-    echo "  2) Add instructions interactively here"
+    echo "  1) Open in your editor"
+    echo "  2) Add instructions interactively"
     echo "  3) View current instructions"
     echo ""
 
-    local choice=$(ask "Choose an option" "2")
+    local choice=$(ask "Choose an option" "1")
 
     case "$choice" in
         1)
             local editor="${EDITOR:-${VISUAL:-nano}}"
             print_step "Opening $prompt_file in $editor..."
             "$editor" "$prompt_file"
+            print_success "Project instructions updated!"
             ;;
         2)
             add_instructions_interactively "$prompt_file"
             ;;
         3)
             echo ""
-            print_step "Current instructions:"
-            echo ""
-            cat "$prompt_file"
+            if [ -f "$prompt_file" ]; then
+                print_step "Current project instructions:"
+                echo ""
+                cat "$prompt_file"
+            else
+                print_warning "No project instructions file found at $prompt_file"
+            fi
             echo ""
             if ask_yes_no "Edit instructions?" "y"; then
-                edit_instructions "$ralph_dir"
+                edit_project_instructions "$ralph_dir"
             fi
             ;;
     esac
+}
 
-    print_success "Instructions updated!"
-    show_menu "$ralph_dir"
+edit_platform_instructions() {
+    local ralph_dir="$1"
+
+    print_subheader "Platform Instructions (Level 2)"
+
+    echo ""
+    echo "Available platforms:"
+    local platforms=()
+    for dir in "$ralph_dir/templates"/*/; do
+        if [ -d "$dir" ]; then
+            local platform=$(basename "$dir")
+            platforms+=("$platform")
+            echo "  - $platform"
+        fi
+    done
+    echo ""
+
+    local platform=$(ask "Which platform?" "ios")
+    local prompt_file="$ralph_dir/templates/$platform/platform_prompt.txt"
+
+    if [ ! -f "$prompt_file" ]; then
+        print_warning "Platform '$platform' not found."
+        if ask_yes_no "Create it?" "y"; then
+            mkdir -p "$ralph_dir/templates/$platform"
+            cp "$ralph_dir/templates/generic/platform_prompt.txt" "$prompt_file"
+            print_success "Created $prompt_file from generic template"
+        else
+            return
+        fi
+    fi
+
+    local editor="${EDITOR:-${VISUAL:-nano}}"
+    print_step "Opening $prompt_file in $editor..."
+    "$editor" "$prompt_file"
+    print_success "Platform instructions updated!"
+}
+
+edit_global_instructions() {
+    local ralph_dir="$1"
+
+    print_subheader "Global Instructions (Level 1)"
+
+    local prompt_file="$ralph_dir/base_prompt.txt"
+
+    echo ""
+    print_warning "Global instructions affect ALL projects using Ralph Loop."
+    echo "These define the core workflow: task format, status markers, rules."
+    echo ""
+
+    if ask_yes_no "Are you sure you want to edit global instructions?" "n"; then
+        local editor="${EDITOR:-${VISUAL:-nano}}"
+        print_step "Opening $prompt_file in $editor..."
+        "$editor" "$prompt_file"
+        print_success "Global instructions updated!"
+    fi
+}
+
+view_combined_instructions() {
+    local ralph_dir="$1"
+
+    print_subheader "View Combined Instructions"
+
+    local project_path=$(select_project "$ralph_dir" "Which project?")
+
+    # Get platform type from config
+    local config_file="$project_path/.ralph/config.sh"
+    local platform_type="generic"
+    if [ -f "$config_file" ]; then
+        source "$config_file"
+        platform_type="${PLATFORM_TYPE:-generic}"
+    fi
+
+    echo ""
+    echo "Showing combined instructions for: $project_path"
+    echo "Platform type: $platform_type"
+    echo ""
+    echo "${CYAN}════════════════════════════════════════════════════════════════${NC}"
+    echo "${CYAN}  Level 1: Global Instructions${NC}"
+    echo "${CYAN}════════════════════════════════════════════════════════════════${NC}"
+    if [ -f "$ralph_dir/base_prompt.txt" ]; then
+        cat "$ralph_dir/base_prompt.txt"
+    else
+        echo "(not found)"
+    fi
+    echo ""
+    echo "${CYAN}════════════════════════════════════════════════════════════════${NC}"
+    echo "${CYAN}  Level 2: Platform Instructions ($platform_type)${NC}"
+    echo "${CYAN}════════════════════════════════════════════════════════════════${NC}"
+    if [ -f "$ralph_dir/templates/$platform_type/platform_prompt.txt" ]; then
+        cat "$ralph_dir/templates/$platform_type/platform_prompt.txt"
+    else
+        echo "(not found)"
+    fi
+    echo ""
+    echo "${CYAN}════════════════════════════════════════════════════════════════${NC}"
+    echo "${CYAN}  Level 3: Project Instructions${NC}"
+    echo "${CYAN}════════════════════════════════════════════════════════════════${NC}"
+    if [ -f "$project_path/.ralph/project_prompt.txt" ]; then
+        cat "$project_path/.ralph/project_prompt.txt"
+    else
+        echo "(not found)"
+    fi
+    echo ""
+
+    echo ""
+    read -p "Press Enter to continue..."
 }
 
 add_instructions_interactively() {
@@ -676,11 +836,10 @@ add_instructions_interactively() {
     echo "Enter your custom instructions for the AI agent."
     echo ""
     echo "These could include:"
-    echo "  - Coding standards and conventions"
-    echo "  - Project architecture overview"
-    echo "  - Important files or patterns to follow"
-    echo "  - Testing requirements"
-    echo "  - Any warnings or things to avoid"
+    echo "  - Project structure and key files"
+    echo "  - Coding conventions specific to this project"
+    echo "  - Things to avoid"
+    echo "  - Reference materials"
     echo ""
     echo "Type your instructions below. When finished, type 'END' on a new line."
     echo ""
@@ -697,7 +856,9 @@ add_instructions_interactively() {
 
     if [ -n "$instructions" ]; then
         # Append to existing file with a separator
-        echo "" >> "$prompt_file"
+        if [ -f "$prompt_file" ]; then
+            echo "" >> "$prompt_file"
+        fi
         echo "# Custom Instructions (added $(date +%Y-%m-%d))" >> "$prompt_file"
         echo "" >> "$prompt_file"
         echo "$instructions" >> "$prompt_file"

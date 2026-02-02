@@ -16,9 +16,9 @@
 #
 # Project Setup:
 #   Your project needs a .ralph/ directory with:
-#   - config.sh    (required) - Project configuration
-#   - prompt.txt   (required) - Project-specific prompt
-#   - TASKS.md     (required) - Task checklist
+#   - config.sh           (required) - Project configuration
+#   - project_prompt.txt  (optional) - Project-specific instructions
+#   - TASKS.md            (required) - Task checklist
 #
 
 set -e
@@ -186,11 +186,6 @@ build_prompt() {
     local base_prompt_file="$RALPH_DIR/base_prompt.txt"
     local platform_prompt_file="$RALPH_DIR/templates/${PLATFORM_TYPE:-generic}/platform_prompt.txt"
     local project_prompt_file="$RALPH_CONFIG_DIR/project_prompt.txt"
-
-    # Legacy support: if old prompt.txt exists and project_prompt.txt doesn't, use it
-    if [ ! -f "$project_prompt_file" ] && [ -f "$RALPH_CONFIG_DIR/prompt.txt" ]; then
-        project_prompt_file="$RALPH_CONFIG_DIR/prompt.txt"
-    fi
 
     # Level 1: Global/Ralph Loop instructions
     if [ -f "$base_prompt_file" ]; then

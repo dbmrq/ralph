@@ -559,12 +559,25 @@ create_config_file() {
 
 HEADER
 
+    # Map project type to platform type
+    local platform_type="generic"
+    case "$project_type" in
+        ios) platform_type="ios" ;;
+        python) platform_type="python" ;;
+        web-react|node) platform_type="generic" ;;  # TODO: add web platform
+        *) platform_type="generic" ;;
+    esac
+
     cat >> "$config_file" << EOF
 #==============================================================================
 # PROJECT SETTINGS
 #==============================================================================
 
 PROJECT_NAME="$project_name"
+
+# Platform type - determines which platform_prompt.txt to use
+# Options: ios, python, generic (more can be added in templates/)
+PLATFORM_TYPE="$platform_type"
 
 #==============================================================================
 # AGENT SETTINGS
@@ -579,6 +592,14 @@ AGENT_TYPE="$agent_type"
 MAX_ITERATIONS=$max_iterations
 PAUSE_SECONDS=5
 MAX_CONSECUTIVE_FAILURES=3
+
+#==============================================================================
+# TEST RUN SETTINGS
+#==============================================================================
+
+# Pause after first N tasks for user verification
+TEST_RUN_ENABLED=true
+TEST_RUN_TASKS=2
 
 #==============================================================================
 # GIT SETTINGS
