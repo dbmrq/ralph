@@ -1095,16 +1095,42 @@ Look at the codebase and fill in each section:
 
 Be specific and accurate based on what you find in the code.
 
-### 2. Verify .ralph/config.sh
-Check that the build and test commands are correct for this project.
-Fix them if needed.
+### 2. Configure build and test commands in .ralph/config.sh
+
+This is CRITICAL. The script uses these functions to verify code quality.
+
+Look at the existing config.sh and make sure these functions are properly defined:
+
+#### project_build()
+This function should build/compile the project. Examples:
+- iOS/Xcode: \`xcodebuild -scheme MyApp -destination 'platform=iOS Simulator,...' build\`
+- Swift Package: \`swift build\`
+- Node.js: \`npm run build\`
+- Python: \`python -m py_compile *.py\` or a linter
+
+#### project_test()
+This function should run the project's tests. Examples:
+- iOS/Xcode: \`xcodebuild -scheme MyApp -destination 'platform=iOS Simulator,...' test\`
+- Swift Package: \`swift test\`
+- Node.js: \`npm test\`
+- Python: \`pytest\`
+
+Look at the project structure to determine the correct commands. Check for:
+- package.json scripts
+- Makefile targets
+- project.yml or .xcodeproj for iOS
+- setup.py or pyproject.toml for Python
+
+If the project uses XcodeGen (has project.yml), you may need to run \`xcodegen\` first.
 
 ### 3. Do NOT modify .ralph/TASKS.md
 Leave the task list for the user to fill in themselves.
 
 ### 4. Final Instructions
 After completing the setup, tell the user:
-- What you configured
+- What you configured in project_prompt.txt
+- What build command you set up
+- What test command you set up
 - How to add tasks to .ralph/TASKS.md
 - How to run Ralph Loop: .ralph/ralph_loop.sh
 
