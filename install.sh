@@ -81,7 +81,8 @@ ask() {
         echo -en "${BOLD}$prompt${NC}: "
     fi
 
-    read result
+    # Read from /dev/tty to handle piped execution (e.g., bash <(...))
+    read result </dev/tty
 
     if [ -z "$result" ] && [ -n "$default" ]; then
         result="$default"
@@ -101,7 +102,8 @@ ask_yes_no() {
         echo -en "${BOLD}$prompt${NC} [y/N]: "
     fi
 
-    read result
+    # Read from /dev/tty to handle piped execution (e.g., bash <(...))
+    read result </dev/tty
     result=$(echo "$result" | tr '[:upper:]' '[:lower:]')
 
     if [ -z "$result" ]; then
@@ -596,7 +598,7 @@ add_tasks_interactively() {
 
     while true; do
         echo -en "${BOLD}Task $task_num${NC}: "
-        read task_desc
+        read task_desc </dev/tty
 
         if [ "$task_desc" = "done" ] || [ -z "$task_desc" ]; then
             break
@@ -604,7 +606,7 @@ add_tasks_interactively() {
 
         # Ask for optional details
         echo -en "  ${CYAN}Details (optional, press Enter to skip)${NC}: "
-        read task_details
+        read task_details </dev/tty
 
         # Append to tasks file
         echo "" >> "$tasks_file"
@@ -826,7 +828,7 @@ view_combined_instructions() {
     echo ""
 
     echo ""
-    read -p "Press Enter to continue..."
+    read -p "Press Enter to continue..." </dev/tty
 }
 
 add_instructions_interactively() {
@@ -847,7 +849,7 @@ add_instructions_interactively() {
     echo ""
 
     local instructions=""
-    while IFS= read -r line; do
+    while IFS= read -r line </dev/tty; do
         if [ "$line" = "END" ]; then
             break
         fi
