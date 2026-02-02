@@ -285,7 +285,7 @@ install_or_update_ralph_loop() {
         if ask_yes_no "Check for updates?" "y"; then
             print_step "Updating ralph-loop..." >&2
             cd "$ralph_dir"
-            git pull origin main 2>/dev/null || git pull origin master 2>/dev/null || true
+            git pull origin main >/dev/null 2>&1 || git pull origin master >/dev/null 2>&1 || true
             print_success "Updated to latest version!" >&2
         fi
         echo "$ralph_dir"
@@ -330,7 +330,7 @@ install_or_update_ralph_loop() {
             print_success "ralph-loop already installed at $install_path" >&2
             cd "$install_path"
             if ask_yes_no "Update to latest version?" "y"; then
-                git pull origin main 2>/dev/null || git pull origin master 2>/dev/null || true
+                git pull origin main >/dev/null 2>&1 || git pull origin master >/dev/null 2>&1 || true
             fi
             echo "$install_path"
             return
