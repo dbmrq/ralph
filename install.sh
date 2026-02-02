@@ -364,7 +364,15 @@ install_or_update_ralph_loop() {
 detect_project_type() {
     local project_dir="$1"
 
-    if [ -f "$project_dir/Package.swift" ] || ls "$project_dir"/*.xcodeproj &>/dev/null 2>&1 || ls "$project_dir"/*.xcworkspace &>/dev/null 2>&1; then
+    # iOS/macOS detection: Xcode projects, Swift packages, or XcodeGen
+    if [ -f "$project_dir/Package.swift" ] || \
+       [ -f "$project_dir/project.yml" ] || \
+       [ -f "$project_dir/project.yaml" ] || \
+       ls "$project_dir"/*.xcodeproj &>/dev/null 2>&1 || \
+       ls "$project_dir"/*.xcworkspace &>/dev/null 2>&1 || \
+       find "$project_dir" -maxdepth 2 -name "*.xcodeproj" 2>/dev/null | grep -q . || \
+       find "$project_dir" -maxdepth 2 -name "*.xcworkspace" 2>/dev/null | grep -q . || \
+       find "$project_dir" -maxdepth 2 -name "project.yml" 2>/dev/null | grep -q .; then
         echo "ios"
     elif [ -f "$project_dir/package.json" ]; then
         if grep -q '"react"' "$project_dir/package.json" 2>/dev/null; then

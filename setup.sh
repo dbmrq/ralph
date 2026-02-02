@@ -126,19 +126,33 @@ ask_choice() {
 
 detect_project_type() {
     local project_dir="$1"
-    
-    # iOS/Xcode
+
+    # iOS/Xcode - check for Xcode projects, Swift packages, or XcodeGen
     if ls "$project_dir"/*.xcodeproj &>/dev/null || ls "$project_dir"/*.xcworkspace &>/dev/null; then
         echo "ios"
         return
     fi
-    
-    # Check subdirectories for Xcode projects
-    if find "$project_dir" -maxdepth 2 -name "*.xcodeproj" -o -name "*.xcworkspace" 2>/dev/null | head -1 | grep -q .; then
+
+    # XcodeGen project files
+    if [ -f "$project_dir/project.yml" ] || [ -f "$project_dir/project.yaml" ]; then
         echo "ios"
         return
     fi
-    
+
+    # Swift Package Manager
+    if [ -f "$project_dir/Package.swift" ]; then
+        echo "ios"
+        return
+    fi
+
+    # Check subdirectories for Xcode projects or XcodeGen
+    if find "$project_dir" -maxdepth 2 -name "*.xcodeproj" 2>/dev/null | grep -q . || \
+       find "$project_dir" -maxdepth 2 -name "*.xcworkspace" 2>/dev/null | grep -q . || \
+       find "$project_dir" -maxdepth 2 -name "project.yml" 2>/dev/null | grep -q .; then
+        echo "ios"
+        return
+    fi
+
     # React/Node
     if [ -f "$project_dir/package.json" ]; then
         if grep -q "react" "$project_dir/package.json" 2>/dev/null; then
@@ -148,25 +162,25 @@ detect_project_type() {
         echo "node"
         return
     fi
-    
+
     # Python
     if [ -f "$project_dir/requirements.txt" ] || [ -f "$project_dir/pyproject.toml" ] || [ -f "$project_dir/setup.py" ]; then
         echo "python"
         return
     fi
-    
+
     # Go
     if [ -f "$project_dir/go.mod" ]; then
         echo "go"
         return
     fi
-    
+
     # Rust
     if [ -f "$project_dir/Cargo.toml" ]; then
         echo "rust"
         return
     fi
-    
+
     echo "unknown"
 }
 
