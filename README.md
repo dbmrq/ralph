@@ -20,9 +20,9 @@ The script guides you through 100% of the setup:
 
 1. **Checks prerequisites** - Installs Homebrew and GitHub CLI if needed
 2. **Authenticates** - Logs you into GitHub if not already authenticated
-3. **Installs ralph-loop** - Clones to your preferred location
-4. **Configures your project** - Detects project type, sets up build commands
-5. **Adds your tasks** - Interactive prompts to add tasks and custom instructions
+3. **Configures your project** - Detects project type, sets up build commands
+4. **Installs files** - Copies Ralph Loop files into your project's `.ralph/` directory
+5. **AI Setup Assistant** - Calls an AI agent to analyze your project and configure settings
 6. **Creates a branch** - Sets up a feature branch for safety
 7. **Runs Ralph Loop** - Starts the automation when you're ready
 
@@ -127,45 +127,63 @@ These could include:
 Type your instructions below. When finished, type 'END' on a new line.
 ```
 
+### AI Setup Assistant
+
+At the end of installation, an AI agent analyzes your project and automatically configures:
+
+- **`project_prompt.txt`** - Project architecture, coding standards, key directories
+- **`config.sh`** - Build and test commands appropriate for your project type
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+AI Setup Assistant
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The AI agent can analyze your project and automatically fill in:
+  • project_prompt.txt - Project-specific instructions
+  • config.sh - Build and test commands
+
+Run AI setup assistant now? [Y/n]:
+```
+
+The assistant leaves `TASKS.md` for you to fill in with your actual tasks.
+
 ## Manual Usage (Advanced)
 
 If you prefer to run commands directly:
 
 ```bash
-# Run Ralph Loop on a project
-./ralph-loop/ralph_loop.sh /path/to/your/project
+# Run Ralph Loop (from within your project directory)
+.ralph/ralph_loop.sh
 
 # With a specific agent
-./ralph-loop/ralph_loop.sh /path/to/your/project auggie
+.ralph/ralph_loop.sh auggie
 
 # Just run the setup wizard
 ./ralph-loop/setup.sh
 ```
 
+The script auto-detects the project directory from its location inside `.ralph/`.
+
 ## Directory Structure
 
+After installation, Ralph Loop files live inside your project:
+
 ```
-~/projects/
-├── ralph-loop/                    # This repo
+my-project/                        # Your project
+├── .ralph/                        # Ralph Loop (all files here)
 │   ├── ralph_loop.sh              # Main script
 │   ├── base_prompt.txt            # Level 1: Global instructions
-│   └── templates/                 # Platform templates
-│       ├── ios/
-│       │   ├── config.sh
-│       │   ├── platform_prompt.txt  # Level 2: iOS guidelines
-│       │   └── project_prompt.txt   # Level 3 template
-│       └── generic/
-│           ├── config.sh
-│           └── platform_prompt.txt  # Level 2: Generic guidelines
-│
-└── my-project/                    # Your project
-    ├── .ralph/                    # Ralph configuration
-    │   ├── config.sh              # Project settings
-    │   ├── project_prompt.txt     # Level 3: Project-specific instructions
-    │   ├── TASKS.md               # Task checklist
-    │   └── logs/                  # Run logs (auto-created)
-    └── (your project files)
+│   ├── platform_prompt.txt        # Level 2: Platform guidelines
+│   ├── project_prompt.txt         # Level 3: Project-specific instructions
+│   ├── config.sh                  # Project settings
+│   ├── TASKS.md                   # Task checklist
+│   ├── docs/                      # Additional documentation (optional)
+│   └── logs/                      # Run logs (auto-created)
+└── (your project files)
 ```
+
+This self-contained structure means you can run `.ralph/ralph_loop.sh` from anywhere in your project.
 
 ## 3-Level Prompt System
 
@@ -217,6 +235,51 @@ TEST_RUN_ENABLED=true   # Enable/disable checkpoint
 TEST_RUN_TASKS=2        # Tasks before checkpoint
 ```
 
+## Model Selection
+
+At startup, Ralph Loop prompts you to select which AI model to use:
+
+```
+Fetching available models for cursor...
+
+Available models (22):
+
+  1) auto
+  2) gpt-5.2-codex
+  ...
+  17) opus-4.5 (current)
+  18) sonnet-4.5
+  ...
+
+Select model [17]:
+```
+
+To skip the prompt, set a default model in `config.sh`:
+```bash
+DEFAULT_MODEL="opus-4.5"
+```
+
+## Progress Indicator
+
+While the agent is working, a real-time progress display shows:
+
+```
+⠹ Agent working...
+  ⏱  02:34 elapsed  📁  5 files changed
+  💬  Implementing the new feature...
+```
+
+- **Spinner** - Visual indicator the script is running
+- **Elapsed time** - How long the agent has been working
+- **Files changed** - Number of modified files (from git)
+- **Last output** - Most recent line from the agent's log
+
+When the agent completes, a summary is shown:
+```
+✓ Agent completed in 2m 34s
+  Files changed: 5 | Log lines: 247
+```
+
 ## Configuration Reference
 
 ### config.sh Options
@@ -226,6 +289,7 @@ TEST_RUN_TASKS=2        # Tasks before checkpoint
 | `PROJECT_NAME` | - | Display name for your project |
 | `PLATFORM_TYPE` | `generic` | Platform for Level 2 prompt: `ios`, `python`, `generic`, etc. |
 | `AGENT_TYPE` | `cursor` | Agent to use: `cursor`, `auggie`, `custom` |
+| `DEFAULT_MODEL` | `""` | AI model to use (empty = prompt at startup) |
 | `MAX_ITERATIONS` | `50` | Maximum loop iterations |
 | `PAUSE_SECONDS` | `5` | Pause between iterations |
 | `MAX_CONSECUTIVE_FAILURES` | `3` | Stop after N consecutive failures |
@@ -330,13 +394,13 @@ See `templates/ios/` for a complete iOS setup.
 
 ```bash
 # Use Cursor (default)
-./ralph_loop.sh ../my-app
+.ralph/ralph_loop.sh
 
 # Use Augment
-./ralph_loop.sh ../my-app auggie
+.ralph/ralph_loop.sh auggie
 
 # Use custom agent (defined in config.sh)
-./ralph_loop.sh ../my-app custom
+.ralph/ralph_loop.sh custom
 ```
 
 ### Resuming After Interruption
@@ -344,7 +408,7 @@ See `templates/ios/` for a complete iOS setup.
 Just run the script again - it picks up from the first unchecked task:
 
 ```bash
-./ralph_loop.sh ../my-app
+.ralph/ralph_loop.sh
 ```
 
 ## Troubleshooting
