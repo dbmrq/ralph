@@ -189,18 +189,47 @@ detect_project_type() {
     echo "unknown"
 }
 
-detect_xcode_scheme() {
+detect_xcode_schemes() {
     local project_dir="$1"
-    local xcodeproj
+    local xcodeproj xcworkspace
 
-    # Find xcodeproj
+    # Prefer workspace over project
+    xcworkspace=$(find "$project_dir" -maxdepth 2 -name "*.xcworkspace" -type d 2>/dev/null | grep -v ".xcodeproj" | head -1)
     xcodeproj=$(find "$project_dir" -maxdepth 2 -name "*.xcodeproj" -type d 2>/dev/null | head -1)
 
-    if [ -n "$xcodeproj" ]; then
-        # Try to get schemes
-        local schemes=$(xcodebuild -project "$xcodeproj" -list 2>/dev/null | grep -A 100 "Schemes:" | tail -n +2 | grep -v "^$" | head -5 | sed 's/^[[:space:]]*//')
-        echo "$schemes" | head -1
+    if [ -n "$xcworkspace" ]; then
+        xcodebuild -workspace "$xcworkspace" -list 2>/dev/null | grep -A 100 "Schemes:" | tail -n +2 | grep -v "^$" | sed 's/^[[:space:]]*//' | grep -v "^$"
+    elif [ -n "$xcodeproj" ]; then
+        xcodebuild -project "$xcodeproj" -list 2>/dev/null | grep -A 100 "Schemes:" | tail -n +2 | grep -v "^$" | sed 's/^[[:space:]]*//' | grep -v "^$"
     fi
+}
+
+detect_xcode_project_dir() {
+    local project_dir="$1"
+    local xcodeproj xcworkspace project_yml
+
+    # Check for XcodeGen first
+    project_yml=$(find "$project_dir" -maxdepth 2 -name "project.yml" 2>/dev/null | head -1)
+    if [ -n "$project_yml" ]; then
+        dirname "$project_yml" | sed "s|^$project_dir/||" | sed "s|^$project_dir$|.|"
+        return
+    fi
+
+    # Check for workspace
+    xcworkspace=$(find "$project_dir" -maxdepth 2 -name "*.xcworkspace" -type d 2>/dev/null | grep -v ".xcodeproj" | head -1)
+    if [ -n "$xcworkspace" ]; then
+        dirname "$xcworkspace" | sed "s|^$project_dir/||" | sed "s|^$project_dir$|.|"
+        return
+    fi
+
+    # Check for project
+    xcodeproj=$(find "$project_dir" -maxdepth 2 -name "*.xcodeproj" -type d 2>/dev/null | head -1)
+    if [ -n "$xcodeproj" ]; then
+        dirname "$xcodeproj" | sed "s|^$project_dir/||" | sed "s|^$project_dir$|.|"
+        return
+    fi
+
+    echo "."
 }
 
 #==============================================================================
@@ -210,40 +239,56 @@ detect_xcode_scheme() {
 main() {
     print_header "Ralph Loop Setup Wizard"
 
-    echo "This wizard will help you set up Ralph Loop for your project."
-    echo "It will create a .ralph/ directory in your project with all"
-    echo "the necessary configuration files."
-    echo ""
-
-    #--------------------------------------------------------------------------
-    # Step 1: Project Path
-    #--------------------------------------------------------------------------
-    print_step "Step 1: Project Location"
-    echo ""
-
+    local step_num=1
     local project_path
-    while true; do
-        project_path=$(ask "Enter path to your project" "")
+    local project_type
 
-        if [ -z "$project_path" ]; then
-            print_error "Project path is required"
-            continue
+    #--------------------------------------------------------------------------
+    # Step 1: Project Path (skip if RALPH_PROJECT_PATH is set)
+    #--------------------------------------------------------------------------
+    if [ -n "$RALPH_PROJECT_PATH" ]; then
+        # Path was passed from install.sh
+        project_path="$RALPH_PROJECT_PATH"
+        print_success "Project: $project_path"
+        echo ""
+
+        # Use pre-detected type if available
+        if [ -n "$RALPH_PROJECT_TYPE" ]; then
+            project_type="$RALPH_PROJECT_TYPE"
         fi
+    else
+        echo "This wizard will help you set up Ralph Loop for your project."
+        echo "It will create a .ralph/ directory in your project with all"
+        echo "the necessary configuration files."
+        echo ""
 
-        # Expand ~ and make absolute
-        project_path="${project_path/#\~/$HOME}"
+        print_step "Step $step_num: Project Location"
+        ((step_num++))
+        echo ""
 
-        if [ ! -d "$project_path" ]; then
-            print_error "Directory not found: $project_path"
-            continue
-        fi
+        while true; do
+            project_path=$(ask "Enter path to your project" "")
 
-        project_path="$(cd "$project_path" && pwd)"
-        break
-    done
+            if [ -z "$project_path" ]; then
+                print_error "Project path is required"
+                continue
+            fi
 
-    print_success "Project: $project_path"
-    echo ""
+            # Expand ~ and make absolute
+            project_path="${project_path/#\~/$HOME}"
+
+            if [ ! -d "$project_path" ]; then
+                print_error "Directory not found: $project_path"
+                continue
+            fi
+
+            project_path="$(cd "$project_path" && pwd)"
+            break
+        done
+
+        print_success "Project: $project_path"
+        echo ""
+    fi
 
     # Check if already set up
     if [ -d "$project_path/.ralph" ]; then
@@ -254,43 +299,33 @@ main() {
     fi
 
     #--------------------------------------------------------------------------
-    # Step 2: Project Type Detection
+    # Step 2: Project Type Detection (skip confirmation if already detected)
     #--------------------------------------------------------------------------
-    print_step "Step 2: Project Type"
-    echo ""
+    if [ -z "$project_type" ]; then
+        print_step "Step $step_num: Project Type"
+        ((step_num++))
+        echo ""
 
-    local detected_type=$(detect_project_type "$project_path")
-    local project_type
+        local detected_type=$(detect_project_type "$project_path")
 
-    if [ "$detected_type" != "unknown" ]; then
-        echo "Detected project type: ${BOLD}$detected_type${NC}"
-        if ask_yes_no "Is this correct?" "y"; then
-            project_type="$detected_type"
+        if [ "$detected_type" != "unknown" ]; then
+            echo -e "Detected project type: ${BOLD}$detected_type${NC}"
+            if ask_yes_no "Is this correct?" "y"; then
+                project_type="$detected_type"
+            else
+                project_type=$(ask_choice "Select project type:" "ios" "web-react" "python" "node" "go" "rust" "other")
+            fi
         else
             project_type=$(ask_choice "Select project type:" "ios" "web-react" "python" "node" "go" "rust" "other")
         fi
     else
-        project_type=$(ask_choice "Select project type:" "ios" "web-react" "python" "node" "go" "rust" "other")
+        echo -e "Project type: ${BOLD}$project_type${NC}"
     fi
 
-    print_success "Project type: $project_type"
-    echo ""
-
     #--------------------------------------------------------------------------
-    # Step 3: Project Name
+    # Build Configuration (for supported types)
     #--------------------------------------------------------------------------
-    print_step "Step 3: Project Details"
-    echo ""
-
-    local default_name=$(basename "$project_path")
-    local project_name=$(ask "Project name" "$default_name")
-
-    print_success "Project name: $project_name"
-    echo ""
-
-    #--------------------------------------------------------------------------
-    # Step 4: Build Configuration (for supported types)
-    #--------------------------------------------------------------------------
+    local project_name=$(basename "$project_path")
     local xcode_scheme=""
     local xcode_project_dir="."
     local build_command=""
@@ -298,34 +333,61 @@ main() {
     local commit_scope=""
 
     if [ "$project_type" = "ios" ]; then
-        print_step "Step 4: iOS Build Configuration"
+        print_step "Step $step_num: iOS Build Configuration"
+        ((step_num++))
         echo ""
 
-        # Detect Xcode scheme
-        local detected_scheme=$(detect_xcode_scheme "$project_path")
-        if [ -n "$detected_scheme" ]; then
-            xcode_scheme=$(ask "Xcode scheme" "$detected_scheme")
-        else
-            xcode_scheme=$(ask "Xcode scheme" "$default_name")
-        fi
+        # Auto-detect Xcode project directory
+        xcode_project_dir=$(detect_xcode_project_dir "$project_path")
+        echo -e "Xcode project directory: ${BOLD}$xcode_project_dir${NC}"
+        echo ""
 
-        # Find Xcode project directory
-        local xcodeproj_path=$(find "$project_path" -maxdepth 2 -name "*.xcodeproj" -type d 2>/dev/null | head -1)
-        if [ -n "$xcodeproj_path" ]; then
-            xcode_project_dir=$(dirname "$xcodeproj_path")
-            xcode_project_dir="${xcode_project_dir#$project_path/}"
-            if [ "$xcode_project_dir" = "$(dirname "$xcodeproj_path")" ]; then
-                xcode_project_dir="."
+        # Detect available schemes and let user pick
+        local schemes_list=$(detect_xcode_schemes "$project_path")
+
+        if [ -n "$schemes_list" ]; then
+            local scheme_count=$(echo "$schemes_list" | wc -l | tr -d ' ')
+
+            if [ "$scheme_count" -eq 1 ]; then
+                # Only one scheme, use it automatically
+                xcode_scheme="$schemes_list"
+                echo -e "Xcode scheme: ${BOLD}$xcode_scheme${NC} (auto-detected)"
+            else
+                # Multiple schemes, let user pick
+                echo "Available schemes:"
+                local i=1
+                while IFS= read -r scheme; do
+                    echo "  $i) $scheme" >&2
+                    ((i++))
+                done <<< "$schemes_list"
+                echo "" >&2
+
+                local scheme_choice
+                echo -en "${BOLD}Select scheme [1]: ${NC}" >&2
+                read scheme_choice </dev/tty
+
+                if [ -z "$scheme_choice" ]; then
+                    scheme_choice=1
+                fi
+
+                xcode_scheme=$(echo "$schemes_list" | sed -n "${scheme_choice}p")
+
+                if [ -z "$xcode_scheme" ]; then
+                    xcode_scheme=$(echo "$schemes_list" | head -1)
+                fi
             fi
+        else
+            # No schemes detected, ask user
+            xcode_scheme=$(ask "Xcode scheme" "$project_name")
         fi
-        xcode_project_dir=$(ask "Xcode project directory (relative to project root)" "$xcode_project_dir")
 
         commit_scope="ios"
         print_success "Xcode scheme: $xcode_scheme"
         echo ""
 
     elif [ "$project_type" = "web-react" ] || [ "$project_type" = "node" ]; then
-        print_step "Step 4: Node.js Build Configuration"
+        print_step "Step $step_num: Node.js Build Configuration"
+        ((step_num++))
         echo ""
 
         build_command=$(ask "Build command" "npm run build")
@@ -334,7 +396,8 @@ main() {
         echo ""
 
     elif [ "$project_type" = "python" ]; then
-        print_step "Step 4: Python Build Configuration"
+        print_step "Step $step_num: Python Build Configuration"
+        ((step_num++))
         echo ""
 
         build_command=$(ask "Build/lint command" "python -m py_compile *.py")
@@ -343,7 +406,8 @@ main() {
         echo ""
 
     else
-        print_step "Step 4: Build Configuration"
+        print_step "Step $step_num: Build Configuration"
+        ((step_num++))
         echo ""
 
         if ask_yes_no "Do you want to configure build verification?" "y"; then
@@ -355,9 +419,10 @@ main() {
     fi
 
     #--------------------------------------------------------------------------
-    # Step 5: Agent Selection
+    # Agent Selection
     #--------------------------------------------------------------------------
-    print_step "Step 5: AI Agent"
+    print_step "Step $step_num: AI Agent"
+    ((step_num++))
     echo ""
 
     local agent_type=$(ask_choice "Select AI agent:" "cursor" "auggie" "custom")
@@ -365,9 +430,10 @@ main() {
     echo ""
 
     #--------------------------------------------------------------------------
-    # Step 6: Git Branch
+    # Git Branch
     #--------------------------------------------------------------------------
-    print_step "Step 6: Git Branch"
+    print_step "Step $step_num: Git Branch"
+    ((step_num++))
     echo ""
 
     local current_branch=""
@@ -378,7 +444,7 @@ main() {
 
     if git rev-parse --git-dir &>/dev/null; then
         current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
-        echo "Current branch: ${BOLD}$current_branch${NC}"
+        echo -e "Current branch: ${BOLD}$current_branch${NC}"
 
         if [ "$current_branch" = "main" ] || [ "$current_branch" = "master" ]; then
             print_warning "You're on $current_branch. Ralph Loop requires a feature branch."
@@ -398,8 +464,8 @@ main() {
     else
         print_warning "Not a git repository. Ralph Loop works best with git."
         if ask_yes_no "Initialize git repository?" "y"; then
-            git init
-            git checkout -b main
+            git init >/dev/null 2>&1
+            git checkout -b main >/dev/null 2>&1
             print_success "Initialized git repository"
 
             create_branch=true
@@ -411,9 +477,10 @@ main() {
     echo ""
 
     #--------------------------------------------------------------------------
-    # Step 7: Task File
+    # Task File
     #--------------------------------------------------------------------------
-    print_step "Step 7: Task List"
+    print_step "Step $step_num: Task List"
+    ((step_num++))
     echo ""
 
     local create_sample_tasks=false

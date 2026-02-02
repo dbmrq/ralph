@@ -151,6 +151,40 @@ fi
 echo ""
 
 #------------------------------------------------------------------------------
+# Check 6: echo statements with color codes should use -e flag
+#------------------------------------------------------------------------------
+echo "Checking echo statements with color codes use -e flag..."
+
+color_check_errors=0
+for script in "$SCRIPT_DIR"/*.sh; do
+    [ -f "$script" ] || continue
+    script_name=$(basename "$script")
+
+    # Skip this validation script
+    [ "$script_name" = "validate.sh" ] && continue
+
+    # Find echo statements with color code variables (BOLD, NC, RED, GREEN, YELLOW, CYAN) that don't use -e
+    # Pattern: echo followed by a quote (not -e or -en), containing ${BOLD}, ${NC}, ${RED}, ${GREEN}, ${YELLOW}, ${CYAN}
+    bad_echo=$(grep -n 'echo "[^"]*\${\(BOLD\|NC\|RED\|GREEN\|YELLOW\|CYAN\)}' "$script" 2>/dev/null | grep -v 'echo -e' | grep -v 'echo -en' || true)
+
+    if [ -n "$bad_echo" ]; then
+        echo -e "${RED}✗ $script_name has echo with color codes missing -e flag:${NC}"
+        echo "$bad_echo" | while read line; do
+            echo "    $line"
+        done
+        ((color_check_errors++)) || true
+        ((ERRORS++)) || true
+    fi
+done
+
+# If no errors found, show success
+if [ $color_check_errors -eq 0 ]; then
+    echo -e "${GREEN}✓ All echo statements with color codes use -e flag${NC}"
+fi
+
+echo ""
+
+#------------------------------------------------------------------------------
 # Summary
 #------------------------------------------------------------------------------
 echo "═══════════════════════════════════════════════════════════════"

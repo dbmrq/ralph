@@ -647,13 +647,13 @@ edit_instructions() {
     echo ""
     echo "Ralph Loop uses a 3-level instruction system:"
     echo ""
-    echo "  ${BOLD}Level 1: Global${NC} - Ralph Loop workflow (base_prompt.txt)"
+    echo -e "  ${BOLD}Level 1: Global${NC} - Ralph Loop workflow (base_prompt.txt)"
     echo "           Applies to all projects. Rarely needs editing."
     echo ""
-    echo "  ${BOLD}Level 2: Platform${NC} - Platform guidelines (templates/{platform}/platform_prompt.txt)"
+    echo -e "  ${BOLD}Level 2: Platform${NC} - Platform guidelines (templates/{platform}/platform_prompt.txt)"
     echo "           iOS, Python, generic, etc. Edit to customize platform standards."
     echo ""
-    echo "  ${BOLD}Level 3: Project${NC} - Project-specific (.ralph/project_prompt.txt)"
+    echo -e "  ${BOLD}Level 3: Project${NC} - Project-specific (.ralph/project_prompt.txt)"
     echo "           Your project's unique requirements. Most commonly edited."
     echo ""
     echo "Which level do you want to edit?"
@@ -812,27 +812,27 @@ view_combined_instructions() {
     echo "Showing combined instructions for: $project_path"
     echo "Platform type: $platform_type"
     echo ""
-    echo "${CYAN}════════════════════════════════════════════════════════════════${NC}"
-    echo "${CYAN}  Level 1: Global Instructions${NC}"
-    echo "${CYAN}════════════════════════════════════════════════════════════════${NC}"
+    echo -e "${CYAN}════════════════════════════════════════════════════════════════${NC}"
+    echo -e "${CYAN}  Level 1: Global Instructions${NC}"
+    echo -e "${CYAN}════════════════════════════════════════════════════════════════${NC}"
     if [ -f "$ralph_dir/base_prompt.txt" ]; then
         cat "$ralph_dir/base_prompt.txt"
     else
         echo "(not found)"
     fi
     echo ""
-    echo "${CYAN}════════════════════════════════════════════════════════════════${NC}"
-    echo "${CYAN}  Level 2: Platform Instructions ($platform_type)${NC}"
-    echo "${CYAN}════════════════════════════════════════════════════════════════${NC}"
+    echo -e "${CYAN}════════════════════════════════════════════════════════════════${NC}"
+    echo -e "${CYAN}  Level 2: Platform Instructions ($platform_type)${NC}"
+    echo -e "${CYAN}════════════════════════════════════════════════════════════════${NC}"
     if [ -f "$ralph_dir/templates/$platform_type/platform_prompt.txt" ]; then
         cat "$ralph_dir/templates/$platform_type/platform_prompt.txt"
     else
         echo "(not found)"
     fi
     echo ""
-    echo "${CYAN}════════════════════════════════════════════════════════════════${NC}"
-    echo "${CYAN}  Level 3: Project Instructions${NC}"
-    echo "${CYAN}════════════════════════════════════════════════════════════════${NC}"
+    echo -e "${CYAN}════════════════════════════════════════════════════════════════${NC}"
+    echo -e "${CYAN}  Level 3: Project Instructions${NC}"
+    echo -e "${CYAN}════════════════════════════════════════════════════════════════${NC}"
     if [ -f "$project_path/.ralph/project_prompt.txt" ]; then
         cat "$project_path/.ralph/project_prompt.txt"
     else
