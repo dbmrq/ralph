@@ -75,10 +75,11 @@ ask() {
     local default="$2"
     local result
 
+    # Write prompt to stderr so it's visible even when stdout is captured
     if [ -n "$default" ]; then
-        echo -en "${BOLD}$prompt${NC} [${default}]: "
+        echo -en "${BOLD}$prompt${NC} [${default}]: " >&2
     else
-        echo -en "${BOLD}$prompt${NC}: "
+        echo -en "${BOLD}$prompt${NC}: " >&2
     fi
 
     # Read from /dev/tty to handle piped execution (e.g., bash <(...))
@@ -96,10 +97,11 @@ ask_yes_no() {
     local default="$2"
     local result
 
+    # Write prompt to stderr so it's visible even when stdout is captured
     if [ "$default" = "y" ]; then
-        echo -en "${BOLD}$prompt${NC} [Y/n]: "
+        echo -en "${BOLD}$prompt${NC} [Y/n]: " >&2
     else
-        echo -en "${BOLD}$prompt${NC} [y/N]: "
+        echo -en "${BOLD}$prompt${NC} [y/N]: " >&2
     fi
 
     # Read from /dev/tty to handle piped execution (e.g., bash <(...))
