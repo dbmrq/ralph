@@ -520,8 +520,9 @@ select_project() {
     local ralph_dir="$1"
     local prompt="${2:-Select a project}"
 
-    echo "$prompt"
-    echo ""
+    # Output prompts to stderr since this function returns a value via stdout
+    echo "$prompt" >&2
+    echo "" >&2
 
     local default_project=$(pwd)
     if [ "$default_project" = "$ralph_dir" ]; then
@@ -536,7 +537,7 @@ select_project() {
     fi
 
     if [ ! -d "$project_path/.ralph" ]; then
-        print_error "This project doesn't have Ralph Loop set up."
+        print_error "This project doesn't have Ralph Loop set up." >&2
         if ask_yes_no "Set it up now?" "y"; then
             setup_project "$ralph_dir"
             return

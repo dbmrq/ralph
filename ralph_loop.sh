@@ -552,7 +552,8 @@ main() {
                 log "  • Build: run your build command"
                 log ""
                 echo -en "${BOLD}Continue with the remaining ${REMAINING} tasks? [y/N]: ${NC}"
-                read -r checkpoint_response
+                # Read from /dev/tty to handle piped execution scenarios
+                read -r checkpoint_response </dev/tty
                 checkpoint_response=$(echo "$checkpoint_response" | tr '[:upper:]' '[:lower:]')
 
                 if [ "$checkpoint_response" = "y" ] || [ "$checkpoint_response" = "yes" ]; then
