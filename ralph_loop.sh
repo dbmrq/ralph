@@ -592,6 +592,42 @@ get_last_completed_task_description() {
 # BUILD VERIFICATION
 #==============================================================================
 
+# Build/test progress spinner - runs in background
+BUILD_SPINNER_PID=""
+
+start_build_spinner() {
+    local label="$1"
+    local spinner_chars='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+    local spinner_idx=0
+    local start_time=$(date +%s)
+
+    # Hide cursor
+    printf "\033[?25l"
+
+    while true; do
+        sleep 0.5
+        local elapsed=$(($(date +%s) - start_time))
+        local mins=$((elapsed / 60))
+        local secs=$((elapsed % 60))
+
+        local spinner="${spinner_chars:$spinner_idx:1}"
+        spinner_idx=$(( (spinner_idx + 1) % ${#spinner_chars} ))
+
+        # Clear line and show spinner with elapsed time
+        printf "\r\033[K${CYAN}%s %s${NC} %02d:%02d" "$spinner" "$label" "$mins" "$secs"
+    done
+}
+
+stop_build_spinner() {
+    if [ -n "$BUILD_SPINNER_PID" ] && kill -0 "$BUILD_SPINNER_PID" 2>/dev/null; then
+        kill "$BUILD_SPINNER_PID" 2>/dev/null
+        wait "$BUILD_SPINNER_PID" 2>/dev/null
+    fi
+    BUILD_SPINNER_PID=""
+    # Show cursor and clear line
+    printf "\033[?25h\r\033[K"
+}
+
 # Default build command - should be overridden in config.sh
 run_build() {
     if type project_build &> /dev/null; then
@@ -617,21 +653,38 @@ verify_build() {
         return 0
     fi
 
-    log "${CYAN}🔨 Verifying build...${NC}"
+    local build_log=$(mktemp)
+    local start_time=$(date +%s)
+
+    # Start spinner in background
+    start_build_spinner "Building..." &
+    BUILD_SPINNER_PID=$!
 
     cd "$PROJECT_DIR"
     set +e
-    run_build
+    run_build > "$build_log" 2>&1
     local build_result=$?
     set -e
     cd - > /dev/null
 
+    # Stop spinner
+    stop_build_spinner
+
+    local elapsed=$(($(date +%s) - start_time))
+
     if [ $build_result -ne 0 ]; then
-        log "${RED}❌ Build failed${NC}"
+        log "${RED}❌ Build failed${NC} (${elapsed}s)"
+        log ""
+        log "${YELLOW}Build output (last 20 lines):${NC}"
+        tail -20 "$build_log" | while IFS= read -r line; do
+            log "  $line"
+        done
+        rm -f "$build_log"
         return 1
     fi
 
-    log "${GREEN}✓ Build succeeded${NC}"
+    log "${GREEN}✓ Build succeeded${NC} (${elapsed}s)"
+    rm -f "$build_log"
     return 0
 }
 
@@ -655,21 +708,38 @@ verify_tests() {
         return 0
     fi
 
-    log "${CYAN}🧪 Running tests...${NC}"
+    local test_log=$(mktemp)
+    local start_time=$(date +%s)
+
+    # Start spinner in background
+    start_build_spinner "Running tests..." &
+    BUILD_SPINNER_PID=$!
 
     cd "$PROJECT_DIR"
     set +e
-    run_tests 2>&1 | tee -a "$MASTER_LOG"
-    local test_result=${PIPESTATUS[0]}
+    run_tests > "$test_log" 2>&1
+    local test_result=$?
     set -e
     cd - > /dev/null
 
+    # Stop spinner
+    stop_build_spinner
+
+    local elapsed=$(($(date +%s) - start_time))
+
     if [ $test_result -ne 0 ]; then
-        log "${RED}❌ Tests failed${NC}"
+        log "${RED}❌ Tests failed${NC} (${elapsed}s)"
+        log ""
+        log "${YELLOW}Test output (last 30 lines):${NC}"
+        tail -30 "$test_log" | while IFS= read -r line; do
+            log "  $line"
+        done
+        rm -f "$test_log"
         return 1
     fi
 
-    log "${GREEN}✓ All tests passed${NC}"
+    log "${GREEN}✓ All tests passed${NC} (${elapsed}s)"
+    rm -f "$test_log"
     return 0
 }
 
