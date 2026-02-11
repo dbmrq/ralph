@@ -12,7 +12,10 @@
 #   1 - One or more tests failed
 #==============================================================================
 
-set -e
+# Note: We don't use 'set -e' here because:
+# 1. Arithmetic operations like ((var++)) return 1 when var is 0
+# 2. We want tests to continue even if individual tests fail
+# 3. We handle exit codes explicitly in the test framework
 
 # Get the directory containing this script
 TESTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
