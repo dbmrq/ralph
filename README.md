@@ -9,7 +9,7 @@ Ralph Loop is a shell script that repeatedly calls an AI coding agent to complet
 Copy and paste this into your terminal:
 
 ```bash
-bash <(gh api repos/dbmrq/ralph/contents/install.sh --jq '.content' | base64 -d)
+bash <(gh api repos/dbmrq/ralph-loop/contents/install.sh --jq '.content' | base64 -d)
 ```
 
 **That's it!** This single command handles everything from start to finish.
@@ -48,7 +48,7 @@ Just run the installer again from anywhere:
 ./install.sh
 
 # Or use the one-liner from anywhere
-bash <(gh api repos/dbmrq/ralph/contents/install.sh --jq '.content' | base64 -d)
+bash <(gh api repos/dbmrq/ralph-loop/contents/install.sh --jq '.content' | base64 -d)
 ```
 
 It detects the existing installation and shows you a menu:
@@ -158,14 +158,44 @@ If you prefer to run commands directly:
 
 # With a specific agent
 .ralph/ralph_loop.sh auggie
-
-# Just run the setup wizard
-./ralph-loop/setup.sh
 ```
 
 The script auto-detects the project directory from its location inside `.ralph/`.
 
 ## Directory Structure
+
+### Ralph Loop Repository
+
+The repository is organized into modular components:
+
+```
+ralph-loop/                        # This repository
+├── install.sh                     # THE entry point - handles everything
+├── README.md                      # This documentation
+├── lib/                           # Worker scripts (sourced by install.sh)
+│   ├── common.sh                  # Shared utilities (colors, prompts)
+│   ├── prereqs.sh                 # Prerequisites checking/installation
+│   ├── download.sh                # GitHub file downloads
+│   ├── detect.sh                  # Project type detection
+│   ├── config.sh                  # Config file generation
+│   ├── prompts.sh                 # Prompt file generation
+│   ├── tasks.sh                   # Task file generation
+│   ├── git.sh                     # Git operations
+│   └── agent.sh                   # AI agent detection/setup
+├── core/                          # Core runtime files (copied to projects)
+│   ├── ralph_loop.sh              # Main automation script
+│   ├── base_prompt.txt            # Global agent instructions
+│   └── validate.sh                # Script validation
+├── templates/                     # Platform templates
+│   ├── ios/                       # iOS-specific prompts
+│   ├── python/                    # Python-specific prompts
+│   ├── web-react/                 # React/Web prompts
+│   └── generic/                   # Generic fallback
+└── hooks/                         # Git hooks for development
+    └── pre-commit                 # Runs validation before commits
+```
+
+### Installed in Your Project
 
 After installation, Ralph Loop files live inside your project:
 

@@ -12,22 +12,22 @@
 #   ln -sf ../../hooks/pre-commit .git/hooks/pre-commit
 #==============================================================================
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 echo "Running Ralph Loop validation..."
 echo ""
 
-if [ -f "$SCRIPT_DIR/validate.sh" ]; then
-    "$SCRIPT_DIR/validate.sh"
+if [ -f "$REPO_ROOT/tests/validate.sh" ]; then
+    "$REPO_ROOT/tests/validate.sh"
     exit_code=$?
-    
+
     if [ $exit_code -ne 0 ]; then
         echo ""
         echo "❌ Validation failed. Please fix the issues above before committing."
         exit 1
     fi
 else
-    echo "⚠️  validate.sh not found, skipping validation"
+    echo "⚠️  tests/validate.sh not found, skipping validation"
 fi
 
 exit 0
