@@ -204,6 +204,16 @@ update_ralph_installation() {
     #--------------------------------------------------------------------------
     local config_file="$ralph_dir/config.sh"
 
+    # Debug: test if we can source the config
+    if [ -f "$config_file" ]; then
+        local source_output
+        source_output=$( (cd "$(dirname "$config_file")" && source "$(basename "$config_file")" 2>&1) )
+        local source_result=$?
+        if [ $source_result -ne 0 ]; then
+            print_warning "config.sh failed to source: $source_output"
+        fi
+    fi
+
     if ! is_valid_config "$config_file"; then
         print_warning "config.sh is missing or invalid - recreating..."
 
