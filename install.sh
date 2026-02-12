@@ -120,30 +120,30 @@ is_valid_config() {
     local config_dir
     config_dir="$(dirname "$config_file")"
 
-    # Extract all source commands and check if the files exist
+    # Check for source commands that reference files in the config directory
+    # Look for patterns like: source "$SCRIPT_DIR/common.sh" or source ./common.sh
+    # Extract just the filename and check if it exists in the config dir
     while IFS= read -r line; do
-        # Skip comments and empty lines
+        # Skip comments
         [[ "$line" =~ ^[[:space:]]*# ]] && continue
-        [[ -z "$line" ]] && continue
 
         # Check for source or . commands
-        if [[ "$line" =~ (^|[[:space:]])(source|\.)[[:space:]]+[\"\']?([^\"\';]+) ]]; then
-            local sourced_file="${BASH_REMATCH[3]}"
-            # Remove trailing quotes/whitespace
-            sourced_file="${sourced_file%%[\"\']*}"
-            sourced_file="${sourced_file%% *}"
+        if [[ "$line" =~ (source|\.)[[:space:]]+ ]]; then
+            # Extract the filename from the end of the path
+            # Handles: source "$SCRIPT_DIR/common.sh", source ./foo.sh, source foo.sh
+            local filename
+            filename=$(echo "$line" | sed -E 's/.*[\/"]([^\/\"]+\.sh).*/\1/' | tr -d '"' | tr -d "'")
 
-            # Skip variable expansions we can't resolve
-            [[ "$sourced_file" =~ \$ ]] && continue
-
-            # Resolve relative paths
-            if [[ "$sourced_file" != /* ]]; then
-                sourced_file="$config_dir/$sourced_file"
-            fi
-
-            # If the file doesn't exist, config is invalid
-            if [ ! -f "$sourced_file" ]; then
-                return 1
+            # If we extracted a .sh filename, check if it should exist in config dir
+            if [[ "$filename" =~ \.sh$ ]] && [[ "$filename" != "config.sh" ]]; then
+                # Check if the line references SCRIPT_DIR, dirname, or relative path
+                # These all resolve to the config directory
+                if [[ "$line" =~ SCRIPT_DIR ]] || [[ "$line" =~ dirname ]] || [[ "$line" =~ \./ ]]; then
+                    # The file should exist in the config directory
+                    if [ ! -f "$config_dir/$filename" ]; then
+                        return 1
+                    fi
+                fi
             fi
         fi
     done < "$config_file"
