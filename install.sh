@@ -105,8 +105,6 @@ bootstrap_libraries() {
 # Check if a config.sh file is valid (has correct syntax and required vars)
 is_valid_config() {
     local config_file="$1"
-    local config_dir
-    config_dir="$(dirname "$config_file")"
 
     # Must exist
     [ -f "$config_file" ] || return 1
@@ -117,20 +115,12 @@ is_valid_config() {
     # Must define PROJECT_NAME (basic sanity check)
     grep -q 'PROJECT_NAME=' "$config_file" 2>/dev/null || return 1
 
-    # Must not try to source files that don't exist (old broken configs)
-    # Check for any 'source' or '.' commands and verify the files exist
-    local sourced_files
-    sourced_files=$(grep -E '^\s*(source|\.)\s+' "$config_file" 2>/dev/null | sed -E 's/^\s*(source|\.)\s+//' | tr -d '"' | tr -d "'")
-    if [ -n "$sourced_files" ]; then
-        while IFS= read -r sourced_file; do
-            # Resolve relative paths from config directory
-            if [[ "$sourced_file" != /* ]]; then
-                sourced_file="$config_dir/$sourced_file"
-            fi
-            # If the sourced file doesn't exist, config is invalid
-            [ -f "$sourced_file" ] || return 1
-        done <<< "$sourced_files"
-    fi
+    # Must actually be sourceable without errors
+    # Run in a subshell to catch any source/. commands that fail
+    (
+        cd "$(dirname "$config_file")" 2>/dev/null || exit 1
+        source "$(basename "$config_file")" 2>/dev/null || exit 1
+    ) || return 1
 
     return 0
 }
