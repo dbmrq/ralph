@@ -112,106 +112,10 @@ run_setup_wizard() {
     #--------------------------------------------------------------------------
     # Step 1: Project Type
     #--------------------------------------------------------------------------
-    print_step "Step $step_num: Project Type"
-    ((step_num++))
-    echo ""
-
-    local project_type=$(detect_project_type "$project_path")
     local project_name=$(basename "$project_path")
 
-    if [ "$project_type" != "generic" ]; then
-        echo -e "Detected project type: ${BOLD}$project_type${NC}"
-        if ! ask_yes_no "Is this correct?" "y"; then
-            project_type=$(ask_choice "Select project type:" "ios" "web-react" "python" "node" "go" "rust" "generic")
-        fi
-    else
-        project_type=$(ask_choice "Select project type:" "ios" "web-react" "python" "node" "go" "rust" "generic")
-    fi
-
-    print_success "Project type: $project_type"
-    echo ""
-
     #--------------------------------------------------------------------------
-    # Step 2: Build Configuration
-    #--------------------------------------------------------------------------
-    local xcode_scheme=""
-    local xcode_project_dir="."
-    local build_command=""
-    local test_command=""
-    local commit_scope=""
-
-    if [ "$project_type" = "ios" ]; then
-        print_step "Step $step_num: iOS Build Configuration"
-        ((step_num++))
-        echo ""
-
-        xcode_project_dir=$(detect_xcode_project_dir "$project_path")
-        echo -e "Xcode project directory: ${BOLD}$xcode_project_dir${NC}"
-        echo ""
-
-        echo -e "${CYAN}Detecting Xcode schemes...${NC}"
-        local schemes_list=$(detect_xcode_schemes "$project_path")
-
-        if [ -n "$schemes_list" ]; then
-            local scheme_count=$(echo "$schemes_list" | wc -l | tr -d ' ')
-            if [ "$scheme_count" -eq 1 ]; then
-                xcode_scheme="$schemes_list"
-                echo -e "Xcode scheme: ${BOLD}$xcode_scheme${NC} (auto-detected)"
-            else
-                echo -e "${GREEN}Found $scheme_count schemes:${NC}"
-                echo ""
-                local i=1
-                while IFS= read -r scheme; do
-                    echo "  $i) $scheme"
-                    ((i++))
-                done <<< "$schemes_list"
-                echo ""
-
-                local scheme_choice
-                echo -en "${BOLD}Select scheme [1]: ${NC}"
-                read scheme_choice </dev/tty
-
-                if [ -z "$scheme_choice" ]; then
-                    scheme_choice=1
-                fi
-
-                xcode_scheme=$(echo "$schemes_list" | sed -n "${scheme_choice}p")
-                if [ -z "$xcode_scheme" ]; then
-                    xcode_scheme=$(echo "$schemes_list" | head -1)
-                fi
-                echo -e "Selected: ${BOLD}$xcode_scheme${NC}"
-            fi
-        else
-            xcode_scheme=$(ask "Xcode scheme" "$project_name")
-        fi
-
-        commit_scope="ios"
-        print_success "Xcode scheme: $xcode_scheme"
-        echo ""
-
-    elif [ "$project_type" = "web-react" ] || [ "$project_type" = "node" ]; then
-        print_step "Step $step_num: Node.js Build Configuration"
-        ((step_num++))
-        echo ""
-
-        build_command=$(ask "Build command" "npm run build")
-        test_command=$(ask "Test command" "npm test")
-        commit_scope="web"
-        echo ""
-
-    elif [ "$project_type" = "python" ]; then
-        print_step "Step $step_num: Python Build Configuration"
-        ((step_num++))
-        echo ""
-
-        build_command=$(ask "Build/lint command" "python -m py_compile *.py")
-        test_command=$(ask "Test command" "pytest")
-        commit_scope="python"
-        echo ""
-    fi
-
-    #--------------------------------------------------------------------------
-    # Step 3: AI Agent
+    # Step 1: AI Agent
     #--------------------------------------------------------------------------
     print_step "Step $step_num: AI Agent"
     ((step_num++))
@@ -222,7 +126,7 @@ run_setup_wizard() {
     echo ""
 
     #--------------------------------------------------------------------------
-    # Step 4: Git Branch
+    # Step 2: Git Branch
     #--------------------------------------------------------------------------
     print_step "Step $step_num: Git Branch"
     ((step_num++))
@@ -249,7 +153,7 @@ run_setup_wizard() {
     echo ""
 
     #--------------------------------------------------------------------------
-    # Step 5: Task File
+    # Step 3: Task File
     #--------------------------------------------------------------------------
     print_step "Step $step_num: Task List"
     ((step_num++))
@@ -280,8 +184,7 @@ run_setup_wizard() {
     print_header "Creating Configuration Files"
 
     # Create config.sh
-    create_config_file "$ralph_dir" "$project_name" "$project_type" "$agent_type" \
-        "$commit_scope" "50" "true"
+    create_config_file "$ralph_dir" "$project_name" "$agent_type" "50" "true"
     print_success "Created .ralph/config.sh"
 
     # Create build.sh and test.sh scripts (placeholder templates)
@@ -302,7 +205,7 @@ run_setup_wizard() {
 
     # Create TASKS.md if requested
     if [ "$create_sample_tasks" = true ]; then
-        create_tasks_file "$ralph_dir" "$project_type"
+        create_tasks_file "$ralph_dir"
         print_success "Created .ralph/TASKS.md"
     fi
 

@@ -39,9 +39,8 @@ test_source_detect() {
     unset __COMMON_SH_SOURCED__
     unset __DETECT_SH_SOURCED__
     source "$REPO_ROOT/lib/detect.sh"
-    
-    # Verify key functions exist
-    declare -f detect_project_type >/dev/null && \
+
+    # Verify key functions exist (Xcode helpers)
     declare -f detect_xcode_schemes >/dev/null && \
     declare -f detect_xcode_project_dir >/dev/null
 }

@@ -1,13 +1,13 @@
 #!/bin/bash
 #
-# detect.sh - Project Type Detection Library
+# detect.sh - Project Detection Library
 #
 # This is a library file meant to be sourced by other scripts.
-# It provides functions for detecting project types and Xcode-specific configurations.
+# It provides functions for detecting Xcode-specific configurations.
 #
 # Usage:
 #   source "$(dirname "${BASH_SOURCE[0]}")/detect.sh"
-#   project_type=$(detect_project_type "/path/to/project")
+#   schemes=$(detect_xcode_schemes "/path/to/project")
 #
 
 # Guard against double-sourcing
@@ -18,42 +18,6 @@ __DETECT_SH_SOURCED__=1
 
 # Source common utilities
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
-
-#==============================================================================
-# PROJECT TYPE DETECTION
-#==============================================================================
-
-detect_project_type() {
-    local project_dir="$1"
-
-    # iOS/macOS detection: Xcode projects, Swift packages, or XcodeGen
-    if [ -f "$project_dir/Package.swift" ] || \
-       [ -f "$project_dir/project.yml" ] || \
-       [ -f "$project_dir/project.yaml" ] || \
-       ls "$project_dir"/*.xcodeproj &>/dev/null 2>&1 || \
-       ls "$project_dir"/*.xcworkspace &>/dev/null 2>&1 || \
-       find "$project_dir" -maxdepth 2 -name "*.xcodeproj" 2>/dev/null | grep -q . || \
-       find "$project_dir" -maxdepth 2 -name "*.xcworkspace" 2>/dev/null | grep -q . || \
-       find "$project_dir" -maxdepth 2 -name "project.yml" 2>/dev/null | grep -q .; then
-        echo "ios"
-    elif [ -f "$project_dir/package.json" ]; then
-        if grep -q '"react"' "$project_dir/package.json" 2>/dev/null; then
-            echo "react"
-        elif grep -q '"next"' "$project_dir/package.json" 2>/dev/null; then
-            echo "nextjs"
-        else
-            echo "node"
-        fi
-    elif [ -f "$project_dir/requirements.txt" ] || [ -f "$project_dir/setup.py" ] || [ -f "$project_dir/pyproject.toml" ]; then
-        echo "python"
-    elif [ -f "$project_dir/Cargo.toml" ]; then
-        echo "rust"
-    elif [ -f "$project_dir/go.mod" ]; then
-        echo "go"
-    else
-        echo "generic"
-    fi
-}
 
 #==============================================================================
 # XCODE HELPERS

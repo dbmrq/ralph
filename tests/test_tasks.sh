@@ -15,8 +15,8 @@ test_create_tasks_file_exists() {
     local ralph_dir="$TEST_TEMP_DIR/.ralph"
     mkdir -p "$ralph_dir"
     
-    create_tasks_file "$ralph_dir" "generic"
-    
+    create_tasks_file "$ralph_dir"
+
     assert_file_exists "$ralph_dir/TASKS.md" "TASKS.md should be created"
 }
 
@@ -25,8 +25,8 @@ test_tasks_contains_format() {
     local ralph_dir="$TEST_TEMP_DIR/.ralph2"
     mkdir -p "$ralph_dir"
     
-    create_tasks_file "$ralph_dir" "generic"
-    
+    create_tasks_file "$ralph_dir"
+
     local content=$(cat "$ralph_dir/TASKS.md")
     assert_contains "$content" "Task List" "Should contain Task List header"
 }
@@ -36,8 +36,8 @@ test_tasks_contains_validation() {
     local ralph_dir="$TEST_TEMP_DIR/.ralph3"
     mkdir -p "$ralph_dir"
     
-    create_tasks_file "$ralph_dir" "generic"
-    
+    create_tasks_file "$ralph_dir"
+
     local content=$(cat "$ralph_dir/TASKS.md")
     assert_contains "$content" "TEST-001" "Should contain validation task"
 }
@@ -47,8 +47,8 @@ test_tasks_contains_samples() {
     local ralph_dir="$TEST_TEMP_DIR/.ralph4"
     mkdir -p "$ralph_dir"
     
-    create_tasks_file "$ralph_dir" "generic"
-    
+    create_tasks_file "$ralph_dir"
+
     local content=$(cat "$ralph_dir/TASKS.md")
     assert_contains "$content" "TASK-001" "Should contain sample task"
 }
@@ -58,8 +58,8 @@ test_tasks_contains_tips() {
     local ralph_dir="$TEST_TEMP_DIR/.ralph5"
     mkdir -p "$ralph_dir"
     
-    create_tasks_file "$ralph_dir" "generic"
-    
+    create_tasks_file "$ralph_dir"
+
     local content=$(cat "$ralph_dir/TASKS.md")
     assert_contains "$content" "Task Writing Tips" "Should contain writing tips"
 }
@@ -69,8 +69,8 @@ test_tasks_checkbox_format() {
     local ralph_dir="$TEST_TEMP_DIR/.ralph6"
     mkdir -p "$ralph_dir"
     
-    create_tasks_file "$ralph_dir" "generic"
-    
+    create_tasks_file "$ralph_dir"
+
     local content=$(cat "$ralph_dir/TASKS.md")
     assert_contains "$content" "- [ ]" "Should use checkbox format"
 }
@@ -87,7 +87,7 @@ test_tasks_uses_template() {
     
     # Temporarily modify LIB_DIR to use our test template
     # (This test verifies the template lookup logic exists)
-    create_tasks_file "$ralph_dir" "generic"
+    create_tasks_file "$ralph_dir"
     
     # Clean up
     rm -rf "$template_dir"
@@ -101,8 +101,8 @@ test_tasks_goal_format() {
     local ralph_dir="$TEST_TEMP_DIR/.ralph8"
     mkdir -p "$ralph_dir"
     
-    create_tasks_file "$ralph_dir" "generic"
-    
+    create_tasks_file "$ralph_dir"
+
     local content=$(cat "$ralph_dir/TASKS.md")
     assert_contains "$content" "> Goal:" "Should contain goal format"
 }

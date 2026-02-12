@@ -28,7 +28,6 @@ source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 #
 # Parameters:
 #   $1 - ralph_dir: Path to .ralph directory
-#   $2 - project_type: Type of project (ios, python, web-react, generic, etc.)
 #
 # Behavior:
 #   - Checks for template in .ralph/templates/TASKS.md
@@ -37,7 +36,6 @@ source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 #
 create_tasks_file() {
     local ralph_dir="$1"
-    local project_type="$2"
 
     local tasks_file="$ralph_dir/TASKS.md"
     local template_file="$ralph_dir/templates/TASKS.md"

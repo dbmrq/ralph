@@ -17,7 +17,7 @@ test_create_config_file_exists() {
     local ralph_dir="$TEST_TEMP_DIR/.ralph"
     mkdir -p "$ralph_dir"
 
-    create_config_file "$ralph_dir" "TestProject" "generic" "cursor" "" "50" "true"
+    create_config_file "$ralph_dir" "TestProject" "cursor" "50" "true"
 
     assert_file_exists "$ralph_dir/config.sh" "config.sh should be created"
 }
@@ -27,7 +27,7 @@ test_config_contains_project_name() {
     local ralph_dir="$TEST_TEMP_DIR/.ralph2"
     mkdir -p "$ralph_dir"
 
-    create_config_file "$ralph_dir" "MyAwesomeProject" "generic" "cursor" "" "50" "true"
+    create_config_file "$ralph_dir" "MyAwesomeProject" "cursor" "50" "true"
 
     local content=$(cat "$ralph_dir/config.sh")
     assert_contains "$content" 'PROJECT_NAME="MyAwesomeProject"' "Should contain project name"
@@ -38,7 +38,7 @@ test_config_contains_agent_type() {
     local ralph_dir="$TEST_TEMP_DIR/.ralph3"
     mkdir -p "$ralph_dir"
 
-    create_config_file "$ralph_dir" "TestProject" "generic" "auggie" "" "50" "true"
+    create_config_file "$ralph_dir" "TestProject" "auggie" "50" "true"
 
     local content=$(cat "$ralph_dir/config.sh")
     assert_contains "$content" 'AGENT_TYPE="auggie"' "Should contain agent type"
@@ -49,7 +49,7 @@ test_config_max_iterations() {
     local ralph_dir="$TEST_TEMP_DIR/.ralph4"
     mkdir -p "$ralph_dir"
 
-    create_config_file "$ralph_dir" "TestProject" "generic" "cursor" "" "100" "true"
+    create_config_file "$ralph_dir" "TestProject" "cursor" "100" "true"
 
     local content=$(cat "$ralph_dir/config.sh")
     assert_contains "$content" "MAX_ITERATIONS=100" "Should contain max iterations"
@@ -60,7 +60,7 @@ test_config_build_gate() {
     local ralph_dir="$TEST_TEMP_DIR/.ralph5"
     mkdir -p "$ralph_dir"
 
-    create_config_file "$ralph_dir" "TestProject" "generic" "cursor" "" "50" "false"
+    create_config_file "$ralph_dir" "TestProject" "cursor" "50" "false"
 
     local content=$(cat "$ralph_dir/config.sh")
     assert_contains "$content" "BUILD_GATE_ENABLED=false" "Should contain build gate setting"
@@ -71,7 +71,7 @@ test_config_valid_syntax() {
     local ralph_dir="$TEST_TEMP_DIR/.ralph6"
     mkdir -p "$ralph_dir"
 
-    create_config_file "$ralph_dir" "TestProject" "generic" "cursor" "" "50" "true"
+    create_config_file "$ralph_dir" "TestProject" "cursor" "50" "true"
 
     bash -n "$ralph_dir/config.sh"
 }

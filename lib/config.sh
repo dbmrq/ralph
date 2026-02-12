@@ -31,20 +31,16 @@ readonly RALPH_VERSION="2.1.0"
 # Parameters:
 #   $1 - ralph_dir: Path to .ralph directory
 #   $2 - project_name: Name of the project
-#   $3 - project_type: Type of project (ios, python, web-react, node, etc.)
-#   $4 - agent_type: Type of agent (cursor, auggie, custom)
-#   $5 - commit_scope: Git commit scope
-#   $6 - max_iterations: Maximum iterations for the loop
-#   $7 - build_gate_enabled: Whether build gate is enabled
+#   $3 - agent_type: Type of agent (cursor, auggie, custom)
+#   $4 - max_iterations: Maximum iterations for the loop
+#   $5 - build_gate_enabled: Whether build gate is enabled
 #==============================================================================
 create_config_file() {
     local ralph_dir="$1"
     local project_name="$2"
-    local project_type="$3"
-    local agent_type="$4"
-    local commit_scope="$5"
-    local max_iterations="$6"
-    local build_gate_enabled="$7"
+    local agent_type="$3"
+    local max_iterations="$4"
+    local build_gate_enabled="$5"
 
     local config_file="$ralph_dir/config.sh"
 
@@ -91,7 +87,7 @@ REQUIRE_BRANCH=true
 ALLOWED_BRANCHES=""
 AUTO_COMMIT=true
 COMMIT_PREFIX="feat"
-COMMIT_SCOPE="$commit_scope"
+COMMIT_SCOPE=""
 
 #==============================================================================
 # BUILD SETTINGS
