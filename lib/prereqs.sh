@@ -114,7 +114,7 @@ check_and_install_prerequisites() {
     if ! command -v gh &> /dev/null; then
         print_warning "GitHub CLI (gh) is not installed."
         echo ""
-        echo "The GitHub CLI is needed to access the private ralph-loop repository"
+        echo "The GitHub CLI is needed to access the Ralph Loop repository"
         echo "and for git operations."
         echo ""
         if command -v brew &> /dev/null; then

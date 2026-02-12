@@ -12,7 +12,7 @@
 #   bash <(curl -fsSL https://raw.githubusercontent.com/dbmrq/ralph-loop/main/install.sh)
 #
 # Or with GitHub CLI:
-#   bash <(gh api repos/dbmrq/ralph-loop/contents/install.sh --jq '.content' | base64 -d)
+#   bash <(gh api repos/dbmrq/ralph/contents/install.sh --jq '.content' | base64 -d)
 #
 
 set -e
@@ -35,7 +35,7 @@ else
 fi
 
 # GitHub repo for downloading files
-REPO_NAME="${RALPH_REPO_NAME:-dbmrq/ralph-loop}"
+REPO_NAME="${RALPH_REPO_NAME:-dbmrq/ralph}"
 RALPH_VERSION="2.1.0"
 
 #==============================================================================

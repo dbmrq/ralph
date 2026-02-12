@@ -24,7 +24,7 @@ __DOWNLOAD_SH_SOURCED__=1
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
 # Default repository name
-REPO_NAME="${REPO_NAME:-dbmrq/ralph-loop}"
+REPO_NAME="${REPO_NAME:-dbmrq/ralph}"
 
 #==============================================================================
 # FILE DOWNLOAD FUNCTIONS

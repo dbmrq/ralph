@@ -9,14 +9,14 @@ Ralph Loop is a shell script that repeatedly calls an AI coding agent to complet
 Copy and paste this into your terminal:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/dbmrq/ralph-loop/main/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/dbmrq/ralph/main/install.sh)
 ```
 
 **That's it!** This single command handles everything from start to finish.
 
 > **Alternative (if using GitHub CLI):**
 > ```bash
-> bash <(gh api repos/dbmrq/ralph-loop/contents/install.sh --jq '.content' | base64 -d)
+> bash <(gh api repos/dbmrq/ralph/contents/install.sh --jq '.content' | base64 -d)
 > ```
 
 ### What Happens
@@ -40,20 +40,20 @@ The installer handles everything, even if you have nothing installed:
 │  Don't have Homebrew?  → Offers to install it   │
 │  Don't have gh CLI?    → Installs via Homebrew  │
 │  Not authenticated?    → Walks you through it   │
-│  Don't have ralph-loop? → Clones it for you     │
+│  Don't have ralph?      → Clones it for you     │
 └─────────────────────────────────────────────────┘
 ```
 
-### Already Have ralph-loop?
+### Already Have Ralph?
 
 Just run the installer again from anywhere:
 
 ```bash
-# From within the ralph-loop directory
+# From within the ralph directory
 ./install.sh
 
 # Or use the one-liner from anywhere
-bash <(curl -fsSL https://raw.githubusercontent.com/dbmrq/ralph-loop/main/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/dbmrq/ralph/main/install.sh)
 ```
 
 It detects the existing installation and shows you a menu:
@@ -64,7 +64,7 @@ What would you like to do?
   2) Add/edit tasks for an existing project
   3) Add custom instructions for an existing project
   4) Run Ralph Loop on a project
-  5) Update ralph-loop to latest version
+  5) Update Ralph Loop to latest version
   6) Exit
 ```
 
@@ -176,7 +176,7 @@ The script auto-detects the project directory from its location inside `.ralph/`
 The repository is organized into modular components:
 
 ```
-ralph-loop/                        # This repository
+ralph/                             # This repository
 ├── install.sh                     # THE entry point - handles everything
 ├── README.md                      # This documentation
 ├── lib/                           # Worker scripts (sourced by install.sh)
