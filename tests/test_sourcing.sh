@@ -65,9 +65,11 @@ test_source_config() {
     unset __COMMON_SH_SOURCED__
     unset RALPH_CONFIG_LIB_LOADED
     source "$REPO_ROOT/lib/config.sh"
-    
+
     # Verify key functions exist
-    declare -f create_config_file >/dev/null
+    declare -f create_config_file >/dev/null && \
+    declare -f create_build_script >/dev/null && \
+    declare -f create_test_script >/dev/null
 }
 
 # Test: tasks.sh can be sourced

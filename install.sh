@@ -281,12 +281,19 @@ run_setup_wizard() {
 
     # Create config.sh
     create_config_file "$ralph_dir" "$project_name" "$project_type" "$agent_type" \
-        "$xcode_scheme" "$xcode_project_dir" "$build_command" "$test_command" \
         "$commit_scope" "50" "true"
     print_success "Created .ralph/config.sh"
 
-    # Create project_prompt.txt
-    create_prompt_file "$ralph_dir" "$project_type" "$project_name"
+    # Create build.sh and test.sh scripts (placeholder templates)
+    create_build_script "$ralph_dir"
+    print_success "Created .ralph/build.sh"
+
+    create_test_script "$ralph_dir"
+    print_success "Created .ralph/test.sh"
+
+    # Create prompt files (placeholder templates)
+    create_prompt_files "$ralph_dir" "$project_name"
+    print_success "Created .ralph/platform_prompt.txt"
     print_success "Created .ralph/project_prompt.txt"
 
     # Create docs README
@@ -313,20 +320,29 @@ run_setup_wizard() {
     echo "Ralph Loop is now configured for your project."
     echo ""
     echo -e "${BOLD}Files created:${NC}"
-    echo "  $ralph_dir/ralph_loop.sh      - Main automation script"
-    echo "  $ralph_dir/config.sh          - Build/test configuration"
-    echo "  $ralph_dir/project_prompt.txt - Project-specific AI instructions"
-    echo "  $ralph_dir/base_prompt.txt    - Core agent workflow"
-    echo "  $ralph_dir/docs/              - Additional documentation for agents"
+    echo "  $ralph_dir/ralph_loop.sh       - Main automation script"
+    echo "  $ralph_dir/config.sh           - Loop settings and configuration"
+    echo "  $ralph_dir/build.sh            - Build verification script (placeholder)"
+    echo "  $ralph_dir/test.sh             - Test runner script (placeholder)"
+    echo "  $ralph_dir/platform_prompt.txt - Platform guidelines (placeholder)"
+    echo "  $ralph_dir/project_prompt.txt  - Project instructions (placeholder)"
+    echo "  $ralph_dir/base_prompt.txt     - Core agent workflow"
+    echo "  $ralph_dir/docs/               - Additional documentation for agents"
     if [ "$create_sample_tasks" = true ]; then
-        echo "  $ralph_dir/TASKS.md           - Task checklist"
+        echo "  $ralph_dir/TASKS.md            - Task checklist"
     fi
     echo ""
 
     local step=1
     echo -e "${BOLD}Next steps:${NC}"
     echo ""
-    echo -e "  $step. ${YELLOW}Review project_prompt.txt${NC} - customize for your project"
+    echo -e "  $step. ${YELLOW}Run the AI setup assistant${NC} to configure placeholder files"
+    ((step++))
+    echo ""
+    echo -e "  $step. ${YELLOW}Or manually configure:${NC}"
+    echo "     - build.sh and test.sh with your build/test commands"
+    echo "     - platform_prompt.txt with platform guidelines"
+    echo "     - project_prompt.txt with project-specific instructions"
     ((step++))
     echo ""
 
@@ -382,9 +398,11 @@ offer_ai_setup_assistant() {
     echo -e "${BOLD}AI Setup Assistant${NC}"
     echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
-    echo "The AI agent can analyze your project and automatically fill in:"
-    echo "  • project_prompt.txt - Project-specific instructions"
-    echo "  • config.sh - Build and test commands"
+    echo "The AI agent can analyze your project and automatically configure:"
+    echo "  • build.sh            - Build verification script"
+    echo "  • test.sh             - Test runner script"
+    echo "  • platform_prompt.txt - Platform guidelines"
+    echo "  • project_prompt.txt  - Project-specific instructions"
     echo ""
 
     if ask_yes_no "Run AI setup assistant now?" "y"; then
@@ -520,16 +538,8 @@ main() {
         exit 1
     fi
 
-    # Download templates for the detected project type
-    local project_type=$(detect_project_type "$project_path")
-    local platform_type="generic"
-    case "$project_type" in
-        ios) platform_type="ios" ;;
-        python) platform_type="python" ;;
-        *) platform_type="generic" ;;
-    esac
-
-    download_template_files "$ralph_dir" "$platform_type"
+    # Download template files
+    download_template_files "$ralph_dir"
     echo ""
 
     # Step 5: Run setup wizard

@@ -1,0 +1,50 @@
+# Project-Specific Instructions
+
+<!-- PLACEHOLDER: This file should contain instructions specific to YOUR project -->
+<!-- The AI setup assistant will populate this based on your codebase -->
+<!-- Delete this comment block when configured -->
+
+## Project Overview
+
+**Project Name:** [Your project name]
+**Description:** [Brief description of what this project does]
+
+## Project Structure
+
+<!-- Describe your folder structure -->
+- `src/` - Main source code
+- `tests/` - Test files
+- `docs/` - Documentation
+
+## Key Files & Patterns
+
+<!-- Point the agent to important files -->
+- Main entry point: [e.g., `src/main.py`, `App.swift`]
+- Configuration: [e.g., `config/settings.py`]
+- Core logic: [e.g., `src/core/`]
+
+## Coding Conventions
+
+<!-- Project-specific conventions -->
+- [e.g., "Use dependency injection for services"]
+- [e.g., "All API calls go through NetworkService"]
+- [e.g., "Follow existing naming patterns"]
+
+## Things to Avoid
+
+<!-- Warn the agent about pitfalls -->
+- [e.g., "Don't modify generated files directly"]
+- [e.g., "Don't add dependencies without approval"]
+
+## Reference Materials
+
+<!-- Links to docs, designs, etc. -->
+- Documentation: [link]
+- API specs: [link]
+
+---
+
+<!-- Remove everything above and add your project-specific instructions -->
+
+Begin now. Find the next unchecked task and complete it.
+

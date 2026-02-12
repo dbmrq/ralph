@@ -1,0 +1,33 @@
+# Platform Guidelines
+
+<!-- PLACEHOLDER: This file should contain platform-specific guidelines -->
+<!-- The AI setup assistant will populate this based on your project type -->
+<!-- Delete this comment block when configured -->
+
+## About This File
+
+This file contains guidelines specific to your platform/framework (iOS, Python, React, etc.).
+
+**To configure:** Run the AI setup assistant or manually add guidelines for:
+- Language-specific best practices
+- Framework conventions (SwiftUI, React, Django, etc.)
+- Architecture patterns (MVVM, MVC, Clean Architecture)
+- Testing frameworks and conventions
+- Common pitfalls to avoid
+
+## Example Content
+
+For an iOS project, this might include:
+- SwiftUI vs UIKit guidelines
+- Concurrency patterns (async/await)
+- Memory management considerations
+
+For a Python project:
+- Type hints usage
+- Testing with pytest
+- Virtual environment conventions
+
+---
+
+<!-- Remove everything above and add your platform guidelines -->
+

@@ -132,16 +132,18 @@ Type your instructions below. When finished, type 'END' on a new line.
 At the end of installation, an AI agent analyzes your project and automatically configures:
 
 - **`project_prompt.txt`** - Project architecture, coding standards, key directories
-- **`config.sh`** - Build and test commands appropriate for your project type
+- **`build.sh`** - Build verification script for your project type
+- **`test.sh`** - Test runner script for your project type
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 AI Setup Assistant
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-The AI agent can analyze your project and automatically fill in:
+The AI agent can analyze your project and automatically configure:
   • project_prompt.txt - Project-specific instructions
-  • config.sh - Build and test commands
+  • build.sh - Build verification script
+  • test.sh  - Test runner script
 
 Run AI setup assistant now? [Y/n]:
 ```
@@ -186,11 +188,11 @@ ralph-loop/                        # This repository
 │   ├── ralph_loop.sh              # Main automation script
 │   ├── base_prompt.txt            # Global agent instructions
 │   └── validate.sh                # Script validation
-├── templates/                     # Platform templates
-│   ├── ios/                       # iOS-specific prompts
-│   ├── python/                    # Python-specific prompts
-│   ├── web-react/                 # React/Web prompts
-│   └── generic/                   # Generic fallback
+├── templates/                     # Placeholder templates
+│   ├── build.sh                   # Build script template
+│   ├── test.sh                    # Test script template
+│   ├── platform_prompt.txt        # Platform guidelines template
+│   └── project_prompt.txt         # Project instructions template
 └── hooks/                         # Git hooks for development
     └── pre-commit                 # Runs validation before commits
 ```
@@ -207,6 +209,8 @@ my-project/                        # Your project
 │   ├── platform_prompt.txt        # Level 2: Platform guidelines
 │   ├── project_prompt.txt         # Level 3: Project-specific instructions
 │   ├── config.sh                  # Project settings
+│   ├── build.sh                   # Build verification script
+│   ├── test.sh                    # Test runner script
 │   ├── TASKS.md                   # Task checklist
 │   ├── docs/                      # Additional documentation (optional)
 │   └── logs/                      # Run logs (auto-created)
@@ -222,20 +226,19 @@ Instructions are split into three layers that can be edited independently:
 | Level | File | Purpose | Examples |
 |-------|------|---------|----------|
 | 1. Global | `base_prompt.txt` | Ralph Loop workflow instructions | Task format, status markers, one-task-at-a-time rule |
-| 2. Platform | `templates/{platform}/platform_prompt.txt` | Platform-specific guidelines | iOS: SwiftUI, MVVM; Python: typing, pytest |
+| 2. Platform | `.ralph/platform_prompt.txt` | Platform-specific guidelines | iOS: SwiftUI, MVVM; Python: typing, pytest |
 | 3. Project | `.ralph/project_prompt.txt` | Your project's unique requirements | "Uses XcodeGen", "API calls go through NetworkService" |
 
-The platform is set via `PLATFORM_TYPE` in your project's `config.sh`:
-```bash
-PLATFORM_TYPE="ios"   # Uses templates/ios/platform_prompt.txt
-PLATFORM_TYPE="python" # Uses templates/python/platform_prompt.txt
-PLATFORM_TYPE="generic" # Uses templates/generic/platform_prompt.txt
-```
+During installation, placeholder templates are created for platform and project prompts.
+The AI setup assistant will configure these files automatically, or you can edit them manually.
+
+**Placeholder detection**: Files containing `<!-- PLACEHOLDER:` are detected as unconfigured
+and skipped when building the prompt. This ensures that placeholder content is never sent to agents.
 
 This separation means:
 - **Update global rules** without touching project configs
-- **Add a new platform** without modifying existing ones
-- **Customize project instructions** without losing platform best practices
+- **Customize platform guidelines** for your specific tech stack
+- **Customize project instructions** for your unique requirements
 
 ## Test Run Mode
 
@@ -317,7 +320,6 @@ When the agent completes, a summary is shown:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PROJECT_NAME` | - | Display name for your project |
-| `PLATFORM_TYPE` | `generic` | Platform for Level 2 prompt: `ios`, `python`, `generic`, etc. |
 | `AGENT_TYPE` | `cursor` | Agent to use: `cursor`, `auggie`, `custom` |
 | `DEFAULT_MODEL` | `""` | AI model to use (empty = prompt at startup) |
 | `MAX_ITERATIONS` | `50` | Maximum loop iterations |
@@ -333,21 +335,25 @@ When the agent completes, a summary is shown:
 | `BUILD_GATE_ENABLED` | `true` | Verify builds between tasks |
 | `BUILD_FIX_ATTEMPTS` | `1` | Attempts to fix broken builds |
 
-### Build Commands
+### Build and Test Scripts
 
-Define these functions in `config.sh`:
+Ralph Loop uses separate executable scripts for build verification and testing:
 
+**`.ralph/build.sh`** - Required if `BUILD_GATE_ENABLED=true`
 ```bash
-# Required if BUILD_GATE_ENABLED=true
-project_build() {
-    xcodebuild -scheme "MyApp" build
-}
-
-# Optional
-project_test() {
-    xcodebuild -scheme "MyApp" test
-}
+#!/bin/bash
+# Example for iOS
+xcodebuild -scheme "MyApp" -destination 'platform=iOS Simulator,name=iPhone 16' build
 ```
+
+**`.ralph/test.sh`** - Optional, for test gates
+```bash
+#!/bin/bash
+# Example for iOS
+xcodebuild -scheme "MyApp" -destination 'platform=iOS Simulator,name=iPhone 16' test
+```
+
+Both scripts must exit 0 on success and non-zero on failure. The AI setup assistant configures these automatically during installation.
 
 ### Custom Agents
 
@@ -415,10 +421,6 @@ Logs are stored in `.ralph/logs/`:
 - `build_fix_YYYYMMDD_HHMMSS.log` - Build fix attempt logs
 
 ## Examples
-
-### iOS Project
-
-See `templates/ios/` for a complete iOS setup.
 
 ### Running with Different Agents
 

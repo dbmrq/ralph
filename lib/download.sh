@@ -108,35 +108,19 @@ DOCS_EOF
 
 download_template_files() {
     local ralph_dir="$1"
-    local platform_type="$2"
-
-    # Map to template directory
-    local template_dir="templates/$platform_type"
 
     # Create templates directory
-    mkdir -p "$ralph_dir/templates/$platform_type"
+    mkdir -p "$ralph_dir/templates"
 
-    # Get list of files in template directory
-    local template_files=$(gh api "repos/$REPO_NAME/contents/$template_dir" --jq '.[].name' 2>/dev/null)
+    # Get list of files in templates directory (flat structure now)
+    local template_files=$(gh api "repos/$REPO_NAME/contents/templates" --jq '.[] | select(.type == "file") | .name' 2>/dev/null)
 
     if [ -n "$template_files" ]; then
         while IFS= read -r file; do
-            if download_file "$template_dir/$file" "$ralph_dir/templates/$platform_type/$file"; then
-                print_success "Downloaded templates/$platform_type/$file"
+            if download_file "templates/$file" "$ralph_dir/templates/$file"; then
+                print_success "Downloaded templates/$file"
             fi
         done <<< "$template_files"
-    fi
-
-    # Also download generic templates as fallback
-    if [ "$platform_type" != "generic" ]; then
-        mkdir -p "$ralph_dir/templates/generic"
-        local generic_files=$(gh api "repos/$REPO_NAME/contents/templates/generic" --jq '.[].name' 2>/dev/null)
-
-        if [ -n "$generic_files" ]; then
-            while IFS= read -r file; do
-                download_file "templates/generic/$file" "$ralph_dir/templates/generic/$file" 2>/dev/null
-            done <<< "$generic_files"
-        fi
     fi
 }
 

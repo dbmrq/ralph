@@ -16,6 +16,9 @@
 # Project Setup:
 #   This script lives in your project's .ralph/ directory alongside:
 #   - config.sh           (required) - Project configuration
+#   - build.sh            (required) - Build verification script
+#   - test.sh             (required) - Test runner script
+#   - platform_prompt.txt (optional) - Platform guidelines
 #   - project_prompt.txt  (optional) - Project-specific instructions
 #   - TASKS.md            (required) - Task checklist
 #
@@ -163,6 +166,42 @@ validate_agent() {
 }
 
 validate_agent
+
+# Validate build and test scripts exist
+validate_scripts() {
+    local build_script="$RALPH_CONFIG_DIR/build.sh"
+    local test_script="$RALPH_CONFIG_DIR/test.sh"
+    local has_errors=false
+
+    # Check build.sh exists
+    if [ ! -f "$build_script" ]; then
+        echo -e "${RED}ERROR: Build script not found: $build_script${NC}"
+        has_errors=true
+    elif [ ! -x "$build_script" ]; then
+        echo -e "${YELLOW}Warning: Build script is not executable: $build_script${NC}"
+        echo "Making it executable..."
+        chmod +x "$build_script"
+    fi
+
+    # Check test.sh exists
+    if [ ! -f "$test_script" ]; then
+        echo -e "${RED}ERROR: Test script not found: $test_script${NC}"
+        has_errors=true
+    elif [ ! -x "$test_script" ]; then
+        echo -e "${YELLOW}Warning: Test script is not executable: $test_script${NC}"
+        echo "Making it executable..."
+        chmod +x "$test_script"
+    fi
+
+    if [ "$has_errors" = true ]; then
+        echo ""
+        echo "Run the Ralph Loop installer to create missing scripts:"
+        echo "  curl -fsSL https://raw.githubusercontent.com/ralphloopai/ralph-loop/main/install.sh | bash"
+        exit 1
+    fi
+}
+
+validate_scripts
 
 #==============================================================================
 # MODEL SELECTION
@@ -320,15 +359,25 @@ verify_branch() {
 #
 # Prompts are combined from 3 levels:
 #   1. Global (base_prompt.txt) - Ralph Loop workflow instructions
-#   2. Platform (templates/{platform}/platform_prompt.txt) - Platform guidelines
+#   2. Platform (.ralph/platform_prompt.txt) - Platform guidelines
 #   3. Project (.ralph/project_prompt.txt) - Project-specific instructions
 #
+# Placeholder files (containing "<!-- PLACEHOLDER:") are skipped.
 # Each level can be edited independently without affecting the others.
 #
 
+# Check if a file contains placeholder content (not yet configured)
+is_placeholder_file() {
+    local file="$1"
+    if [ ! -f "$file" ]; then
+        return 1
+    fi
+    grep -q "<!-- PLACEHOLDER:" "$file" 2>/dev/null
+}
+
 build_prompt() {
     local base_prompt_file="$RALPH_DIR/base_prompt.txt"
-    local platform_prompt_file="$RALPH_DIR/templates/${PLATFORM_TYPE:-generic}/platform_prompt.txt"
+    local platform_prompt_file="$RALPH_CONFIG_DIR/platform_prompt.txt"
     local project_prompt_file="$RALPH_CONFIG_DIR/project_prompt.txt"
 
     # Level 1: Global/Ralph Loop instructions
@@ -341,25 +390,29 @@ build_prompt() {
         echo ""
     fi
 
-    # Level 2: Platform-specific guidelines
+    # Level 2: Platform-specific guidelines (skip if placeholder)
     if [ -f "$platform_prompt_file" ]; then
-        echo "# Level 2: Platform Guidelines (${PLATFORM_TYPE:-generic})"
-        echo ""
-        cat "$platform_prompt_file"
-        echo ""
-        echo "---"
-        echo ""
-    else
-        log "${YELLOW}Note: No platform prompt found for '${PLATFORM_TYPE:-generic}'${NC}"
+        if is_placeholder_file "$platform_prompt_file"; then
+            log "${YELLOW}Note: platform_prompt.txt contains placeholder content - skipping${NC}"
+        else
+            echo "# Level 2: Platform Guidelines"
+            echo ""
+            cat "$platform_prompt_file"
+            echo ""
+            echo "---"
+            echo ""
+        fi
     fi
 
-    # Level 3: Project-specific instructions
+    # Level 3: Project-specific instructions (skip if placeholder)
     if [ -f "$project_prompt_file" ]; then
-        echo "# Level 3: Project-Specific Instructions"
-        echo ""
-        cat "$project_prompt_file"
-    else
-        log "${YELLOW}Note: No project prompt found at $project_prompt_file${NC}"
+        if is_placeholder_file "$project_prompt_file"; then
+            log "${YELLOW}Note: project_prompt.txt contains placeholder content - skipping${NC}"
+        else
+            echo "# Level 3: Project-Specific Instructions"
+            echo ""
+            cat "$project_prompt_file"
+        fi
     fi
 }
 
@@ -628,22 +681,26 @@ stop_build_spinner() {
     printf "\033[?25h\r\033[K"
 }
 
-# Default build command - should be overridden in config.sh
+# Build script path
+BUILD_SCRIPT="$RALPH_CONFIG_DIR/build.sh"
+TEST_SCRIPT="$RALPH_CONFIG_DIR/test.sh"
+
+# Run build script
 run_build() {
-    if type project_build &> /dev/null; then
-        project_build
+    if [ -x "$BUILD_SCRIPT" ]; then
+        "$BUILD_SCRIPT"
     else
-        log "${YELLOW}⚠ No build command defined (define project_build() in config.sh)${NC}"
+        log "${YELLOW}⚠ Build script not found or not executable: $BUILD_SCRIPT${NC}"
         return 0
     fi
 }
 
-# Default test command - should be overridden in config.sh
+# Run test script
 run_tests() {
-    if type project_test &> /dev/null; then
-        project_test
+    if [ -x "$TEST_SCRIPT" ]; then
+        "$TEST_SCRIPT"
     else
-        log "${YELLOW}⚠ No test command defined (define project_test() in config.sh)${NC}"
+        log "${YELLOW}⚠ Test script not found or not executable: $TEST_SCRIPT${NC}"
         return 0
     fi
 }
@@ -701,10 +758,10 @@ verify_tests() {
         return 0
     fi
 
-    # Check if test command is defined
-    if ! type project_test &> /dev/null; then
-        log "${YELLOW}⚠ No test command defined - skipping test verification${NC}"
-        log "${YELLOW}  Define project_test() in config.sh to enable test gates${NC}"
+    # Check if test script exists and is executable
+    if [ ! -x "$TEST_SCRIPT" ]; then
+        log "${YELLOW}⚠ No test script found - skipping test verification${NC}"
+        log "${YELLOW}  Create .ralph/test.sh to enable test gates${NC}"
         return 0
     fi
 

@@ -25,60 +25,17 @@ source "$LIB_DIR/common.sh"
 # PROMPT FILE GENERATION
 #==============================================================================
 
-create_prompt_file() {
+create_prompt_files() {
     local ralph_dir="$1"
-    local project_type="$2"
-    local project_name="$3"
+    local project_name="$2"
 
-    local prompt_file="$ralph_dir/project_prompt.txt"
+    # Copy placeholder templates
+    cp "$LIB_DIR/../templates/platform_prompt.txt" "$ralph_dir/platform_prompt.txt"
+    cp "$LIB_DIR/../templates/project_prompt.txt" "$ralph_dir/project_prompt.txt"
 
-    # Check if template exists for this project type
-    local template_file="$LIB_DIR/../templates/$project_type/project_prompt.txt"
-
-    if [ -f "$template_file" ]; then
-        # Use template and replace project name placeholders
-        sed "s/\[Your App Name\]/$project_name/g; s/My iOS App/$project_name/g; s/MyApp/$project_name/g" "$template_file" > "$prompt_file"
-    else
-        # Create generic project prompt
-        cat > "$prompt_file" << EOF
-# $project_name - Project-Specific Instructions
-
-<!--
-This file contains instructions specific to YOUR project.
-The platform-level guidelines are loaded automatically based on PLATFORM_TYPE in config.sh.
-Edit this file to describe your project's unique requirements.
--->
-
-## Project Overview
-
-Project Name: $project_name
-Description: [Brief description of the project]
-
-## Project Structure
-
-<!-- Describe your specific folder structure -->
-
-## Key Files & Patterns
-
-<!-- Point the agent to important files to reference -->
-
-## Coding Conventions
-
-<!-- Any project-specific conventions -->
-
-## Things to Avoid
-
-<!-- Warn the agent about pitfalls -->
-
-## Reference Materials
-
-<!-- Links to docs, designs, etc. -->
-
----
-
-Begin now. Find the next unchecked task and complete it.
-EOF
-    fi
+    # Replace project name placeholder in project_prompt.txt
+    sed -i '' "s/\[Your project name\]/$project_name/g" "$ralph_dir/project_prompt.txt" 2>/dev/null || \
+        sed -i "s/\[Your project name\]/$project_name/g" "$ralph_dir/project_prompt.txt"
 }
 
 create_docs_readme() {

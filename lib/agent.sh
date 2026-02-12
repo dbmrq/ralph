@@ -97,55 +97,64 @@ run_ai_setup_assistant() {
 
 ## Your Task
 
-Analyze this project and help configure Ralph Loop by:
+Analyze this project and configure all placeholder files in .ralph/:
 
-### 1. Fill in .ralph/project_prompt.txt
-Look at the codebase and fill in each section:
-- **Project Overview**: What does this project do?
-- **Architecture**: What patterns are used? (MVVM, MVC, Clean Architecture, etc.)
-- **Key Directories**: Map out the important folders and their purposes
-- **Coding Standards**: What conventions does this project follow?
-- **Testing Requirements**: How are tests structured and run?
-- **Things to Avoid**: Any files or patterns to stay away from?
+### 1. Configure .ralph/build.sh (CRITICAL)
 
-Be specific and accurate based on what you find in the code.
+Edit .ralph/build.sh to build/compile the project.
+The script must exit 0 on success and non-zero on failure.
+Remove the placeholder block and add the actual build command.
 
-### 2. Configure build and test commands in .ralph/config.sh
-
-This is CRITICAL. The script uses these functions to verify code quality.
-
-Look at the existing config.sh and make sure these functions are properly defined:
-
-#### project_build()
-This function should build/compile the project. Examples:
+Look at the project and configure the appropriate build command. Examples:
 - iOS/Xcode: \`xcodebuild -scheme MyApp -destination 'platform=iOS Simulator,...' build\`
 - Swift Package: \`swift build\`
 - Node.js: \`npm run build\`
-- Python: \`python -m py_compile *.py\` or a linter
+- Python: \`ruff check .\` or \`python -m py_compile *.py\`
 
-#### project_test()
-This function should run the project's tests. Examples:
+Check for project.yml (XcodeGen), Package.swift (SPM), package.json, Makefile, etc.
+
+**Run the build script to verify it works**: \`.ralph/build.sh\`
+
+### 2. Configure .ralph/test.sh (CRITICAL)
+
+Edit .ralph/test.sh to run the project's tests.
+The script must exit 0 on success and non-zero on failure.
+Remove the placeholder block and add the actual test command.
+
+Examples:
 - iOS/Xcode: \`xcodebuild -scheme MyApp -destination 'platform=iOS Simulator,...' test\`
 - Swift Package: \`swift test\`
 - Node.js: \`npm test\`
 - Python: \`pytest\`
 
-Look at the project structure to determine the correct commands. Check for:
-- package.json scripts
-- Makefile targets
-- project.yml or .xcodeproj for iOS
-- setup.py or pyproject.toml for Python
+**Run the test script to verify it works**: \`.ralph/test.sh\`
 
-If the project uses XcodeGen (has project.yml), you may need to run \`xcodegen\` first.
+### 3. Configure .ralph/platform_prompt.txt
 
-### 3. Do NOT modify .ralph/TASKS.md
+Replace the placeholder content with platform-specific guidelines for this project.
+Include best practices for the language/framework (Swift, Python, React, etc.).
+Remove the \`<!-- PLACEHOLDER:\` comment block when done.
+
+### 4. Configure .ralph/project_prompt.txt
+
+Replace the placeholder content with project-specific instructions:
+- **Project Overview**: What does this project do?
+- **Architecture**: What patterns are used? (MVVM, MVC, Clean Architecture, etc.)
+- **Key Directories**: Map out the important folders and their purposes
+- **Coding Standards**: What conventions does this project follow?
+- **Things to Avoid**: Any files or patterns to stay away from?
+
+Remove the \`<!-- PLACEHOLDER:\` comment block when done.
+
+### 5. Do NOT modify .ralph/TASKS.md
 Leave the task list for the user to fill in themselves.
 
-### 4. Final Instructions
+### 6. Final Summary
 After completing the setup, tell the user:
-- What you configured in project_prompt.txt
-- What build command you set up
-- What test command you set up
+- What build command you configured (and whether it passed)
+- What test command you configured (and whether tests passed)
+- What platform guidelines you added
+- What project-specific instructions you added
 - How to add tasks to .ralph/TASKS.md
 - How to run Ralph Loop: .ralph/ralph_loop.sh
 
