@@ -99,6 +99,196 @@ bootstrap_libraries() {
 }
 
 #==============================================================================
+# FILE VALIDATION HELPERS
+#==============================================================================
+
+# Check if a config.sh file is valid (has correct syntax and required vars)
+is_valid_config() {
+    local config_file="$1"
+
+    # Must exist
+    [ -f "$config_file" ] || return 1
+
+    # Must have valid bash syntax
+    bash -n "$config_file" 2>/dev/null || return 1
+
+    # Must define PROJECT_NAME (basic sanity check)
+    grep -q 'PROJECT_NAME=' "$config_file" 2>/dev/null || return 1
+
+    return 0
+}
+
+# Check if a script file is customized (not a placeholder)
+is_customized_script() {
+    local script_file="$1"
+
+    # Must exist
+    [ -f "$script_file" ] || return 1
+
+    # If it contains placeholder marker, it's not customized
+    grep -q '<!-- PLACEHOLDER:' "$script_file" 2>/dev/null && return 1
+
+    # If it contains the TODO marker from our templates, it's not customized
+    grep -q '# TODO: Add your' "$script_file" 2>/dev/null && return 1
+
+    return 0
+}
+
+# Check if a prompt file is customized (not a placeholder)
+is_customized_prompt() {
+    local prompt_file="$1"
+
+    # Must exist
+    [ -f "$prompt_file" ] || return 1
+
+    # If it contains placeholder marker, it's not customized
+    grep -q '<!-- PLACEHOLDER:' "$prompt_file" 2>/dev/null && return 1
+
+    return 0
+}
+
+#==============================================================================
+# UPDATE INSTALLATION (Idempotent)
+#==============================================================================
+
+update_ralph_installation() {
+    local project_path="$1"
+    local ralph_dir="$project_path/.ralph"
+    local project_name=$(basename "$project_path")
+
+    print_header "Updating Ralph Loop"
+
+    #--------------------------------------------------------------------------
+    # Step 1: Update core files (always)
+    #--------------------------------------------------------------------------
+    print_step "Updating core files..."
+    echo ""
+
+    if ! download_ralph_files "$ralph_dir"; then
+        print_error "Failed to download Ralph Loop files."
+        return 1
+    fi
+
+    # Update templates (always)
+    download_template_files "$ralph_dir"
+    echo ""
+
+    #--------------------------------------------------------------------------
+    # Step 2: Fix/create config.sh if needed
+    #--------------------------------------------------------------------------
+    local config_file="$ralph_dir/config.sh"
+
+    if ! is_valid_config "$config_file"; then
+        print_warning "config.sh is missing or invalid - recreating..."
+
+        # Try to preserve existing settings if possible
+        local existing_agent="cursor"
+        if [ -f "$config_file" ]; then
+            existing_agent=$(grep 'AGENT_TYPE=' "$config_file" 2>/dev/null | cut -d'"' -f2 || echo "cursor")
+        fi
+
+        create_config_file "$ralph_dir" "$project_name" "${existing_agent:-cursor}" "50" "true"
+        print_success "Recreated .ralph/config.sh"
+    else
+        print_success "config.sh is valid - preserved"
+    fi
+
+    #--------------------------------------------------------------------------
+    # Step 3: Create missing user files (don't overwrite customized ones)
+    #--------------------------------------------------------------------------
+
+    # build.sh
+    if [ ! -f "$ralph_dir/build.sh" ]; then
+        create_build_script "$ralph_dir"
+        print_success "Created missing .ralph/build.sh"
+    elif ! is_customized_script "$ralph_dir/build.sh"; then
+        # It's a placeholder, update it with latest template
+        create_build_script "$ralph_dir"
+        print_success "Updated placeholder .ralph/build.sh"
+    else
+        print_success "build.sh is customized - preserved"
+    fi
+
+    # test.sh
+    if [ ! -f "$ralph_dir/test.sh" ]; then
+        create_test_script "$ralph_dir"
+        print_success "Created missing .ralph/test.sh"
+    elif ! is_customized_script "$ralph_dir/test.sh"; then
+        create_test_script "$ralph_dir"
+        print_success "Updated placeholder .ralph/test.sh"
+    else
+        print_success "test.sh is customized - preserved"
+    fi
+
+    # platform_prompt.txt
+    if [ ! -f "$ralph_dir/platform_prompt.txt" ]; then
+        create_prompt_files "$ralph_dir" "$project_name"
+        print_success "Created missing prompt files"
+    elif ! is_customized_prompt "$ralph_dir/platform_prompt.txt"; then
+        create_prompt_files "$ralph_dir" "$project_name"
+        print_success "Updated placeholder prompt files"
+    else
+        print_success "Prompt files are customized - preserved"
+    fi
+
+    # TASKS.md - never overwrite, only create if missing
+    if [ ! -f "$ralph_dir/TASKS.md" ]; then
+        create_tasks_file "$ralph_dir"
+        print_success "Created missing .ralph/TASKS.md"
+    else
+        print_success "TASKS.md exists - preserved"
+    fi
+
+    # docs/README.md - only create if missing
+    if [ ! -f "$ralph_dir/docs/README.md" ]; then
+        mkdir -p "$ralph_dir/docs"
+        create_docs_readme "$ralph_dir"
+        print_success "Created missing .ralph/docs/README.md"
+    else
+        print_success "docs/ exists - preserved"
+    fi
+
+    #--------------------------------------------------------------------------
+    # Done
+    #--------------------------------------------------------------------------
+    echo ""
+    print_header "Update Complete! 🎉"
+    echo ""
+    echo "Ralph Loop has been updated to version $RALPH_VERSION"
+    echo ""
+    echo "Your configuration files have been preserved."
+    echo ""
+    echo "To run Ralph Loop:"
+    echo -e "  ${CYAN}cd $project_path && .ralph/ralph_loop.sh${NC}"
+}
+
+#==============================================================================
+# FRESH INSTALLATION
+#==============================================================================
+
+fresh_install() {
+    local project_path="$1"
+    local ralph_dir="$project_path/.ralph"
+
+    print_subheader "Installing Ralph Loop"
+
+    mkdir -p "$ralph_dir"
+
+    if ! download_ralph_files "$ralph_dir"; then
+        print_error "Failed to download Ralph Loop files."
+        echo "Check your network connection and GitHub authentication."
+        exit 1
+    fi
+
+    # Download template files
+    download_template_files "$ralph_dir"
+    echo ""
+
+    # Run setup wizard
+    run_setup_wizard "$project_path"
+}
+
+#==============================================================================
 # SETUP WIZARD
 #==============================================================================
 
@@ -402,8 +592,8 @@ main() {
         print_warning "This project already has Ralph Loop installed."
         echo ""
         echo "Options:"
-        echo "  1) Update to latest version"
-        echo "  2) Reconfigure from scratch"
+        echo "  1) Update Ralph Loop (preserves your configuration)"
+        echo "  2) Reconfigure from scratch (deletes everything)"
         echo "  3) Exit"
         echo ""
 
@@ -411,12 +601,7 @@ main() {
 
         case "$choice" in
             1)
-                print_step "Updating Ralph Loop files..."
-                download_ralph_files "$ralph_dir"
-                print_success "Updated to version $RALPH_VERSION!"
-                echo ""
-                echo "To run Ralph Loop:"
-                echo -e "  ${CYAN}cd $project_path && .ralph/ralph_loop.sh${NC}"
+                update_ralph_installation "$project_path"
                 exit 0
                 ;;
             2)
@@ -430,23 +615,8 @@ main() {
         esac
     fi
 
-    # Step 4: Download Ralph Loop files
-    print_subheader "Installing Ralph Loop"
-
-    mkdir -p "$ralph_dir"
-
-    if ! download_ralph_files "$ralph_dir"; then
-        print_error "Failed to download Ralph Loop files."
-        echo "Check your network connection and GitHub authentication."
-        exit 1
-    fi
-
-    # Download template files
-    download_template_files "$ralph_dir"
-    echo ""
-
-    # Step 5: Run setup wizard
-    run_setup_wizard "$project_path"
+    # Fresh installation
+    fresh_install "$project_path"
 }
 
 # Run main
