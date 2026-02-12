@@ -105,6 +105,8 @@ bootstrap_libraries() {
 # Check if a config.sh file is valid (has correct syntax and required vars)
 is_valid_config() {
     local config_file="$1"
+    local config_dir
+    config_dir="$(dirname "$config_file")"
 
     # Must exist
     [ -f "$config_file" ] || return 1
@@ -114,6 +116,21 @@ is_valid_config() {
 
     # Must define PROJECT_NAME (basic sanity check)
     grep -q 'PROJECT_NAME=' "$config_file" 2>/dev/null || return 1
+
+    # Must not try to source files that don't exist (old broken configs)
+    # Check for any 'source' or '.' commands and verify the files exist
+    local sourced_files
+    sourced_files=$(grep -E '^\s*(source|\.)\s+' "$config_file" 2>/dev/null | sed -E 's/^\s*(source|\.)\s+//' | tr -d '"' | tr -d "'")
+    if [ -n "$sourced_files" ]; then
+        while IFS= read -r sourced_file; do
+            # Resolve relative paths from config directory
+            if [[ "$sourced_file" != /* ]]; then
+                sourced_file="$config_dir/$sourced_file"
+            fi
+            # If the sourced file doesn't exist, config is invalid
+            [ -f "$sourced_file" ] || return 1
+        done <<< "$sourced_files"
+    fi
 
     return 0
 }
@@ -159,14 +176,33 @@ update_ralph_installation() {
     print_header "Updating Ralph Loop"
 
     #--------------------------------------------------------------------------
-    # Step 1: Update core files (always)
+    # Step 1: Update core script (always)
     #--------------------------------------------------------------------------
     print_step "Updating core files..."
     echo ""
 
-    if ! download_ralph_files "$ralph_dir"; then
-        print_error "Failed to download Ralph Loop files."
+    # Always update ralph_loop.sh (the engine)
+    if download_file "core/ralph_loop.sh" "$ralph_dir/ralph_loop.sh"; then
+        chmod +x "$ralph_dir/ralph_loop.sh" 2>/dev/null
+        print_success "Updated ralph_loop.sh"
+    else
+        print_error "Failed to download ralph_loop.sh"
         return 1
+    fi
+
+    # Only update base_prompt.txt if it has the version marker (not customized)
+    # or if it doesn't exist
+    if [ ! -f "$ralph_dir/base_prompt.txt" ]; then
+        if download_file "core/base_prompt.txt" "$ralph_dir/base_prompt.txt"; then
+            print_success "Created base_prompt.txt"
+        fi
+    elif grep -q 'RALPH_BASE_PROMPT_VERSION:' "$ralph_dir/base_prompt.txt" 2>/dev/null; then
+        # Has version marker = not customized, safe to update
+        if download_file "core/base_prompt.txt" "$ralph_dir/base_prompt.txt"; then
+            print_success "Updated base_prompt.txt"
+        fi
+    else
+        print_success "base_prompt.txt is customized - preserved"
     fi
 
     # Update templates (always)
