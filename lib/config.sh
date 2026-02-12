@@ -90,11 +90,22 @@ COMMIT_PREFIX="feat"
 COMMIT_SCOPE=""
 
 #==============================================================================
-# BUILD SETTINGS
+# BUILD GATE SETTINGS
 #==============================================================================
+# When enabled, verifies the build passes after each task.
+# If the build fails, an agent will attempt to fix it.
 
 BUILD_GATE_ENABLED=$build_gate_enabled
 BUILD_FIX_ATTEMPTS=1
+
+#==============================================================================
+# TEST GATE SETTINGS
+#==============================================================================
+# When enabled, verifies tests pass after each task.
+# If tests fail, an agent will attempt to fix them properly.
+
+TEST_GATE_ENABLED=true
+TEST_FIX_ATTEMPTS=1
 
 #==============================================================================
 # BUILD/TEST SCRIPTS

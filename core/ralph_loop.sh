@@ -807,10 +807,16 @@ Your ONLY task right now is to fix the failing tests. Do not work on any tasks f
 Steps:
 1. Run the test suite to see which tests are failing
 2. Analyze the test failures - understand what's expected vs actual
-3. Determine if the test is wrong or the implementation is wrong
-4. Fix the issue (either the test or the implementation)
+3. Determine the root cause. Consider ALL possibilities:
+   - The implementation code may be wrong
+   - The test itself may be wrong (incorrect expectations, outdated assertions)
+   - The test script (.ralph/test.sh) may have issues (timeouts, missing dependencies, incorrect commands)
+   - There may be environment or configuration issues
+4. Fix the issue properly - don't just make tests pass with hacks
 5. Run tests again to verify they pass
 6. If you fix implementation code, make sure the build still passes
+
+Important: If the test script itself is misconfigured (wrong commands, insufficient timeouts, etc.), fix the test script. Check .ralph/test.sh if tests are timing out or failing to run properly.
 
 When all tests pass, output: FIXED
 If you cannot fix the tests, output: ERROR: <description of the problem>
