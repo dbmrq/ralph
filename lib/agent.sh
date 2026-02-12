@@ -85,15 +85,15 @@ run_ai_setup_assistant() {
         return 1
     fi
 
-    if ask_yes_no "Run AI setup assistant now?" "y"; then
-        echo ""
-        print_step "Starting AI setup assistant..."
-        echo ""
+    # Note: The caller (offer_ai_setup_assistant) already asked for confirmation
+    echo ""
+    print_step "Starting AI setup assistant..."
+    echo ""
 
-        cd "$project_path" || return 1
+    cd "$project_path" || return 1
 
-        # Create the setup prompt
-        local setup_prompt="You are helping set up Ralph Loop, an automated AI agent task runner.
+    # Create the setup prompt
+    local setup_prompt="You are helping set up Ralph Loop, an automated AI agent task runner.
 
 ## Your Task
 
@@ -160,29 +160,16 @@ After completing the setup, tell the user:
 
 Output DONE when finished."
 
-        # Run the agent
-        if [ "$agent_type" = "cursor" ]; then
-            agent "$setup_prompt"
-        elif [ "$agent_type" = "auggie" ]; then
-            auggie "$setup_prompt"
-        fi
-
-        echo ""
-        echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-        echo -e "${GREEN}Setup complete! 🎉${NC}"
-        echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    else
-        echo ""
-        echo "You can run the setup assistant later with:"
-        echo -e "  ${CYAN}cd $project_path${NC}"
-        if [ "$agent_type" = "cursor" ]; then
-            echo -e "  ${CYAN}agent \"Help me set up Ralph Loop by filling in .ralph/project_prompt.txt\"${NC}"
-        else
-            echo -e "  ${CYAN}auggie \"Help me set up Ralph Loop by filling in .ralph/project_prompt.txt\"${NC}"
-        fi
-        echo ""
-        echo "Or start Ralph Loop directly:"
-        echo -e "  ${CYAN}.ralph/ralph_loop.sh${NC}"
+    # Run the agent
+    if [ "$agent_type" = "cursor" ]; then
+        agent "$setup_prompt"
+    elif [ "$agent_type" = "auggie" ]; then
+        auggie "$setup_prompt"
     fi
+
+    echo ""
+    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${GREEN}Setup complete! 🎉${NC}"
+    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 }
 

@@ -19,8 +19,8 @@ readonly RALPH_CONFIG_LIB_LOADED=true
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/common.sh"
 
-# Ralph version
-readonly RALPH_VERSION="2.0.0"
+# Ralph version (should match install.sh)
+readonly RALPH_VERSION="2.1.0"
 
 #==============================================================================
 # CREATE CONFIG FILE
@@ -115,7 +115,7 @@ EOF
 # CREATE BUILD SCRIPT
 #==============================================================================
 # Copies the placeholder build.sh template to .ralph/build.sh.
-# The AI setup assistant will configure it for the specific project.
+# Uses templates from .ralph/templates/ (downloaded by download_template_files).
 #
 # Parameters:
 #   $1 - ralph_dir: Path to .ralph directory
@@ -123,8 +123,22 @@ EOF
 create_build_script() {
     local ralph_dir="$1"
     local build_file="$ralph_dir/build.sh"
+    local template_file="$ralph_dir/templates/build.sh"
 
-    cp "$SCRIPT_DIR/../templates/build.sh" "$build_file"
+    if [ -f "$template_file" ]; then
+        cp "$template_file" "$build_file"
+    else
+        # Fallback: create minimal placeholder
+        cat > "$build_file" << 'EOF'
+#!/bin/bash
+# PLACEHOLDER: Configure your build command
+set -e
+cd "$(dirname "$0")/.."
+echo "⚠️  BUILD SCRIPT NOT CONFIGURED"
+echo "Edit .ralph/build.sh to add your project's build command."
+exit 1
+EOF
+    fi
     chmod +x "$build_file"
 }
 
@@ -132,7 +146,7 @@ create_build_script() {
 # CREATE TEST SCRIPT
 #==============================================================================
 # Copies the placeholder test.sh template to .ralph/test.sh.
-# The AI setup assistant will configure it for the specific project.
+# Uses templates from .ralph/templates/ (downloaded by download_template_files).
 #
 # Parameters:
 #   $1 - ralph_dir: Path to .ralph directory
@@ -140,24 +154,22 @@ create_build_script() {
 create_test_script() {
     local ralph_dir="$1"
     local test_file="$ralph_dir/test.sh"
+    local template_file="$ralph_dir/templates/test.sh"
 
-    cp "$SCRIPT_DIR/../templates/test.sh" "$test_file"
+    if [ -f "$template_file" ]; then
+        cp "$template_file" "$test_file"
+    else
+        # Fallback: create minimal placeholder
+        cat > "$test_file" << 'EOF'
+#!/bin/bash
+# PLACEHOLDER: Configure your test command
+set -e
+cd "$(dirname "$0")/.."
+echo "⚠️  TEST SCRIPT NOT CONFIGURED"
+echo "Edit .ralph/test.sh to add your project's test command."
+exit 1
+EOF
+    fi
     chmod +x "$test_file"
-}
-
-#==============================================================================
-# CREATE PROMPT FILES
-#==============================================================================
-# Copies placeholder prompt templates to .ralph/.
-# The AI setup assistant will configure them for the specific project.
-#
-# Parameters:
-#   $1 - ralph_dir: Path to .ralph directory
-#==============================================================================
-create_prompt_files() {
-    local ralph_dir="$1"
-
-    cp "$SCRIPT_DIR/../templates/platform_prompt.txt" "$ralph_dir/platform_prompt.txt"
-    cp "$SCRIPT_DIR/../templates/project_prompt.txt" "$ralph_dir/project_prompt.txt"
 }
 

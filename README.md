@@ -9,10 +9,15 @@ Ralph Loop is a shell script that repeatedly calls an AI coding agent to complet
 Copy and paste this into your terminal:
 
 ```bash
-bash <(gh api repos/dbmrq/ralph-loop/contents/install.sh --jq '.content' | base64 -d)
+bash <(curl -fsSL https://raw.githubusercontent.com/dbmrq/ralph-loop/main/install.sh)
 ```
 
 **That's it!** This single command handles everything from start to finish.
+
+> **Alternative (if using GitHub CLI):**
+> ```bash
+> bash <(gh api repos/dbmrq/ralph-loop/contents/install.sh --jq '.content' | base64 -d)
+> ```
 
 ### What Happens
 
@@ -48,7 +53,7 @@ Just run the installer again from anywhere:
 ./install.sh
 
 # Or use the one-liner from anywhere
-bash <(gh api repos/dbmrq/ralph-loop/contents/install.sh --jq '.content' | base64 -d)
+bash <(curl -fsSL https://raw.githubusercontent.com/dbmrq/ralph-loop/main/install.sh)
 ```
 
 It detects the existing installation and shows you a menu:
@@ -186,13 +191,13 @@ ralph-loop/                        # This repository
 │   └── agent.sh                   # AI agent detection/setup
 ├── core/                          # Core runtime files (copied to projects)
 │   ├── ralph_loop.sh              # Main automation script
-│   ├── base_prompt.txt            # Global agent instructions
-│   └── validate.sh                # Script validation
-├── templates/                     # Placeholder templates
+│   └── base_prompt.txt            # Global agent instructions
+├── templates/                     # Placeholder templates (copied to .ralph/templates/)
 │   ├── build.sh                   # Build script template
 │   ├── test.sh                    # Test script template
 │   ├── platform_prompt.txt        # Platform guidelines template
-│   └── project_prompt.txt         # Project instructions template
+│   ├── project_prompt.txt         # Project instructions template
+│   └── TASKS.md                   # Task list template
 └── hooks/                         # Git hooks for development
     └── pre-commit                 # Runs validation before commits
 ```
@@ -212,6 +217,7 @@ my-project/                        # Your project
 │   ├── build.sh                   # Build verification script
 │   ├── test.sh                    # Test runner script
 │   ├── TASKS.md                   # Task checklist
+│   ├── templates/                 # Original templates (for reference)
 │   ├── docs/                      # Additional documentation (optional)
 │   └── logs/                      # Run logs (auto-created)
 └── (your project files)

@@ -28,14 +28,38 @@ source "$LIB_DIR/common.sh"
 create_prompt_files() {
     local ralph_dir="$1"
     local project_name="$2"
+    local platform_template="$ralph_dir/templates/platform_prompt.txt"
+    local project_template="$ralph_dir/templates/project_prompt.txt"
 
-    # Copy placeholder templates
-    cp "$LIB_DIR/../templates/platform_prompt.txt" "$ralph_dir/platform_prompt.txt"
-    cp "$LIB_DIR/../templates/project_prompt.txt" "$ralph_dir/project_prompt.txt"
+    # Copy placeholder templates from downloaded templates directory
+    if [ -f "$platform_template" ]; then
+        cp "$platform_template" "$ralph_dir/platform_prompt.txt"
+    else
+        # Fallback: create minimal placeholder
+        cat > "$ralph_dir/platform_prompt.txt" << 'EOF'
+# Platform Guidelines
 
-    # Replace project name placeholder in project_prompt.txt
-    sed -i '' "s/\[Your project name\]/$project_name/g" "$ralph_dir/project_prompt.txt" 2>/dev/null || \
-        sed -i "s/\[Your project name\]/$project_name/g" "$ralph_dir/project_prompt.txt"
+<!-- PLACEHOLDER: Configure platform-specific guidelines -->
+EOF
+    fi
+
+    if [ -f "$project_template" ]; then
+        cp "$project_template" "$ralph_dir/project_prompt.txt"
+        # Replace project name placeholder
+        sed -i '' "s/\[Your project name\]/$project_name/g" "$ralph_dir/project_prompt.txt" 2>/dev/null || \
+            sed -i "s/\[Your project name\]/$project_name/g" "$ralph_dir/project_prompt.txt"
+    else
+        # Fallback: create minimal placeholder
+        cat > "$ralph_dir/project_prompt.txt" << EOF
+# Project-Specific Instructions
+
+<!-- PLACEHOLDER: Configure project-specific instructions -->
+
+**Project Name:** $project_name
+
+Begin now. Find the next unchecked task and complete it.
+EOF
+    fi
 }
 
 create_docs_readme() {

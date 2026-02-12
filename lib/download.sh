@@ -55,38 +55,10 @@ download_ralph_files() {
     mkdir -p "$ralph_dir/logs"
     mkdir -p "$ralph_dir/docs"
 
-    # Create docs README
-    cat > "$ralph_dir/docs/README.md" << 'DOCS_EOF'
-# Ralph Loop Documentation
-
-Place additional documentation files here to provide context for AI agents.
-
-## How It Works
-
-Files in this directory are **not automatically included** in agent prompts,
-but agents are instructed to check here when they need more context.
-
-## Suggested Files
-
-- `architecture.md` - High-level system architecture
-- `api-reference.md` - API documentation
-- `coding-standards.md` - Detailed coding conventions
-- `dependencies.md` - Third-party libraries and their usage
-- `troubleshooting.md` - Common issues and solutions
-
-## Tips
-
-- Keep files focused and concise
-- Use clear headings for easy scanning
-- Include code examples where helpful
-- Update docs when making significant changes
-DOCS_EOF
-
     # Download core files (from core/ directory in repo)
     local core_files=(
         "ralph_loop.sh"
         "base_prompt.txt"
-        "validate.sh"
     )
 
     for file in "${core_files[@]}"; do
@@ -100,7 +72,6 @@ DOCS_EOF
 
     # Make scripts executable
     chmod +x "$ralph_dir/ralph_loop.sh" 2>/dev/null
-    chmod +x "$ralph_dir/validate.sh" 2>/dev/null
 
     echo ""
     return 0

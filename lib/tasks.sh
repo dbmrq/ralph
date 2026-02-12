@@ -20,21 +20,19 @@ __TASKS_LIB_SOURCED__=1
 # Source common library
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
-# Get the lib directory for template lookups
-LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
 #==============================================================================
 # CREATE TASKS FILE
 #==============================================================================
 # Generates .ralph/TASKS.md with sample tasks and guidelines.
+# Uses templates from .ralph/templates/ (downloaded by download_template_files).
 #
 # Parameters:
 #   $1 - ralph_dir: Path to .ralph directory
 #   $2 - project_type: Type of project (ios, python, web-react, generic, etc.)
 #
 # Behavior:
-#   - Checks for platform-specific template in templates/{project_type}/TASKS.md
-#   - Falls back to generic template if platform template doesn't exist
+#   - Checks for template in .ralph/templates/TASKS.md
+#   - Falls back to inline template if not found
 #   - Creates file with validation task, sample tasks, and writing tips
 #
 create_tasks_file() {
@@ -42,13 +40,12 @@ create_tasks_file() {
     local project_type="$2"
 
     local tasks_file="$ralph_dir/TASKS.md"
-
-    # Check if template exists for this project type
-    local template_file="$LIB_DIR/../templates/$project_type/TASKS.md"
+    local template_file="$ralph_dir/templates/TASKS.md"
 
     if [ -f "$template_file" ]; then
         cp "$template_file" "$tasks_file"
     else
+        # Fallback: create inline template
         # Create generic tasks file
         cat > "$tasks_file" << 'EOF'
 # Task List
