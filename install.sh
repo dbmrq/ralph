@@ -115,12 +115,38 @@ is_valid_config() {
     # Must define PROJECT_NAME (basic sanity check)
     grep -q 'PROJECT_NAME=' "$config_file" 2>/dev/null || return 1
 
-    # Must actually be sourceable without errors
-    # Run in a subshell to catch any source/. commands that fail
-    (
-        cd "$(dirname "$config_file")" 2>/dev/null || exit 1
-        source "$(basename "$config_file")" 2>/dev/null || exit 1
-    ) || return 1
+    # Must not have any source/. commands that reference non-existent files
+    # This catches old broken configs that try to source common.sh etc.
+    local config_dir
+    config_dir="$(dirname "$config_file")"
+
+    # Extract all source commands and check if the files exist
+    while IFS= read -r line; do
+        # Skip comments and empty lines
+        [[ "$line" =~ ^[[:space:]]*# ]] && continue
+        [[ -z "$line" ]] && continue
+
+        # Check for source or . commands
+        if [[ "$line" =~ (^|[[:space:]])(source|\.)[[:space:]]+[\"\']?([^\"\';]+) ]]; then
+            local sourced_file="${BASH_REMATCH[3]}"
+            # Remove trailing quotes/whitespace
+            sourced_file="${sourced_file%%[\"\']*}"
+            sourced_file="${sourced_file%% *}"
+
+            # Skip variable expansions we can't resolve
+            [[ "$sourced_file" =~ \$ ]] && continue
+
+            # Resolve relative paths
+            if [[ "$sourced_file" != /* ]]; then
+                sourced_file="$config_dir/$sourced_file"
+            fi
+
+            # If the file doesn't exist, config is invalid
+            if [ ! -f "$sourced_file" ]; then
+                return 1
+            fi
+        fi
+    done < "$config_file"
 
     return 0
 }
@@ -203,16 +229,6 @@ update_ralph_installation() {
     # Step 2: Fix/create config.sh if needed
     #--------------------------------------------------------------------------
     local config_file="$ralph_dir/config.sh"
-
-    # Debug: test if we can source the config
-    if [ -f "$config_file" ]; then
-        local source_output
-        source_output=$( (cd "$(dirname "$config_file")" && source "$(basename "$config_file")" 2>&1) )
-        local source_result=$?
-        if [ $source_result -ne 0 ]; then
-            print_warning "config.sh failed to source: $source_output"
-        fi
-    fi
 
     if ! is_valid_config "$config_file"; then
         print_warning "config.sh is missing or invalid - recreating..."
