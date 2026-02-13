@@ -22,6 +22,42 @@ type AgentConfig struct {
 	Default string `yaml:"default" json:"default" mapstructure:"default"`
 	// Model is the default model to use. Empty string means use agent's default.
 	Model string `yaml:"model" json:"model" mapstructure:"model"`
+	// Custom is a list of custom agent definitions.
+	Custom []CustomAgentConfig `yaml:"custom,omitempty" json:"custom,omitempty" mapstructure:"custom"`
+}
+
+// DetectionMethod defines how to detect if a custom agent is available.
+type DetectionMethod string
+
+const (
+	// DetectionMethodCommand checks if the command exists in PATH.
+	DetectionMethodCommand DetectionMethod = "command"
+	// DetectionMethodPath checks if a specific file or directory exists.
+	DetectionMethodPath DetectionMethod = "path"
+	// DetectionMethodEnv checks if an environment variable is set.
+	DetectionMethodEnv DetectionMethod = "env"
+	// DetectionMethodAlways assumes the agent is always available.
+	DetectionMethodAlways DetectionMethod = "always"
+)
+
+// CustomAgentConfig defines a custom agent added via `ralph agent add`.
+type CustomAgentConfig struct {
+	// Name is the unique identifier for this agent.
+	Name string `yaml:"name" json:"name" mapstructure:"name"`
+	// Description is a human-readable description of the agent.
+	Description string `yaml:"description,omitempty" json:"description,omitempty" mapstructure:"description"`
+	// Command is the command used to run the agent.
+	Command string `yaml:"command" json:"command" mapstructure:"command"`
+	// DetectionMethod defines how to detect if the agent is available.
+	DetectionMethod DetectionMethod `yaml:"detection_method" json:"detection_method" mapstructure:"detection_method"`
+	// DetectionValue is the value used for detection (command name, path, env var name).
+	DetectionValue string `yaml:"detection_value,omitempty" json:"detection_value,omitempty" mapstructure:"detection_value"`
+	// ModelListCommand is the command to list available models (optional).
+	ModelListCommand string `yaml:"model_list_command,omitempty" json:"model_list_command,omitempty" mapstructure:"model_list_command"`
+	// DefaultModel is the default model for this agent.
+	DefaultModel string `yaml:"default_model,omitempty" json:"default_model,omitempty" mapstructure:"default_model"`
+	// Args are additional arguments to pass to the command.
+	Args []string `yaml:"args,omitempty" json:"args,omitempty" mapstructure:"args"`
 }
 
 // TimeoutConfig configures the smart timeout system.
@@ -317,6 +353,13 @@ func (c *Config) Validate() error {
 		}
 	}
 
+	// Validate custom agents
+	for i, agent := range c.Agent.Custom {
+		if err := validateCustomAgent(agent, "agent.custom", i); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
 	// Validate hooks
 	for i, hook := range c.Hooks.PreTask {
 		if err := validateHook(hook, "hooks.pre_task", i); err != nil {
@@ -367,3 +410,37 @@ func validateHook(hook HookDefinition, prefix string, index int) *ValidationErro
 	return nil
 }
 
+func validateCustomAgent(agent CustomAgentConfig, prefix string, index int) *ValidationError {
+	field := fmt.Sprintf("%s[%d]", prefix, index)
+
+	// Name is required
+	if agent.Name == "" {
+		return &ValidationError{
+			Field:   field + ".name",
+			Message: "is required",
+		}
+	}
+
+	// Command is required
+	if agent.Command == "" {
+		return &ValidationError{
+			Field:   field + ".command",
+			Message: "is required",
+		}
+	}
+
+	// Validate detection method
+	if agent.DetectionMethod != "" {
+		switch agent.DetectionMethod {
+		case DetectionMethodCommand, DetectionMethodPath, DetectionMethodEnv, DetectionMethodAlways:
+			// valid
+		default:
+			return &ValidationError{
+				Field:   field + ".detection_method",
+				Message: "must be 'command', 'path', 'env', or 'always'",
+			}
+		}
+	}
+
+	return nil
+}

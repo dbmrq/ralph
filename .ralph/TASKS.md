@@ -110,7 +110,7 @@
   > If multiple available, prompt user to choose (no silent defaults)
   > Store selection in session state
 
-- [ ] AGENT-005: Add agent add command
+- [x] AGENT-005: Add agent add command
   > Goal: `ralph agent add` for adding custom agents
   > Prompt for: name, command, detection method, model list command
   > Store in config for future sessions

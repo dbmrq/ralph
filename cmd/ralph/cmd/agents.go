@@ -4,6 +4,8 @@ import (
 	"github.com/wexinc/ralph/internal/agent"
 	"github.com/wexinc/ralph/internal/agent/auggie"
 	"github.com/wexinc/ralph/internal/agent/cursor"
+	"github.com/wexinc/ralph/internal/agent/custom"
+	"github.com/wexinc/ralph/internal/config"
 )
 
 // DefaultRegistry is the global registry containing all built-in agents.
@@ -16,6 +18,7 @@ var DefaultDiscovery *agent.Discovery
 func init() {
 	DefaultRegistry = agent.NewRegistry()
 	RegisterDefaultAgents(DefaultRegistry)
+	LoadCustomAgents(DefaultRegistry)
 	DefaultDiscovery = agent.NewDiscovery(DefaultRegistry)
 }
 
@@ -26,3 +29,26 @@ func RegisterDefaultAgents(r *agent.Registry) {
 	r.Register(auggie.New())
 }
 
+// LoadCustomAgents loads custom agents from config and registers them.
+// If config cannot be loaded, custom agents are silently skipped.
+func LoadCustomAgents(r *agent.Registry) {
+	cfg, err := config.Load("")
+	if err != nil {
+		// Config not found or invalid - silently skip custom agents
+		return
+	}
+
+	for _, customCfg := range cfg.Agent.Custom {
+		a := custom.New(customCfg)
+		r.Register(a)
+	}
+}
+
+// RegisterCustomAgentsFromConfig registers custom agents from a given config.
+// This is useful for testing when you want to register agents from a specific config.
+func RegisterCustomAgentsFromConfig(r *agent.Registry, cfg *config.Config) {
+	for _, customCfg := range cfg.Agent.Custom {
+		a := custom.New(customCfg)
+		r.Register(a)
+	}
+}

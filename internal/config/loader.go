@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -201,6 +202,8 @@ func stringToCustomTypeHookFunc() mapstructure.DecodeHookFunc {
 			return FailureMode(data.(string)), nil
 		case reflect.TypeOf(HookType("")):
 			return HookType(data.(string)), nil
+		case reflect.TypeOf(DetectionMethod("")):
+			return DetectionMethod(data.(string)), nil
 		}
 
 		return data, nil
@@ -236,3 +239,34 @@ func LoadFromDir(dir string) (*Config, error) {
 	return NewLoader().LoadConfigFromDir(dir)
 }
 
+// Save writes the configuration to the specified path in YAML format.
+// If path is empty, it uses DefaultConfigPath.
+func Save(cfg *Config, path string) error {
+	if path == "" {
+		path = DefaultConfigPath
+	}
+
+	// Ensure parent directory exists
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+
+	// Marshal to YAML
+	data, err := marshalConfigToYAML(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+
+	// Write to file
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return fmt.Errorf("failed to write config file: %w", err)
+	}
+
+	return nil
+}
+
+// marshalConfigToYAML marshals the config to YAML bytes.
+func marshalConfigToYAML(cfg *Config) ([]byte, error) {
+	return yaml.Marshal(cfg)
+}

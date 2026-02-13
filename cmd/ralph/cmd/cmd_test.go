@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/wexinc/ralph/internal/agent"
+	"github.com/wexinc/ralph/internal/config"
 )
 
 // newTestRoot creates a fresh command hierarchy for testing.
@@ -41,6 +42,39 @@ completing tasks from a task list using AI agents.`,
 	}
 	initC.Flags().BoolP("force", "f", false, "Overwrite existing configuration")
 	root.AddCommand(initC)
+
+	// Add agent command group
+	agentC := &cobra.Command{
+		Use:   "agent",
+		Short: "Manage AI agents",
+		Long:  "Commands for managing AI agents including listing, adding, and configuring agents.",
+	}
+	root.AddCommand(agentC)
+
+	// Add agent list command
+	agentListC := &cobra.Command{
+		Use:   "list",
+		Short: "List available agents",
+		Long:  "List all available agents including built-in and custom agents.",
+		RunE:  runAgentList,
+	}
+	agentC.AddCommand(agentListC)
+
+	// Add agent add command
+	agentAddC := &cobra.Command{
+		Use:   "add",
+		Short: "Add a custom agent",
+		Long:  "Add a custom agent to Ralph.",
+		RunE:  runAgentAdd,
+	}
+	agentAddC.Flags().StringP("name", "n", "", "Agent name")
+	agentAddC.Flags().StringP("command", "c", "", "Agent command")
+	agentAddC.Flags().StringP("description", "d", "", "Agent description")
+	agentAddC.Flags().String("detection", "command", "Detection method")
+	agentAddC.Flags().String("detection-value", "", "Value for detection")
+	agentAddC.Flags().String("model-list-cmd", "", "Command to list available models")
+	agentAddC.Flags().String("default-model", "", "Default model for the agent")
+	agentC.AddCommand(agentAddC)
 
 	return root
 }
@@ -276,3 +310,87 @@ func TestRegisterDefaultAgents(t *testing.T) {
 	}
 }
 
+func TestAgentCommand(t *testing.T) {
+	tests := []struct {
+		name       string
+		args       []string
+		wantErr    bool
+		wantOutput string
+	}{
+		{
+			name:       "agent help",
+			args:       []string{"agent", "--help"},
+			wantErr:    false,
+			wantOutput: "managing AI agents",
+		},
+		{
+			name:       "agent list",
+			args:       []string{"agent", "list"},
+			wantErr:    false,
+			wantOutput: "Registered agents:",
+		},
+		{
+			name:       "agent add help",
+			args:       []string{"agent", "add", "--help"},
+			wantErr:    false,
+			wantOutput: "Add a custom agent",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buf := new(bytes.Buffer)
+			cmd := newTestRoot()
+			cmd.SetOut(buf)
+			cmd.SetErr(buf)
+			cmd.SetArgs(tt.args)
+
+			err := cmd.Execute()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Execute() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if tt.wantOutput != "" && !bytes.Contains(buf.Bytes(), []byte(tt.wantOutput)) {
+				t.Errorf("Output = %q, want to contain %q", buf.String(), tt.wantOutput)
+			}
+		})
+	}
+}
+
+func TestRegisterCustomAgentsFromConfig(t *testing.T) {
+	r := agent.NewRegistry()
+
+	cfg := &config.Config{
+		Agent: config.AgentConfig{
+			Custom: []config.CustomAgentConfig{
+				{
+					Name:            "test-custom",
+					Command:         "echo",
+					Description:     "Test custom agent",
+					DetectionMethod: config.DetectionMethodAlways,
+				},
+			},
+		},
+	}
+
+	RegisterCustomAgentsFromConfig(r, cfg)
+
+	// Verify the custom agent was registered
+	a, ok := r.Get("test-custom")
+	if !ok {
+		t.Fatal("test-custom agent should be registered")
+	}
+
+	if a.Name() != "test-custom" {
+		t.Errorf("agent.Name() = %q, want %q", a.Name(), "test-custom")
+	}
+
+	if a.Description() != "Test custom agent" {
+		t.Errorf("agent.Description() = %q, want %q", a.Description(), "Test custom agent")
+	}
+
+	if !a.IsAvailable() {
+		t.Error("agent should be available (detection method is 'always')")
+	}
+}
