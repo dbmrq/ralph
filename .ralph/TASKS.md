@@ -3,6 +3,8 @@
 **Purpose:** Transform Ralph Loop from shell scripts to a robust Go application with TUI
 **Reference:** See `.ralph/docs/` for architecture and feature specifications
 
+**Note:**  If during development you realize there are architecture improvements that can be made to subsequent tasks, update them!
+
 ---
 
 ## 🏗️ Phase 1: Project Foundation
