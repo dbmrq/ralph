@@ -2,11 +2,11 @@
 package main
 
 import (
-	"fmt"
-	"os"
+	"github.com/wexinc/ralph/cmd/ralph/cmd"
 )
 
-// Version information - will be set by build flags
+// Version information - set via ldflags at build time.
+// These are passed to the cmd package for the version command.
 var (
 	version = "dev"
 	commit  = "none"
@@ -14,8 +14,11 @@ var (
 )
 
 func main() {
-	// TODO: Initialize Cobra CLI in INIT-003
-	fmt.Printf("ralph %s (commit: %s, built: %s)\n", version, commit, date)
-	os.Exit(0)
+	// Set version info in cmd package
+	cmd.Version = version
+	cmd.Commit = commit
+	cmd.Date = date
+
+	cmd.Execute()
 }
 

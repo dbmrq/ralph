@@ -27,7 +27,7 @@
   > gopkg.in/yaml.v3
   > Tests: Not required (dependency-only task)
 
-- [ ] INIT-003: Create basic CLI structure with Cobra
+- [x] INIT-003: Create basic CLI structure with Cobra
   > Goal: Implement root command with version flag
   > Add `run` subcommand skeleton
   > Add `init` subcommand skeleton for project setup
