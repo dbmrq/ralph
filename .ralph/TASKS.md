@@ -156,7 +156,7 @@
   > Style with Lip Gloss
   > Create reusable form components (text input, checkbox, dropdown) for later use
 
-- [ ] TUI-002: Implement form components
+- [x] TUI-002: Implement form components
   > Goal: Create reusable form building blocks for confirmation screens
   > Create components/form.go - form container with field navigation
   > Create components/textinput.go - editable text field

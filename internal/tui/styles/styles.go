@@ -150,3 +150,82 @@ var (
 			Foreground(Muted)
 )
 
+// Form component styles.
+var (
+	// FormTitleStyle is for form titles.
+	FormTitleStyle = lipgloss.NewStyle().
+			Foreground(Foreground).
+			Bold(true).
+			Padding(0, 1)
+
+	// FormLabelStyle is for form field labels.
+	FormLabelStyle = lipgloss.NewStyle().
+			Foreground(MutedLight)
+
+	// FormLabelFocusedStyle is for focused form field labels.
+	FormLabelFocusedStyle = lipgloss.NewStyle().
+				Foreground(Secondary).
+				Bold(true)
+
+	// FormInputStyle is for form text inputs (unfocused).
+	FormInputStyle = lipgloss.NewStyle().
+			Foreground(MutedLight).
+			Padding(0, 1)
+
+	// FormInputFocusedStyle is for focused form text inputs.
+	FormInputFocusedStyle = lipgloss.NewStyle().
+				Foreground(Foreground).
+				Background(Background).
+				Padding(0, 1)
+
+	// CheckboxCheckedStyle is for checked checkboxes.
+	CheckboxCheckedStyle = lipgloss.NewStyle().
+				Foreground(Success)
+
+	// CheckboxUncheckedStyle is for unchecked checkboxes.
+	CheckboxUncheckedStyle = lipgloss.NewStyle().
+				Foreground(Muted)
+
+	// ButtonPrimaryStyle is for primary buttons (focused).
+	ButtonPrimaryStyle = lipgloss.NewStyle().
+				Foreground(Background).
+				Background(Primary).
+				Bold(true).
+				Padding(0, 2)
+
+	// ButtonPrimaryUnfocusedStyle is for primary buttons (unfocused).
+	ButtonPrimaryUnfocusedStyle = lipgloss.NewStyle().
+					Foreground(Primary).
+					Border(lipgloss.NormalBorder()).
+					BorderForeground(Primary).
+					Padding(0, 1)
+
+	// ButtonSecondaryStyle is for secondary buttons (focused).
+	ButtonSecondaryStyle = lipgloss.NewStyle().
+				Foreground(Background).
+				Background(Secondary).
+				Bold(true).
+				Padding(0, 2)
+
+	// ButtonSecondaryUnfocusedStyle is for secondary buttons (unfocused).
+	ButtonSecondaryUnfocusedStyle = lipgloss.NewStyle().
+					Foreground(MutedLight).
+					Border(lipgloss.NormalBorder()).
+					BorderForeground(Muted).
+					Padding(0, 1)
+
+	// ButtonDangerStyle is for danger buttons (focused).
+	ButtonDangerStyle = lipgloss.NewStyle().
+				Foreground(Foreground).
+				Background(Error).
+				Bold(true).
+				Padding(0, 2)
+
+	// ButtonDangerUnfocusedStyle is for danger buttons (unfocused).
+	ButtonDangerUnfocusedStyle = lipgloss.NewStyle().
+					Foreground(Error).
+					Border(lipgloss.NormalBorder()).
+					BorderForeground(Error).
+					Padding(0, 1)
+)
+
