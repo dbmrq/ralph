@@ -105,7 +105,7 @@
   > Execute with --print --quiet, support --continue for session resumption
   > Parse `auggie models list` for model discovery
 
-- [ ] AGENT-004: Add agent discovery and selection
+- [x] AGENT-004: Add agent discovery and selection
   > Goal: On startup, detect all available agents
   > If multiple available, prompt user to choose (no silent defaults)
   > Store selection in session state

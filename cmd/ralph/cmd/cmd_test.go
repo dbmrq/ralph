@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
+	"github.com/wexinc/ralph/internal/agent"
 )
 
 // newTestRoot creates a fresh command hierarchy for testing.
@@ -213,6 +214,65 @@ func TestInitCommand(t *testing.T) {
 				t.Errorf("Output = %q, want to contain %q", buf.String(), tt.wantOutput)
 			}
 		})
+	}
+}
+
+func TestDefaultRegistry(t *testing.T) {
+	t.Run("registry is initialized", func(t *testing.T) {
+		if DefaultRegistry == nil {
+			t.Fatal("DefaultRegistry should not be nil")
+		}
+	})
+
+	t.Run("cursor agent is registered", func(t *testing.T) {
+		a, ok := DefaultRegistry.Get("cursor")
+		if !ok {
+			t.Fatal("cursor agent should be registered")
+		}
+		if a.Name() != "cursor" {
+			t.Errorf("agent.Name() = %q, want %q", a.Name(), "cursor")
+		}
+	})
+
+	t.Run("auggie agent is registered", func(t *testing.T) {
+		a, ok := DefaultRegistry.Get("auggie")
+		if !ok {
+			t.Fatal("auggie agent should be registered")
+		}
+		if a.Name() != "auggie" {
+			t.Errorf("agent.Name() = %q, want %q", a.Name(), "auggie")
+		}
+	})
+
+	t.Run("has expected agent count", func(t *testing.T) {
+		all := DefaultRegistry.All()
+		if len(all) != 2 {
+			t.Errorf("Registry.All() count = %d, want 2", len(all))
+		}
+	})
+}
+
+func TestDefaultDiscovery(t *testing.T) {
+	if DefaultDiscovery == nil {
+		t.Fatal("DefaultDiscovery should not be nil")
+	}
+}
+
+func TestRegisterDefaultAgents(t *testing.T) {
+	// Test with a fresh registry
+	r := agent.NewRegistry()
+	RegisterDefaultAgents(r)
+
+	if len(r.All()) != 2 {
+		t.Errorf("RegisterDefaultAgents() registered %d agents, want 2", len(r.All()))
+	}
+
+	// Verify specific agents
+	if _, ok := r.Get("cursor"); !ok {
+		t.Error("cursor agent should be registered")
+	}
+	if _, ok := r.Get("auggie"); !ok {
+		t.Error("auggie agent should be registered")
 	}
 }
 
