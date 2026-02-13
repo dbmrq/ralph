@@ -127,6 +127,26 @@ build:
 - **TDD mode**: No baseline captured until tests exist
 - **Logging**: Clear indication that bootstrap phase is active
 
+### Task-Level Gate Overrides
+Individual tasks can specify that tests or builds are not required using metadata in the task description:
+
+```markdown
+- [ ] INIT-001: Initialize project structure
+  > Goal: Create go.mod and basic files
+  > Tests: Not required (setup-only task)
+  > Build: Not required
+
+- [ ] INIT-002: Add dependencies
+  > Tests: Not required (dependency-only task)
+```
+
+Supported patterns (case-insensitive):
+- `Tests: Not required` / `Tests: None` / `Tests: N/A` / `Tests: Skip`
+- `Build: Not required` / `Build: None` / `Build: N/A` / `Build: Skip`
+- `No tests needed` / `No tests required`
+
+When a task has these markers, the corresponding gate is skipped with an info message after that task completes.
+
 ### Transition Detection
 When bootstrap phase ends (first buildable code appears):
 1. Run initial build verification

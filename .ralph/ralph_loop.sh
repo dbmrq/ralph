@@ -619,7 +619,7 @@ run_agent() {
 }
 
 #==============================================================================
-# TASK COUNTING
+# TASK COUNTING AND METADATA
 #==============================================================================
 
 count_remaining() {
@@ -640,6 +640,71 @@ get_last_completed_task_id() {
 
 get_last_completed_task_description() {
     grep "^\- \[x\]" "$TASK_FILE" | tail -1 | sed -E 's/.*\[x\] [A-Za-z0-9_-]+: (.*)/\1/'
+}
+
+# Extract metadata for a task from its notes/description
+# Returns "true" if the task says tests are not required
+task_tests_not_required() {
+    local task_id="$1"
+    if [ -z "$task_id" ]; then
+        return 1
+    fi
+
+    # Find the task line and look at the following lines for metadata
+    # Task metadata is in indented lines starting with > after the task
+    # Look for patterns like "Tests: Not required" or "No tests needed"
+    local in_task=false
+    while IFS= read -r line; do
+        if echo "$line" | grep -qE "^\- \[(x| )\] ${task_id}:"; then
+            in_task=true
+            continue
+        fi
+
+        if [ "$in_task" = "true" ]; then
+            # If we hit another task or section, stop looking
+            if echo "$line" | grep -qE "^-|\#|^$" && ! echo "$line" | grep -qE "^  >"; then
+                break
+            fi
+            # Check for "Tests: Not required" or similar patterns
+            if echo "$line" | grep -qiE "Tests:[[:space:]]*(Not required|None|N/A|Skip)"; then
+                return 0
+            fi
+            if echo "$line" | grep -qiE "No tests (needed|required)"; then
+                return 0
+            fi
+        fi
+    done < "$TASK_FILE"
+
+    return 1
+}
+
+# Extract metadata for a task from its notes/description
+# Returns "true" if the task says build verification is not required
+task_build_not_required() {
+    local task_id="$1"
+    if [ -z "$task_id" ]; then
+        return 1
+    fi
+
+    # Similar to task_tests_not_required but for build
+    local in_task=false
+    while IFS= read -r line; do
+        if echo "$line" | grep -qE "^\- \[(x| )\] ${task_id}:"; then
+            in_task=true
+            continue
+        fi
+
+        if [ "$in_task" = "true" ]; then
+            if echo "$line" | grep -qE "^-|\#|^$" && ! echo "$line" | grep -qE "^  >"; then
+                break
+            fi
+            if echo "$line" | grep -qiE "Build:[[:space:]]*(Not required|None|N/A|Skip)"; then
+                return 0
+            fi
+        fi
+    done < "$TASK_FILE"
+
+    return 1
 }
 
 #==============================================================================
@@ -1210,9 +1275,11 @@ main() {
                 consecutive_failures=0
                 tasks_completed_this_run=$((tasks_completed_this_run + 1))
 
-                # Verify build after task completion
+                # Verify build after task completion (unless task says not required)
                 if [ "$BUILD_GATE_ENABLED" = "true" ]; then
-                    if ! verify_build; then
+                    if task_build_not_required "$TASK_ID"; then
+                        log "${CYAN}ℹ Build verification skipped (task metadata: Build not required)${NC}"
+                    elif ! verify_build; then
                         log "${YELLOW}Build broken after task - attempting fix...${NC}"
                         if ! attempt_build_fix; then
                             log "${RED}═══════════════════════════════════════════════════════════════${NC}"
@@ -1223,9 +1290,11 @@ main() {
                     fi
                 fi
 
-                # Verify tests after task completion
+                # Verify tests after task completion (unless task says not required)
                 if [ "$TEST_GATE_ENABLED" = "true" ]; then
-                    if ! verify_tests; then
+                    if task_tests_not_required "$TASK_ID"; then
+                        log "${CYAN}ℹ Test verification skipped (task metadata: Tests not required)${NC}"
+                    elif ! verify_tests; then
                         log "${YELLOW}Tests failing after task - attempting fix...${NC}"
                         if ! attempt_test_fix; then
                             log "${RED}═══════════════════════════════════════════════════════════════${NC}"
@@ -1257,14 +1326,22 @@ main() {
                 log "${GREEN}🎉 ALL DONE! Final task ${TASK_ID} completed in ${MINUTES}m ${SECONDS}s${NC}"
                 tasks_completed_this_run=$((tasks_completed_this_run + 1))
 
-                # Final build check
+                # Final build check (unless task says not required)
                 if [ "$BUILD_GATE_ENABLED" = "true" ]; then
-                    verify_build
+                    if task_build_not_required "$TASK_ID"; then
+                        log "${CYAN}ℹ Build verification skipped (task metadata: Build not required)${NC}"
+                    else
+                        verify_build
+                    fi
                 fi
 
-                # Final test check
+                # Final test check (unless task says not required)
                 if [ "$TEST_GATE_ENABLED" = "true" ]; then
-                    verify_tests
+                    if task_tests_not_required "$TASK_ID"; then
+                        log "${CYAN}ℹ Test verification skipped (task metadata: Tests not required)${NC}"
+                    else
+                        verify_tests
+                    fi
                 fi
 
                 # Commit final changes

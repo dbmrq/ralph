@@ -183,8 +183,10 @@
   > Goal: Orchestrate bootstrap check → build → test → gate decision
   > Support gate, tdd, and report modes
   > Handle transitions: bootstrap → ready (log and capture baseline)
+  > Parse task metadata for gate overrides (Tests: Not required, Build: Not required)
+  > Skip gates when task metadata says not required (log info message)
   > Clear error messaging for failures
-  > Return GateResult: { Passed, Skipped (bootstrap), Failed, Reason }
+  > Return GateResult: { Passed, Skipped (bootstrap), SkippedByTask, Failed, Reason }
 
 ---
 
