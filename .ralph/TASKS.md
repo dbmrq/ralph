@@ -311,7 +311,7 @@
   > Support `ralph run --continue` for resuming sessions
   > Store agent session IDs for `auggie --continue`
 
-- [ ] LOOP-006: Add headless runner
+- [x] LOOP-006: Add headless runner
   > Goal: Implement headless execution mode
   > Support --output json for structured output
   > Same functionality as TUI mode without interactive UI

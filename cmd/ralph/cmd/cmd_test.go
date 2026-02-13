@@ -29,8 +29,10 @@ completing tasks from a task list using AI agents.`,
 		RunE:  runRun,
 	}
 	run.Flags().Bool("headless", false, "Run in headless mode without TUI")
-	run.Flags().Bool("output", false, "Output in JSON format (requires --headless)")
+	run.Flags().String("output", "", "Output format: json for structured output (requires --headless)")
 	run.Flags().String("continue", "", "Continue a paused session by ID")
+	run.Flags().String("tasks", "", "Path to task file")
+	run.Flags().BoolP("verbose", "v", false, "Enable verbose output")
 	root.AddCommand(run)
 
 	// Add init command
@@ -145,12 +147,9 @@ func TestRunCommand(t *testing.T) {
 			wantErr:    false,
 			wantOutput: "Starting Ralph in TUI mode",
 		},
-		{
-			name:       "run with headless flag",
-			args:       []string{"run", "--headless"},
-			wantErr:    false,
-			wantOutput: "Starting Ralph in headless mode",
-		},
+		// Note: headless mode now actually tries to run the loop, which requires
+		// agents, config, tasks, etc. This is tested in integration tests.
+		// Here we only test the help and flag parsing.
 		{
 			name:       "run help",
 			args:       []string{"run", "--help"},
@@ -158,21 +157,15 @@ func TestRunCommand(t *testing.T) {
 			wantOutput: "--headless",
 		},
 		{
-			name:       "run with continue flag",
+			name:       "run with continue flag shows TUI message",
 			args:       []string{"run", "--continue", "session-123"},
 			wantErr:    false,
 			wantOutput: "Continuing session: session-123",
 		},
 		{
 			name:    "output requires headless",
-			args:    []string{"run", "--output"},
+			args:    []string{"run", "--output", "json"},
 			wantErr: true,
-		},
-		{
-			name:       "output with headless works",
-			args:       []string{"run", "--headless", "--output"},
-			wantErr:    false,
-			wantOutput: "headless mode",
 		},
 	}
 

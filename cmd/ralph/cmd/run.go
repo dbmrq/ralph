@@ -1,9 +1,21 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"syscall"
 
 	"github.com/spf13/cobra"
+	"github.com/wexinc/ralph/internal/agent"
+	"github.com/wexinc/ralph/internal/agent/auggie"
+	"github.com/wexinc/ralph/internal/agent/cursor"
+	"github.com/wexinc/ralph/internal/config"
+	"github.com/wexinc/ralph/internal/hooks"
+	"github.com/wexinc/ralph/internal/loop"
+	"github.com/wexinc/ralph/internal/task"
 )
 
 // runCmd represents the run command.
@@ -28,38 +40,211 @@ func init() {
 	rootCmd.AddCommand(runCmd)
 
 	runCmd.Flags().Bool("headless", false, "Run in headless mode without TUI")
-	runCmd.Flags().Bool("output", false, "Output in JSON format (requires --headless)")
+	runCmd.Flags().String("output", "", "Output format: json for structured output (requires --headless)")
 	runCmd.Flags().String("continue", "", "Continue a paused session by ID")
 	runCmd.Flags().String("tasks", "", "Path to task file (required for headless mode if no tasks.json exists)")
+	runCmd.Flags().BoolP("verbose", "v", false, "Enable verbose output")
 }
 
 // runRun is the main entry point for the run command.
 func runRun(cmd *cobra.Command, args []string) error {
 	headless, _ := cmd.Flags().GetBool("headless")
-	outputJSON, _ := cmd.Flags().GetBool("output")
+	outputFormat, _ := cmd.Flags().GetString("output")
 	continueID, _ := cmd.Flags().GetString("continue")
 	tasksPath, _ := cmd.Flags().GetString("tasks")
+	verbose, _ := cmd.Flags().GetBool("verbose")
 
-	if outputJSON && !headless {
+	if outputFormat != "" && !headless {
 		return fmt.Errorf("--output flag requires --headless mode")
 	}
 
-	// TODO: LOOP-001+ will implement actual loop execution
 	if headless {
-		cmd.Println("Starting Ralph in headless mode...")
-		if tasksPath != "" {
-			cmd.Printf("Using task file: %s\n", tasksPath)
-		}
-		if continueID != "" {
-			cmd.Printf("Continuing session: %s\n", continueID)
-		}
-	} else {
-		cmd.Println("Starting Ralph in TUI mode...")
-		if continueID != "" {
-			cmd.Printf("Continuing session: %s\n", continueID)
+		return runHeadless(cmd, outputFormat, continueID, tasksPath, verbose)
+	}
+
+	// TUI mode (placeholder - will be implemented in TUI-006)
+	cmd.Println("Starting Ralph in TUI mode...")
+	if continueID != "" {
+		cmd.Printf("Continuing session: %s\n", continueID)
+	}
+	cmd.Println("TUI mode not yet implemented. Use --headless for now.")
+	return nil
+}
+
+// runHeadless executes ralph in headless mode for CI/GitHub Actions.
+func runHeadless(cmd *cobra.Command, outputFormat, continueID, tasksPath string, verbose bool) error {
+	// Get the current working directory as project dir
+	projectDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get working directory: %w", err)
+	}
+
+	// Configure headless output
+	headlessConfig := loop.DefaultHeadlessConfig()
+	headlessConfig.Writer = cmd.OutOrStdout()
+	headlessConfig.ErrorWriter = cmd.ErrOrStderr()
+	headlessConfig.Verbose = verbose
+
+	if outputFormat == "json" {
+		headlessConfig.OutputFormat = loop.OutputFormatJSON
+	}
+
+	runner := loop.NewHeadlessRunner(headlessConfig)
+
+	// Load configuration
+	cfg, err := loadConfig(projectDir)
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
+	// Initialize agent registry and select agent
+	selectedAgent, err := selectAgent(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to select agent: %w", err)
+	}
+
+	// Load task manager
+	taskMgr, err := loadTasks(projectDir, tasksPath)
+	if err != nil {
+		return fmt.Errorf("failed to load tasks: %w", err)
+	}
+
+	// Create hook manager (optional - hooks may not be configured)
+	var hookMgr *hooks.Manager
+	if len(cfg.Hooks.PreTask) > 0 || len(cfg.Hooks.PostTask) > 0 {
+		hookMgr, err = hooks.NewManagerFromConfig(&cfg.Hooks)
+		if err != nil {
+			return fmt.Errorf("failed to create hook manager: %w", err)
 		}
 	}
 
-	return nil
+	// Create the main loop
+	mainLoop := loop.NewLoop(selectedAgent, taskMgr, hookMgr, cfg, projectDir)
+
+	// Configure loop options with headless event handler
+	loopOpts := loop.DefaultOptions()
+	loopOpts.OnEvent = runner.HandleEvent
+	loopOpts.LogWriter = cmd.OutOrStdout() // Agent output to stdout
+	mainLoop.SetOptions(loopOpts)
+
+	// Set up cancellation context
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Handle signals for graceful shutdown
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-sigChan
+		cancel()
+	}()
+
+	// Run or resume the loop
+	var loopErr error
+	if continueID != "" {
+		loopErr = mainLoop.Resume(ctx, continueID)
+	} else {
+		sessionID := loop.GenerateSessionID()
+		loopErr = mainLoop.Run(ctx, sessionID)
+	}
+
+	// Output final results
+	loopCtx := mainLoop.Context()
+	if loopCtx != nil {
+		if headlessConfig.OutputFormat == loop.OutputFormatJSON {
+			if err := runner.WriteJSONOutput(loopCtx); err != nil {
+				fmt.Fprintf(cmd.ErrOrStderr(), "Failed to write JSON output: %v\n", err)
+			}
+		} else {
+			runner.PrintSummary(loopCtx)
+		}
+	}
+
+	return loopErr
+}
+
+// loadConfig loads the ralph configuration from the project directory.
+func loadConfig(projectDir string) (*config.Config, error) {
+	configPath := filepath.Join(projectDir, ".ralph", "config.yaml")
+
+	// Check if config file exists
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		// Use default config if no config file exists
+		return config.NewConfig(), nil
+	}
+
+	loader := config.NewLoader()
+	return loader.LoadConfig(configPath)
+}
+
+// selectAgent initializes the agent registry and selects an agent.
+func selectAgent(cfg *config.Config) (agent.Agent, error) {
+	registry := agent.NewRegistry()
+
+	// Register built-in agents
+	registry.Register(cursor.New())
+	registry.Register(auggie.New())
+
+	// Select agent based on config or availability
+	agentName := cfg.Agent.Default
+	return registry.SelectAgent(agentName)
+}
+
+// loadTasks loads the task manager from the project directory.
+func loadTasks(projectDir, tasksPath string) (*task.Manager, error) {
+	ralphDir := filepath.Join(projectDir, ".ralph")
+
+	// Determine task store path
+	var storePath string
+	if tasksPath != "" {
+		// If a specific tasks file is provided, import it
+		storePath = filepath.Join(ralphDir, "tasks.json")
+		store := task.NewStore(storePath)
+		mgr := task.NewManager(store)
+
+		// Import tasks from the provided file
+		if err := importTasks(mgr, tasksPath); err != nil {
+			return nil, fmt.Errorf("failed to import tasks from %s: %w", tasksPath, err)
+		}
+		return mgr, nil
+	}
+
+	// Use default tasks.json location
+	storePath = filepath.Join(ralphDir, "tasks.json")
+	if _, err := os.Stat(storePath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("no tasks found: run 'ralph init' or use --tasks flag")
+	}
+
+	store := task.NewStore(storePath)
+	mgr := task.NewManager(store)
+	if err := mgr.Load(); err != nil {
+		return nil, fmt.Errorf("failed to load tasks: %w", err)
+	}
+
+	return mgr, nil
+}
+
+// importTasks imports tasks from a markdown or text file.
+func importTasks(mgr *task.Manager, path string) error {
+	importer := task.NewImporter()
+
+	// Auto-detect format based on file extension
+	format := task.FormatMarkdown
+	if filepath.Ext(path) == ".txt" {
+		format = task.FormatPlainText
+	}
+
+	result, err := importer.ImportFromFile(path, format)
+	if err != nil {
+		return err
+	}
+
+	for _, t := range result.Tasks {
+		if err := mgr.AddTask(t); err != nil {
+			return fmt.Errorf("failed to add task %s: %w", t.ID, err)
+		}
+	}
+
+	return mgr.Save()
 }
 
