@@ -18,7 +18,7 @@
   > Add .gitignore for Go projects
   > Tests: Not required (setup-only task)
 
-- [ ] INIT-002: Add core dependencies
+- [x] INIT-002: Add core dependencies
   > Goal: Add Bubble Tea, Lip Gloss, Cobra, Viper dependencies
   > github.com/charmbracelet/bubbletea
   > github.com/charmbracelet/lipgloss
