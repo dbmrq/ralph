@@ -1,0 +1,59 @@
+# Ralph Go - Project-Specific Guidelines
+
+You are working on Ralph Go, a rewrite of the Ralph Loop shell scripts into a Go application.
+
+## Current State (IMPORTANT)
+
+This is a **greenfield project starting from scratch**. You are building a Go application where:
+
+**What EXISTS (reference only):**
+- Shell scripts in `core/` and `lib/` - study for behavior patterns, but don't replicate bash idioms
+- Documentation in `.ralph/docs/` - these are your specifications
+- Task list in `.ralph/TASKS.md` - follow this exactly
+
+**What does NOT exist yet (you create these):**
+- NO `go.mod` file - you create this in INIT-001
+- NO Go source files - you create these
+- NO tests yet - you add tests as you build features
+
+## Project Context
+- This is a Go rewrite of shell scripts in core/ and lib/
+- Reference the existing shell scripts for behavior, but don't replicate bash patterns
+- See .ralph/docs/ for architecture and feature specifications
+- Task list is in .ralph/TASKS.md
+
+## Key Design Decisions
+1. **Agent Interface**: All AI agents (Cursor, Auggie, custom) implement a common Agent interface
+2. **TUI with Bubble Tea**: Real-time progress display using Charmbracelet libraries
+3. **Configuration via YAML**: Migrate from shell script config to config.yaml
+4. **Hook System**: Support pre/post task hooks as shell commands or agent calls
+5. **TDD Mode**: Track test baseline to avoid blocking on pre-written failing tests
+6. **Feedback Loop**: Extract learnings from completed tasks to inform future tasks
+
+## Important Files to Reference
+- `.ralph/docs/ARCHITECTURE.md` - Package structure and interfaces
+- `.ralph/docs/FEATURES.md` - Feature specifications
+- `.ralph/docs/AUGGIE_INTEGRATION.md` - Auggie CLI integration guide
+- `core/ralph_loop.sh` - Reference implementation (shell)
+- `core/base_prompt.txt` - Agent prompt template
+
+## Task Status Markers
+When completing tasks, use these markers in your final output:
+- `NEXT:` - Task is in progress, more work needed
+- `DONE:` - Task completed successfully
+- `ERROR:` - Task failed, needs attention
+- `FIXED:` - Previous error was fixed
+
+## Code Patterns to Follow
+- Use context.Context for all operations that may need cancellation
+- Implement the Agent interface exactly as specified in ARCHITECTURE.md
+- Keep TUI components focused and composable
+- Use structured logging throughout
+- Handle all errors with appropriate context
+
+## What NOT to Do
+- Don't create shell script wrappers - this is a Go rewrite
+- Don't copy bash idioms into Go code
+- Don't use global state - pass dependencies explicitly
+- Don't ignore errors or use panic for recoverable errors
+

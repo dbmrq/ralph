@@ -1,0 +1,47 @@
+# Go Platform Guidelines
+
+You are working on a Go project. Follow these guidelines:
+
+## Code Style
+- Follow standard Go conventions (gofmt, golint)
+- Use meaningful package and variable names
+- Keep functions focused and small
+- Document exported functions and types with godoc comments
+
+## Error Handling
+- Always handle errors explicitly - never ignore them
+- Use error wrapping with fmt.Errorf("context: %w", err)
+- Return errors up the call stack, handle at appropriate level
+- Use custom error types when additional context is needed
+
+## Project Structure
+- Use internal/ for private packages
+- Use cmd/ for executable entry points
+- Use pkg/ only for packages intended for external use
+- Keep package dependencies minimal and acyclic
+
+## Testing
+- Write table-driven tests where appropriate
+- Use t.Helper() in test helper functions
+- Test edge cases and error conditions
+- Use subtests for better organization
+
+## Concurrency
+- Use context.Context for cancellation and timeouts
+- Prefer channels for communication, mutexes for state
+- Be explicit about goroutine lifetimes
+- Use sync.WaitGroup for goroutine synchronization
+
+## Dependencies
+- Minimize external dependencies
+- Vendor critical dependencies if needed
+- Use go mod tidy regularly
+- Pin versions for reproducibility
+
+## Charmbracelet Libraries
+This project uses Charmbracelet libraries for TUI:
+- Bubble Tea: Follow the Elm architecture (Model, Update, View)
+- Lip Gloss: Use consistent styling via a styles package
+- Keep UI components in separate files
+- Use custom messages for state updates
+
