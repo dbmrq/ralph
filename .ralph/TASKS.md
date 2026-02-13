@@ -305,7 +305,7 @@
   > Automatic fix attempts for build/test failures
   > Save state on interruption for resume
 
-- [ ] LOOP-005: Implement session management
+- [x] LOOP-005: Implement session management
   > Goal: Generate unique session IDs
   > Persist session state to .ralph/sessions/<id>.json
   > Support `ralph run --continue` for resuming sessions

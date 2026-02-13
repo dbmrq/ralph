@@ -698,25 +698,169 @@ func (l *Loop) Pause() error {
 	if l.context == nil || l.context.State != StateRunning {
 		return fmt.Errorf("loop is not running")
 	}
-	return l.context.Transition(StatePaused)
-}
-
-// Resume resumes a paused loop.
-func (l *Loop) Resume(ctx context.Context) error {
-	if l.context == nil {
-		return fmt.Errorf("no loop context")
-	}
-	if !l.context.State.CanResume() {
-		return fmt.Errorf("loop cannot be resumed from state: %s", l.context.State)
-	}
-
-	if err := l.context.Transition(StateRunning); err != nil {
+	if err := l.context.Transition(StatePaused); err != nil {
 		return err
 	}
+	// Save state for resume
+	if err := l.persistence.Save(l.context); err != nil {
+		l.emit(EventError, "", "", 0, "Failed to save paused state", err)
+		// Non-fatal, the pause still happened
+	}
+	l.emit(EventLoopPaused, "", "", 0,
+		fmt.Sprintf("Session %s paused, can resume with --continue", l.context.SessionID), nil)
+	return nil
+}
 
-	// Continue with the main loop (this is a simplified resume - full implementation
-	// would restore all state and continue from where we left off)
-	return l.Run(ctx, l.context.SessionID)
+// Resume resumes a paused session.
+// If sessionID is empty, resumes the most recent resumable session.
+func (l *Loop) Resume(ctx context.Context, sessionID string) error {
+	mgr := NewSessionManager(l.projectDir)
+
+	// Load the session
+	resumedCtx, err := mgr.ResumeSession(sessionID)
+	if err != nil {
+		return fmt.Errorf("cannot resume session: %w", err)
+	}
+
+	// Restore the context
+	l.context = resumedCtx
+
+	// Transition to running
+	if err := l.context.Transition(StateRunning); err != nil {
+		return fmt.Errorf("failed to resume loop: %w", err)
+	}
+	l.emit(EventLoopStarted, "", "", 0,
+		fmt.Sprintf("Resuming session %s", l.context.SessionID), nil)
+
+	// Continue the loop from where it left off
+	return l.continueLoop(ctx)
+}
+
+// ResumeFromContext resumes with an already-loaded context.
+// Used when the caller has already loaded the session.
+func (l *Loop) ResumeFromContext(ctx context.Context, loopCtx *LoopContext) error {
+	if loopCtx == nil {
+		return fmt.Errorf("no loop context provided")
+	}
+	if !loopCtx.State.CanResume() {
+		return fmt.Errorf("session cannot be resumed from state: %s", loopCtx.State)
+	}
+
+	// Restore the context
+	l.context = loopCtx
+
+	// Transition to running
+	if err := l.context.Transition(StateRunning); err != nil {
+		return fmt.Errorf("failed to resume loop: %w", err)
+	}
+	l.emit(EventLoopStarted, "", "", 0,
+		fmt.Sprintf("Resuming session %s", l.context.SessionID), nil)
+
+	// Continue the loop from where it left off
+	return l.continueLoop(ctx)
+}
+
+// continueLoop continues the main task loop after resuming.
+func (l *Loop) continueLoop(ctx context.Context) error {
+	// Setup signal handler for graceful shutdown
+	if l.recovery != nil {
+		cleanup := l.recovery.SetupSignalHandler()
+		defer cleanup()
+	}
+
+	// Restore model name from config if set
+	if l.config.Agent.Model != "" {
+		l.context.ModelName = l.config.Agent.Model
+	}
+
+	// Step 1: Run project analysis if not already set
+	if l.analysis == nil {
+		if err := l.runAnalysis(ctx); err != nil {
+			l.context.SetError(err.Error())
+			if transErr := l.context.Transition(StateFailed); transErr != nil {
+				return fmt.Errorf("analysis failed: %w (also failed to transition: %v)", err, transErr)
+			}
+			l.emit(EventAnalysisFailed, "", "", 0, "Analysis failed", err)
+			return fmt.Errorf("analysis failed: %w", err)
+		}
+	}
+
+	// Step 2: Main task loop (same as Run)
+	for {
+		// Check for cancellation
+		if ctx.Err() != nil {
+			l.context.SetError("cancelled")
+			_ = l.context.Transition(StateFailed)
+			return ctx.Err()
+		}
+
+		// Get next task
+		nextTask := l.taskManager.GetNext()
+		if nextTask == nil {
+			// All tasks complete
+			if err := l.context.Transition(StateCompleted); err != nil {
+				return fmt.Errorf("failed to complete loop: %w", err)
+			}
+			l.emit(EventLoopCompleted, "", "", 0, "All tasks completed", nil)
+			return nil
+		}
+
+		// Run the task
+		result, err := l.runTask(ctx, nextTask)
+		if err != nil {
+			// Handle task-level errors
+			if ctx.Err() != nil {
+				return ctx.Err() // Cancelled
+			}
+
+			// Record failure
+			l.context.SetError(err.Error())
+			l.context.RecordTaskCompletion(task.StatusFailed)
+
+			// If we can't continue, fail the loop
+			if !l.canContinueAfterError(err) {
+				if transErr := l.context.Transition(StateFailed); transErr != nil {
+					return fmt.Errorf("task failed: %w (also failed to transition: %v)", err, transErr)
+				}
+				l.emit(EventLoopFailed, nextTask.ID, nextTask.Name, 0, "Loop failed", err)
+				return err
+			}
+
+			// Mark task as failed but continue
+			if markErr := l.taskManager.MarkFailed(nextTask.ID); markErr != nil {
+				return fmt.Errorf("failed to mark task as failed: %w", markErr)
+			}
+			l.emit(EventTaskFailed, nextTask.ID, nextTask.Name, 0, err.Error(), err)
+			continue
+		}
+
+		// Handle task result
+		if err := l.handleTaskResult(ctx, nextTask, result); err != nil {
+			return err
+		}
+
+		// Save state after each task
+		if err := l.persistence.Save(l.context); err != nil {
+			l.emit(EventError, "", "", 0, "Failed to save state", err)
+			// Non-fatal, continue
+		}
+	}
+}
+
+// SessionID returns the current session ID.
+func (l *Loop) SessionID() string {
+	if l.context == nil {
+		return ""
+	}
+	return l.context.SessionID
+}
+
+// AgentSessionID returns the agent's session ID for continuation (e.g., auggie --continue).
+func (l *Loop) AgentSessionID() string {
+	if l.context == nil {
+		return ""
+	}
+	return l.context.AgentSessionID
 }
 
 // truncateOutput truncates output to a reasonable size for storage.

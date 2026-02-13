@@ -1331,3 +1331,122 @@ func TestFixPromptBuilder_BuildVerificationFixPrompt(t *testing.T) {
 		}
 	})
 }
+
+func TestLoop_SessionID(t *testing.T) {
+	projectDir := setupTestProjectDir(t)
+	mockAg := &mockAgent{name: "test"}
+	taskMgr := newTestManager(t)
+	cfg := newTestConfig()
+
+	l := NewLoop(mockAg, taskMgr, nil, cfg, projectDir)
+
+	// Before Run, should be empty
+	if id := l.SessionID(); id != "" {
+		t.Errorf("SessionID() before Run = %q, want empty", id)
+	}
+
+	// Initialize context manually
+	l.context = NewLoopContext("test-session-123", projectDir, "test")
+
+	if id := l.SessionID(); id != "test-session-123" {
+		t.Errorf("SessionID() = %q, want %q", id, "test-session-123")
+	}
+}
+
+func TestLoop_AgentSessionID(t *testing.T) {
+	projectDir := setupTestProjectDir(t)
+	mockAg := &mockAgent{name: "test"}
+	taskMgr := newTestManager(t)
+	cfg := newTestConfig()
+
+	l := NewLoop(mockAg, taskMgr, nil, cfg, projectDir)
+
+	// Before Run, should be empty
+	if id := l.AgentSessionID(); id != "" {
+		t.Errorf("AgentSessionID() before Run = %q, want empty", id)
+	}
+
+	// Initialize context manually and set agent session
+	l.context = NewLoopContext("test-session", projectDir, "auggie")
+	l.context.SetAgentSession("auggie-session-abc")
+
+	if id := l.AgentSessionID(); id != "auggie-session-abc" {
+		t.Errorf("AgentSessionID() = %q, want %q", id, "auggie-session-abc")
+	}
+}
+
+func TestLoop_Pause(t *testing.T) {
+	projectDir := setupTestProjectDir(t)
+	mockAg := &mockAgent{name: "test"}
+	taskMgr := newTestManager(t)
+	cfg := newTestConfig()
+
+	l := NewLoop(mockAg, taskMgr, nil, cfg, projectDir)
+
+	t.Run("pause without running fails", func(t *testing.T) {
+		err := l.Pause()
+		if err == nil {
+			t.Error("Pause() should fail when loop not running")
+		}
+	})
+
+	t.Run("pause when running succeeds", func(t *testing.T) {
+		l.context = NewLoopContext("test-session", projectDir, "test")
+		l.context.Transition(StateRunning)
+
+		err := l.Pause()
+		if err != nil {
+			t.Errorf("Pause() error = %v", err)
+		}
+		if l.context.State != StatePaused {
+			t.Errorf("State = %q, want %q", l.context.State, StatePaused)
+		}
+	})
+}
+
+func TestLoop_ResumeFromContext(t *testing.T) {
+	projectDir := setupTestProjectDir(t)
+	mockAg := &mockAgent{
+		name: "test",
+		runResult: agent.Result{
+			Status: agent.TaskStatusDone,
+		},
+	}
+	taskMgr := newTestManager(t)
+	cfg := newTestConfig()
+
+	l := NewLoop(mockAg, taskMgr, nil, cfg, projectDir)
+	l.SetAnalysis(newTestAnalysis())
+
+	t.Run("resume nil context fails", func(t *testing.T) {
+		err := l.ResumeFromContext(context.Background(), nil)
+		if err == nil {
+			t.Error("ResumeFromContext(nil) should fail")
+		}
+	})
+
+	t.Run("resume non-resumable context fails", func(t *testing.T) {
+		ctx := NewLoopContext("test", projectDir, "test")
+		ctx.State = StateCompleted // Not resumable
+
+		err := l.ResumeFromContext(context.Background(), ctx)
+		if err == nil {
+			t.Error("ResumeFromContext() should fail for completed session")
+		}
+	})
+
+	t.Run("resume paused context succeeds", func(t *testing.T) {
+		loopCtx := NewLoopContext("test-resume", projectDir, "test")
+		loopCtx.Transition(StateRunning)
+		loopCtx.Transition(StatePaused)
+
+		// Will complete quickly with no tasks
+		err := l.ResumeFromContext(context.Background(), loopCtx)
+		if err != nil {
+			t.Errorf("ResumeFromContext() error = %v", err)
+		}
+		if l.context.State != StateCompleted {
+			t.Errorf("State after resume = %q, want %q", l.context.State, StateCompleted)
+		}
+	})
+}
