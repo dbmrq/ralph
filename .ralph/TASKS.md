@@ -240,7 +240,7 @@
   > In headless mode: Require --tasks flag pointing to file, or existing tasks.json
   > Reference: FEATURES.md Section 4 "Task List Initialization"
 
-- [ ] BUILD-002: Implement build verification
+- [x] BUILD-002: Implement build verification
   > Goal: Create build.go with build execution logic
   > Use ProjectAnalysis.Build.Command (from AI detection)
   > Check ProjectAnalysis.Build.Ready - skip gracefully if not ready
