@@ -8,38 +8,38 @@ import (
 
 // Config represents the complete ralph configuration loaded from .ralph/config.yaml.
 type Config struct {
-	Agent   AgentConfig   `yaml:"agent"   json:"agent"`
-	Timeout TimeoutConfig `yaml:"timeout" json:"timeout"`
-	Git     GitConfig     `yaml:"git"     json:"git"`
-	Build   BuildConfig   `yaml:"build"   json:"build"`
-	Test    TestConfig    `yaml:"test"    json:"test"`
-	Hooks   HooksConfig   `yaml:"hooks"   json:"hooks"`
+	Agent   AgentConfig   `yaml:"agent"   json:"agent"   mapstructure:"agent"`
+	Timeout TimeoutConfig `yaml:"timeout" json:"timeout" mapstructure:"timeout"`
+	Git     GitConfig     `yaml:"git"     json:"git"     mapstructure:"git"`
+	Build   BuildConfig   `yaml:"build"   json:"build"   mapstructure:"build"`
+	Test    TestConfig    `yaml:"test"    json:"test"    mapstructure:"test"`
+	Hooks   HooksConfig   `yaml:"hooks"   json:"hooks"   mapstructure:"hooks"`
 }
 
 // AgentConfig configures the AI agent settings.
 type AgentConfig struct {
 	// Default is the default agent to use. Empty string means prompt user if multiple available.
-	Default string `yaml:"default" json:"default"`
+	Default string `yaml:"default" json:"default" mapstructure:"default"`
 	// Model is the default model to use. Empty string means use agent's default.
-	Model string `yaml:"model" json:"model"`
+	Model string `yaml:"model" json:"model" mapstructure:"model"`
 }
 
 // TimeoutConfig configures the smart timeout system.
 type TimeoutConfig struct {
 	// Active is the timeout while agent is producing output (default: 2h).
-	Active time.Duration `yaml:"active" json:"active"`
+	Active time.Duration `yaml:"active" json:"active" mapstructure:"active"`
 	// Stuck is the timeout when no output is being produced (default: 30m).
-	Stuck time.Duration `yaml:"stuck" json:"stuck"`
+	Stuck time.Duration `yaml:"stuck" json:"stuck" mapstructure:"stuck"`
 }
 
 // GitConfig configures git integration settings.
 type GitConfig struct {
 	// AutoCommit enables automatic commit after each successful task (default: true).
-	AutoCommit bool `yaml:"auto_commit" json:"auto_commit"`
+	AutoCommit bool `yaml:"auto_commit" json:"auto_commit" mapstructure:"auto_commit"`
 	// CommitPrefix is the prefix for commit messages (default: "[ralph]").
-	CommitPrefix string `yaml:"commit_prefix" json:"commit_prefix"`
+	CommitPrefix string `yaml:"commit_prefix" json:"commit_prefix" mapstructure:"commit_prefix"`
 	// Push enables automatic push after commit (default: false).
-	Push bool `yaml:"push" json:"push"`
+	Push bool `yaml:"push" json:"push" mapstructure:"push"`
 }
 
 // BootstrapDetection defines how bootstrap/greenfield state is detected.
@@ -57,11 +57,11 @@ const (
 // BuildConfig configures build verification settings.
 type BuildConfig struct {
 	// Command is the build command. Empty means auto-detect based on project type.
-	Command string `yaml:"command" json:"command"`
+	Command string `yaml:"command" json:"command" mapstructure:"command"`
 	// BootstrapDetection configures how bootstrap state is detected (default: auto).
-	BootstrapDetection BootstrapDetection `yaml:"bootstrap_detection" json:"bootstrap_detection"`
+	BootstrapDetection BootstrapDetection `yaml:"bootstrap_detection" json:"bootstrap_detection" mapstructure:"bootstrap_detection"`
 	// BootstrapCheck is the custom command for manual mode (exit 0 = bootstrap, non-zero = ready).
-	BootstrapCheck string `yaml:"bootstrap_check" json:"bootstrap_check"`
+	BootstrapCheck string `yaml:"bootstrap_check" json:"bootstrap_check" mapstructure:"bootstrap_check"`
 }
 
 // TestMode defines the test gate behavior.
@@ -91,13 +91,13 @@ const (
 // TestConfig configures test verification settings.
 type TestConfig struct {
 	// Command is the test command. Empty means auto-detect based on project type.
-	Command string `yaml:"command" json:"command"`
+	Command string `yaml:"command" json:"command" mapstructure:"command"`
 	// Mode controls test gate behavior (default: gate).
-	Mode TestMode `yaml:"mode" json:"mode"`
+	Mode TestMode `yaml:"mode" json:"mode" mapstructure:"mode"`
 	// BaselineFile is the path for test baseline storage (default: .ralph/test_baseline.json).
-	BaselineFile string `yaml:"baseline_file" json:"baseline_file"`
+	BaselineFile string `yaml:"baseline_file" json:"baseline_file" mapstructure:"baseline_file"`
 	// BaselineScope controls when baselines are captured (default: global).
-	BaselineScope BaselineScope `yaml:"baseline_scope" json:"baseline_scope"`
+	BaselineScope BaselineScope `yaml:"baseline_scope" json:"baseline_scope" mapstructure:"baseline_scope"`
 }
 
 // FailureMode defines how hook failures are handled.
@@ -127,23 +127,23 @@ const (
 // HookDefinition defines a single hook configuration.
 type HookDefinition struct {
 	// Type is the hook type: "shell" or "agent".
-	Type HookType `yaml:"type" json:"type"`
+	Type HookType `yaml:"type" json:"type" mapstructure:"type"`
 	// Command is the shell command (for shell hooks) or prompt (for agent hooks).
-	Command string `yaml:"command" json:"command"`
+	Command string `yaml:"command" json:"command" mapstructure:"command"`
 	// Model is the model to use (for agent hooks, optional - uses main agent's model if empty).
-	Model string `yaml:"model,omitempty" json:"model,omitempty"`
+	Model string `yaml:"model,omitempty" json:"model,omitempty" mapstructure:"model"`
 	// Agent is the agent to use (for agent hooks, optional - uses main agent if empty).
-	Agent string `yaml:"agent,omitempty" json:"agent,omitempty"`
+	Agent string `yaml:"agent,omitempty" json:"agent,omitempty" mapstructure:"agent"`
 	// OnFailure defines how to handle hook failures (default: warn_continue).
-	OnFailure FailureMode `yaml:"on_failure" json:"on_failure"`
+	OnFailure FailureMode `yaml:"on_failure" json:"on_failure" mapstructure:"on_failure"`
 }
 
 // HooksConfig configures pre/post task hooks.
 type HooksConfig struct {
 	// PreTask hooks run before each task.
-	PreTask []HookDefinition `yaml:"pre_task" json:"pre_task"`
+	PreTask []HookDefinition `yaml:"pre_task" json:"pre_task" mapstructure:"pre_task"`
 	// PostTask hooks run after each task.
-	PostTask []HookDefinition `yaml:"post_task" json:"post_task"`
+	PostTask []HookDefinition `yaml:"post_task" json:"post_task" mapstructure:"post_task"`
 }
 
 // Default values.

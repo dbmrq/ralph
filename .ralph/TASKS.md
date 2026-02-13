@@ -43,7 +43,7 @@
   > Include agent settings, loop settings, git settings, gates, hooks
   > YAML-only format (no shell script support needed)
 
-- [ ] CONFIG-002: Implement configuration loader
+- [x] CONFIG-002: Implement configuration loader
   > Goal: Load config from .ralph/config.yaml
   > Support environment variable overrides
   > Validate configuration and provide clear error messages
