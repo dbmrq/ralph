@@ -294,7 +294,7 @@
   > Integrate: analysis → task selection → hooks → agent → verify → commit
   > Respect iteration limits per task
 
-- [ ] LOOP-003: Add automatic commit logic
+- [x] LOOP-003: Add automatic commit logic
   > Goal: Create git.go for git operations
   > Stage changes, create commit with task reference
   > Handle uncommitted changes detection

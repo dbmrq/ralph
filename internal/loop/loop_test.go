@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -616,3 +617,201 @@ func containsHelper(s, substr string) bool {
 	return false
 }
 
+func TestLoop_CommitTaskChanges(t *testing.T) {
+	t.Run("emits commit events", func(t *testing.T) {
+		// Create temp git repo
+		tmpDir, err := os.MkdirTemp("", "loop-commit-test-*")
+		if err != nil {
+			t.Fatalf("failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		// Initialize git repo with initial commit
+		runGitCommand(t, tmpDir, "init")
+		runGitCommand(t, tmpDir, "config", "user.email", "test@example.com")
+		runGitCommand(t, tmpDir, "config", "user.name", "Test User")
+		if err := os.WriteFile(filepath.Join(tmpDir, "README.md"), []byte("# Test"), 0644); err != nil {
+			t.Fatalf("failed to create README: %v", err)
+		}
+		runGitCommand(t, tmpDir, "add", "-A")
+		runGitCommand(t, tmpDir, "commit", "-m", "Initial commit")
+
+		// Create .ralph directory with required files
+		ralphDir := filepath.Join(tmpDir, ".ralph")
+		if err := os.MkdirAll(ralphDir, 0755); err != nil {
+			t.Fatalf("failed to create .ralph dir: %v", err)
+		}
+
+		// Create base prompt file (required by prompt loader)
+		basePrompt := `# Ralph Base Prompt
+You are an AI agent working on a task. Complete the task and report your status.
+`
+		if err := os.WriteFile(filepath.Join(ralphDir, "base_prompt.txt"), []byte(basePrompt), 0644); err != nil {
+			t.Fatalf("failed to write base_prompt.txt: %v", err)
+		}
+
+		// Create task manager
+		store := task.NewStore(filepath.Join(ralphDir, "tasks.json"))
+		mgr := task.NewManager(store)
+
+		testTask := task.NewTask("TEST-001", "Test Task", "Description")
+		if err := mgr.AddTask(testTask); err != nil {
+			t.Fatalf("failed to add task: %v", err)
+		}
+
+		// Config with auto-commit enabled
+		cfg := config.NewConfig()
+		cfg.Git.AutoCommit = true
+		cfg.Git.CommitPrefix = "[test]"
+
+		// Create mock agent
+		mockAg := &mockAgent{
+			name: "test-agent",
+			runResult: agent.Result{
+				Status:    agent.TaskStatusDone,
+				SessionID: "test-session",
+			},
+		}
+
+		// Create loop
+		loop := NewLoop(mockAg, mgr, nil, cfg, tmpDir)
+
+		// Set analysis to skip analysis phase
+		loop.SetAnalysis(&build.ProjectAnalysis{
+			ProjectType: "test",
+		})
+
+		// Track events
+		var events []Event
+		loop.SetOptions(&Options{
+			MaxIterationsPerTask: 1,
+			OnEvent: func(e Event) {
+				events = append(events, e)
+			},
+		})
+
+		// Create a file change
+		if err := os.WriteFile(filepath.Join(tmpDir, "feature.go"), []byte("package main"), 0644); err != nil {
+			t.Fatalf("failed to create test file: %v", err)
+		}
+
+		// Run the loop
+		ctx := context.Background()
+		err = loop.Run(ctx, "test-session")
+		if err != nil {
+			t.Fatalf("Run() error = %v", err)
+		}
+
+		// Check for commit events
+		var foundCommitStarted, foundCommitCompleted bool
+		for _, e := range events {
+			switch e.Type {
+			case EventCommitStarted:
+				foundCommitStarted = true
+			case EventCommitCompleted:
+				foundCommitCompleted = true
+				if e.TaskID != "TEST-001" {
+					t.Errorf("commit event TaskID = %q, want %q", e.TaskID, "TEST-001")
+				}
+			}
+		}
+
+		if !foundCommitStarted {
+			t.Error("expected EventCommitStarted event")
+		}
+		if !foundCommitCompleted {
+			t.Error("expected EventCommitCompleted event")
+		}
+	})
+
+	t.Run("skips commit when auto-commit disabled", func(t *testing.T) {
+		// Create temp dir (not a git repo)
+		tmpDir, err := os.MkdirTemp("", "loop-nocommit-test-*")
+		if err != nil {
+			t.Fatalf("failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		// Create .ralph directory with required files
+		ralphDir := filepath.Join(tmpDir, ".ralph")
+		if err := os.MkdirAll(ralphDir, 0755); err != nil {
+			t.Fatalf("failed to create .ralph dir: %v", err)
+		}
+
+		// Create base prompt file (required by prompt loader)
+		basePrompt := `# Ralph Base Prompt
+You are an AI agent working on a task. Complete the task and report your status.
+`
+		if err := os.WriteFile(filepath.Join(ralphDir, "base_prompt.txt"), []byte(basePrompt), 0644); err != nil {
+			t.Fatalf("failed to write base_prompt.txt: %v", err)
+		}
+
+		// Create task manager
+		store := task.NewStore(filepath.Join(ralphDir, "tasks.json"))
+		mgr := task.NewManager(store)
+
+		testTask := task.NewTask("TEST-002", "Test Task", "Description")
+		if err := mgr.AddTask(testTask); err != nil {
+			t.Fatalf("failed to add task: %v", err)
+		}
+
+		// Config with auto-commit disabled
+		cfg := config.NewConfig()
+		cfg.Git.AutoCommit = false
+
+		// Create mock agent
+		mockAg := &mockAgent{
+			name: "test-agent",
+			runResult: agent.Result{
+				Status:    agent.TaskStatusDone,
+				SessionID: "test-session",
+			},
+		}
+
+		// Create loop
+		loop := NewLoop(mockAg, mgr, nil, cfg, tmpDir)
+
+		// Set analysis to skip analysis phase
+		loop.SetAnalysis(&build.ProjectAnalysis{
+			ProjectType: "test",
+		})
+
+		// Track events
+		var events []Event
+		loop.SetOptions(&Options{
+			MaxIterationsPerTask: 1,
+			OnEvent: func(e Event) {
+				events = append(events, e)
+			},
+		})
+
+		// Run the loop
+		ctx := context.Background()
+		err = loop.Run(ctx, "test-session")
+		if err != nil {
+			t.Fatalf("Run() error = %v", err)
+		}
+
+		// Check for commit skipped event
+		var foundCommitSkipped bool
+		for _, e := range events {
+			if e.Type == EventCommitSkipped {
+				foundCommitSkipped = true
+				break
+			}
+		}
+
+		if !foundCommitSkipped {
+			t.Error("expected EventCommitSkipped event when auto-commit is disabled")
+		}
+	})
+}
+
+func runGitCommand(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	c := exec.Command("git", args...)
+	c.Dir = dir
+	if err := c.Run(); err != nil {
+		t.Fatalf("git %v failed: %v", args, err)
+	}
+}

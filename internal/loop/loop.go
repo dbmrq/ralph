@@ -46,6 +46,10 @@ const (
 	EventVerifyFailed      EventType = "verify_failed"
 	EventHooksStarted      EventType = "hooks_started"
 	EventHooksCompleted    EventType = "hooks_completed"
+	EventCommitStarted     EventType = "commit_started"
+	EventCommitCompleted   EventType = "commit_completed"
+	EventCommitSkipped     EventType = "commit_skipped"
+	EventCommitFailed      EventType = "commit_failed"
 	EventError             EventType = "error"
 )
 
@@ -84,7 +88,7 @@ func DefaultOptions() *Options {
 }
 
 // Loop orchestrates the main execution flow for ralph.
-// It integrates: analysis → task selection → hooks → agent → verify → state update.
+// It integrates: analysis → task selection → hooks → agent → verify → commit → state update.
 type Loop struct {
 	// Dependencies
 	agent        agent.Agent
@@ -92,6 +96,7 @@ type Loop struct {
 	hookManager  *hooks.Manager
 	config       *config.Config
 	promptLoader *prompt.Loader
+	gitOps       *GitOperations
 
 	// Project analysis (populated during Run)
 	analysis *build.ProjectAnalysis
@@ -121,6 +126,7 @@ func NewLoop(
 		projectDir:   projectDir,
 		promptLoader: prompt.NewLoader(projectDir + "/.ralph"),
 		persistence:  NewStatePersistence(projectDir),
+		gitOps:       NewGitOperations(projectDir, cfg.Git),
 		opts:         DefaultOptions(),
 	}
 }
@@ -562,6 +568,9 @@ func (l *Loop) handleTaskResult(ctx context.Context, t *task.Task, result *agent
 		l.context.RecordTaskCompletion(task.StatusCompleted)
 		l.emit(EventTaskCompleted, t.ID, t.Name, l.context.CurrentIteration, "Task completed", nil)
 
+		// Commit changes if auto-commit is enabled
+		l.commitTaskChanges(ctx, t)
+
 	case agent.TaskStatusError:
 		// Agent reported error
 		if err := l.taskManager.MarkFailed(t.ID); err != nil {
@@ -580,6 +589,37 @@ func (l *Loop) handleTaskResult(ctx context.Context, t *task.Task, result *agent
 	}
 
 	return nil
+}
+
+// commitTaskChanges commits the changes made for a task if auto-commit is enabled.
+func (l *Loop) commitTaskChanges(ctx context.Context, t *task.Task) {
+	if l.gitOps == nil {
+		return
+	}
+
+	l.emit(EventCommitStarted, t.ID, t.Name, l.context.CurrentIteration, "Committing changes", nil)
+
+	result := l.gitOps.CommitTask(ctx, t)
+
+	if result.Error != nil {
+		l.emit(EventCommitFailed, t.ID, t.Name, l.context.CurrentIteration, result.Error.Error(), result.Error)
+		return
+	}
+
+	if !result.Committed {
+		reason := "No changes to commit"
+		if !l.config.Git.AutoCommit {
+			reason = "Auto-commit disabled"
+		}
+		l.emit(EventCommitSkipped, t.ID, t.Name, l.context.CurrentIteration, reason, nil)
+		return
+	}
+
+	message := fmt.Sprintf("Committed: %s", result.Message)
+	if result.Pushed {
+		message += " (pushed)"
+	}
+	l.emit(EventCommitCompleted, t.ID, t.Name, l.context.CurrentIteration, message, nil)
 }
 
 // canContinueAfterError determines if the loop can continue after an error.
