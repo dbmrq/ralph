@@ -119,7 +119,7 @@
 
 ## 🔗 Phase 5: Hook System
 
-- [ ] HOOK-001: Define hook interface and types
+- [x] HOOK-001: Define hook interface and types
   > Goal: Create hook.go with Hook interface
   > Define HookType (Pre/Post), HookConfig, HookDefinition
   > Support shell and agent hook types
@@ -229,61 +229,40 @@
 
 ## 🖥️ Phase 8: TUI Implementation
 
-- [ ] TUI-001: Create basic Bubble Tea app structure
+- [ ] TUI-001: Create basic Bubble Tea app with header and progress
   > Goal: Create tui/app.go with Model, Init, Update, View
   > Define messages for state updates
   > Basic key handling (q to quit)
-
-- [ ] TUI-002: Implement header component
-  > Goal: Create components/header.go
-  > Display project name, agent, model, session ID
+  > Create components/header.go - display project name, agent, model, session ID
+  > Create components/progress.go - show completed/remaining task counts
   > Style with Lip Gloss
 
-- [ ] TUI-003: Implement progress bar component
-  > Goal: Create components/progress.go
-  > Show completed/remaining task counts
-  > Visual progress indicator with iteration count
-
-- [ ] TUI-004: Implement task list component
+- [ ] TUI-002: Implement task list and status bar components
   > Goal: Create components/taskList.go
   > Scrollable task list with status icons (✓ ○ → ⊘ ⏸ ✗)
-  > Highlight current task
-  > Support j/k or arrow key navigation
+  > Highlight current task, support j/k or arrow key navigation
+  > Create components/status.go - elapsed time, iteration count, build/test status
+  > Display keyboard shortcuts in status bar
 
-- [ ] TUI-005: Implement log viewport component
+- [ ] TUI-003: Implement log viewport component
   > Goal: Create components/log.go
   > Real-time agent output streaming
   > Scrollable with auto-follow
   > Option to open in $EDITOR
 
-- [ ] TUI-006: Implement status bar component
-  > Goal: Create components/status.go
-  > Show elapsed time, iteration count, build/test status
-  > Display keyboard shortcuts
-
-- [ ] TUI-007: Implement task editor component
+- [ ] TUI-004: Implement task editor and model picker
   > Goal: Create components/taskEditor.go
-  > Add new tasks inline (e key)
-  > Edit task name/description
-  > Reorder tasks
-  > Save to JSON storage
-
-- [ ] TUI-008: Implement model picker component
-  > Goal: Create components/modelPicker.go
-  > List available models from current agent
-  > Allow selection before or during run (m key)
+  > Add new tasks inline (e key), edit task name/description
+  > Reorder tasks, save to JSON storage
+  > Create components/modelPicker.go
+  > List available models from current agent (m key)
   > Show current model indicator
 
-- [ ] TUI-009: Add keyboard controls
+- [ ] TUI-005: Add keyboard controls and loop integration
   > Goal: Handle p (pause), s (skip), a (abort), l (logs), h (help)
-  > e (edit tasks), m (model picker), r (review mode)
-  > Confirmation dialogs for destructive actions
-  > Help overlay
-
-- [ ] TUI-010: Integrate TUI with loop execution
-  > Goal: Connect loop events to TUI updates
-  > Real-time progress updates
-  > Error state visualization
+  > Confirmation dialogs for destructive actions, help overlay
+  > Connect loop events to TUI updates
+  > Real-time progress updates, error state visualization
   > Pause/resume integration with session management
 
 ---
