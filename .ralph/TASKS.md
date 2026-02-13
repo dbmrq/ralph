@@ -458,7 +458,7 @@
 > **Note**: This is the first thing users experience. Make it seamless and delightful.
 > Goal: User runs `ralph` in any project → everything "just works"
 
-- [ ] INSTALL-001: Implement zero-config first run
+- [x] INSTALL-001: Implement zero-config first run
   > Goal: Running `ralph` or `ralph run` in a project without `.ralph/` triggers setup
   > Detect missing `.ralph/` directory
   > Instead of error, show friendly welcome and start setup flow:

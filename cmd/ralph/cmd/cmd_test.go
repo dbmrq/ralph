@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"os"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -140,12 +141,14 @@ func TestRunCommand(t *testing.T) {
 		args       []string
 		wantErr    bool
 		wantOutput string
+		skipSetup  bool // if true, create .ralph dir to skip setup flow
 	}{
 		{
 			name:       "run without flags",
 			args:       []string{"run"},
 			wantErr:    false,
 			wantOutput: "Starting Ralph in TUI mode",
+			skipSetup:  true,
 		},
 		// Note: headless mode now actually tries to run the loop, which requires
 		// agents, config, tasks, etc. This is tested in integration tests.
@@ -155,22 +158,40 @@ func TestRunCommand(t *testing.T) {
 			args:       []string{"run", "--help"},
 			wantErr:    false,
 			wantOutput: "--headless",
+			skipSetup:  false, // help doesn't run the command
 		},
 		{
 			name:       "run with continue flag shows TUI message",
 			args:       []string{"run", "--continue", "session-123"},
 			wantErr:    false,
 			wantOutput: "Continuing session: session-123",
+			skipSetup:  true,
 		},
 		{
-			name:    "output requires headless",
-			args:    []string{"run", "--output", "json"},
-			wantErr: true,
+			name:      "output requires headless",
+			args:      []string{"run", "--output", "json"},
+			wantErr:   true,
+			skipSetup: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Set up temp directory if we need to skip setup flow
+			if tt.skipSetup {
+				tmpDir := t.TempDir()
+				// Create .ralph directory to skip setup flow
+				if err := os.MkdirAll(tmpDir+"/.ralph", 0755); err != nil {
+					t.Fatalf("failed to create .ralph dir: %v", err)
+				}
+				// Change to temp directory for the test
+				oldWd, _ := os.Getwd()
+				if err := os.Chdir(tmpDir); err != nil {
+					t.Fatalf("failed to chdir: %v", err)
+				}
+				defer os.Chdir(oldWd)
+			}
+
 			buf := new(bytes.Buffer)
 			cmd := newTestRoot()
 			cmd.SetOut(buf)
