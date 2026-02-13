@@ -125,7 +125,7 @@
   > Support shell and agent hook types
   > Define failure modes: skip_task, warn_continue, abort_loop, ask_agent
 
-- [ ] HOOK-002: Implement shell command hooks
+- [x] HOOK-002: Implement shell command hooks
   > Goal: Create shell.go for shell command execution
   > Set environment variables (TASK_ID, TASK_NAME, TASK_STATUS, etc.)
   > Capture output and handle errors per on_failure mode

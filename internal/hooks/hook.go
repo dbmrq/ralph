@@ -190,17 +190,18 @@ func CreateHooksFromConfig(cfg *config.HooksConfig) (preHooks, postHooks []Hook,
 }
 
 // createHookFromDefinition creates a single hook from a definition.
-// Returns a placeholder hook for now - actual implementations come in HOOK-002/003.
+// Returns ShellHook for shell type, placeholder for agent type (until HOOK-003).
 func createHookFromDefinition(name string, phase HookPhase, def config.HookDefinition) (Hook, error) {
 	switch def.Type {
 	case config.HookTypeShell:
-		return &placeholderHook{BaseHook: NewBaseHook(name, phase, def)}, nil
+		return NewShellHook(name, phase, def), nil
 	case config.HookTypeAgent:
+		// Agent hooks will be implemented in HOOK-003
 		return &placeholderHook{BaseHook: NewBaseHook(name, phase, def)}, nil
 	case "":
 		// Default to shell if type not specified
 		def.Type = config.HookTypeShell
-		return &placeholderHook{BaseHook: NewBaseHook(name, phase, def)}, nil
+		return NewShellHook(name, phase, def), nil
 	default:
 		return nil, fmt.Errorf("unknown hook type: %s", def.Type)
 	}
