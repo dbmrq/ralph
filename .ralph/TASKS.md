@@ -77,7 +77,7 @@
   > Methods: GetNext(), MarkComplete(), Skip(), Pause(), CountRemaining()
   > Handle task ordering and dependencies
 
-- [ ] TASK-004: Add task import utilities
+- [x] TASK-004: Add task import utilities
   > Goal: Parse markdown task lists on import
   > Parse plain text task lists
   > Convert to internal JSON format
