@@ -401,3 +401,176 @@ func TestCreateHooksFromConfig_ShellHooks(t *testing.T) {
 		}
 	}
 }
+
+func TestShellHook_Execute_StderrOnly(t *testing.T) {
+	// Test when there's only stderr output, no stdout
+	def := config.HookDefinition{
+		Type:    config.HookTypeShell,
+		Command: "echo 'error message' >&2",
+	}
+	hook := NewShellHook("stderr-only-hook", HookPhasePre, def)
+
+	ctx := context.Background()
+	hookCtx := &HookContext{
+		Task:       task.NewTask("TASK-001", "Test", "Desc"),
+		Iteration:  1,
+		ProjectDir: "/tmp",
+	}
+
+	result, err := hook.Execute(ctx, hookCtx)
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if !result.IsSuccess() {
+		t.Errorf("IsSuccess() = false; error=%s", result.Error)
+	}
+
+	if !strings.Contains(result.Output, "error message") {
+		t.Errorf("Output should contain stderr; got: %s", result.Output)
+	}
+}
+
+func TestShellHook_Execute_ExpandVariablesWithNilResult(t *testing.T) {
+	// Test variable expansion when Result is nil (pre-task hooks)
+	def := config.HookDefinition{
+		Type:    config.HookTypeShell,
+		Command: "echo '${TASK_ID} ${TASK_NAME} ${TASK_STATUS} ${ITERATION}'",
+	}
+	hook := NewShellHook("expand-hook", HookPhasePre, def)
+
+	ctx := context.Background()
+	tk := task.NewTask("TASK-005", "My Task", "Description")
+	hookCtx := &HookContext{
+		Task:       tk,
+		Result:     nil, // Pre-task, no result
+		Iteration:  7,
+		ProjectDir: "/tmp",
+	}
+
+	result, err := hook.Execute(ctx, hookCtx)
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if !result.IsSuccess() {
+		t.Errorf("IsSuccess() = false; error=%s", result.Error)
+	}
+
+	if !strings.Contains(result.Output, "TASK-005") {
+		t.Errorf("Output should contain TASK_ID; got: %s", result.Output)
+	}
+	if !strings.Contains(result.Output, "My Task") {
+		t.Errorf("Output should contain TASK_NAME; got: %s", result.Output)
+	}
+	if !strings.Contains(result.Output, "7") {
+		t.Errorf("Output should contain ITERATION; got: %s", result.Output)
+	}
+}
+
+func TestShellHook_Execute_AllEnvironmentVariables(t *testing.T) {
+	// Test all available environment variables
+	def := config.HookDefinition{
+		Type:    config.HookTypeShell,
+		Command: "echo \"ID:$TASK_ID NAME:$TASK_NAME DESC:$TASK_DESCRIPTION STATUS:$TASK_STATUS ITER:$ITERATION DIR:$PROJECT_DIR OUT:$AGENT_OUTPUT EXIT:$AGENT_EXIT_CODE ASTATUS:$AGENT_STATUS\"",
+	}
+	hook := NewShellHook("all-env-hook", HookPhasePost, def)
+
+	ctx := context.Background()
+	tk := task.NewTask("T-001", "TaskName", "TaskDesc")
+	hookCtx := &HookContext{
+		Task:      tk,
+		Iteration: 2,
+		Result: &agent.Result{
+			Output:   "agent output text",
+			ExitCode: 0,
+			Status:   agent.TaskStatusNext,
+		},
+		ProjectDir: "/my/project",
+	}
+
+	result, err := hook.Execute(ctx, hookCtx)
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if !result.IsSuccess() {
+		t.Errorf("IsSuccess() = false; error=%s", result.Error)
+	}
+
+	checks := []string{
+		"ID:T-001",
+		"NAME:TaskName",
+		"DESC:TaskDesc",
+		"ITER:2",
+		"DIR:/my/project",
+		"EXIT:0",
+		"ASTATUS:NEXT",
+	}
+
+	for _, check := range checks {
+		if !strings.Contains(result.Output, check) {
+			t.Errorf("Output should contain %q; got: %s", check, result.Output)
+		}
+	}
+}
+
+func TestShellHook_Execute_NonExitError(t *testing.T) {
+	// Test when command itself fails to execute (not found)
+	def := config.HookDefinition{
+		Type:      config.HookTypeShell,
+		Command:   "nonexistent_command_12345",
+		OnFailure: config.FailureModeWarnContinue,
+	}
+	hook := NewShellHook("nonexist-hook", HookPhasePre, def)
+
+	ctx := context.Background()
+	hookCtx := &HookContext{
+		Task:       task.NewTask("TASK-001", "Test", "Desc"),
+		Iteration:  1,
+		ProjectDir: "/tmp",
+	}
+
+	result, err := hook.Execute(ctx, hookCtx)
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if result.IsSuccess() {
+		t.Error("IsSuccess() = true, want false (command not found)")
+	}
+	// Should have non-zero exit code
+	if result.ExitCode == 0 {
+		t.Error("ExitCode = 0, want non-zero")
+	}
+}
+
+func TestShellHook_Execute_DefaultFailureMode(t *testing.T) {
+	// Test that default failure mode is warn_continue
+	def := config.HookDefinition{
+		Type:    config.HookTypeShell,
+		Command: "exit 1",
+		// OnFailure not set - should default to warn_continue
+	}
+	hook := NewShellHook("default-mode-hook", HookPhasePre, def)
+
+	ctx := context.Background()
+	hookCtx := &HookContext{
+		Task:       task.NewTask("TASK-001", "Test", "Desc"),
+		Iteration:  1,
+		ProjectDir: "/tmp",
+	}
+
+	result, err := hook.Execute(ctx, hookCtx)
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if result.IsSuccess() {
+		t.Error("IsSuccess() = true, want false")
+	}
+	// Default failure mode should be warn_continue
+	if !result.ShouldWarnAndContinue() {
+		t.Errorf("ShouldWarnAndContinue() = false, want true (default); FailureMode = %v", result.FailureMode)
+	}
+}

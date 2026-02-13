@@ -416,10 +416,15 @@
   > - custom_test.go: Continue(), IsAvailable (path detection, env detection, unknown method), ListModels with command, Run with LogWriter/WorkDir/Args/empty command/nonexistent command, extractSessionID, parseModelsOutput (nil on empty, skips separators)
   > - Coverage improvements: auggie 36%→49%, cursor 43%→48%, custom 43%→95%
 
-- [ ] TEST-004: Add unit tests for hooks
+- [x] TEST-004: Add unit tests for hooks
   > Goal: Test hook execution
   > Test failure modes (skip_task, warn_continue, etc.)
   > Test environment variable injection
+  > **Completed:** Added comprehensive tests improving coverage from 95.5% to 99.0%:
+  > - agenthook_test.go: Empty error with non-zero exit code, nil task in context, agent not found, default agent from config, WorkDir/Timeout options
+  > - shell_test.go: Stderr-only output, variable expansion with nil result, all environment variables, non-exit error, default failure mode
+  > - manager_test.go: Context cancelled before start, NewManagerFromConfigWithAgents error, PostTask error, mixed failure modes, logger for failures, nil task/result contexts
+  > - hook_test.go: Empty HookContext, all HookResult methods, BaseHook all fields, mixed hook types, nil config
 
 - [ ] TEST-005: Add integration tests
   > Goal: Test full loop with mock agent

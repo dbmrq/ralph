@@ -1,0 +1,851 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>hooks: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/wexinc/ralph/internal/hooks/agenthook.go (98.0%)</option>
+				
+				<option value="file1">github.com/wexinc/ralph/internal/hooks/hook.go (100.0%)</option>
+				
+				<option value="file2">github.com/wexinc/ralph/internal/hooks/manager.go (100.0%)</option>
+				
+				<option value="file3">github.com/wexinc/ralph/internal/hooks/shell.go (98.4%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">// Package hooks provides pre/post task hook functionality for ralph.
+package hooks
+
+import (
+        "context"
+        "fmt"
+        "strings"
+        "time"
+
+        "github.com/wexinc/ralph/internal/agent"
+        "github.com/wexinc/ralph/internal/config"
+)
+
+// AgentHookConfig provides configuration for agent hook execution.
+type AgentHookConfig struct {
+        // Registry is the agent registry to look up agents.
+        Registry *agent.Registry
+        // DefaultAgent is the default agent to use if none specified in hook.
+        DefaultAgent string
+        // DefaultModel is the default model to use if none specified in hook.
+        DefaultModel string
+        // WorkDir is the working directory for agent execution.
+        WorkDir string
+        // Timeout is the maximum time for hook execution.
+        Timeout time.Duration
+}
+
+// AgentHook executes agent prompts as hooks.
+// It runs an AI agent with a custom prompt and captures the result.
+type AgentHook struct {
+        BaseHook
+        config AgentHookConfig
+}
+
+// NewAgentHook creates a new agent hook with the given parameters.
+func NewAgentHook(name string, phase HookPhase, def config.HookDefinition, cfg AgentHookConfig) *AgentHook <span class="cov8" title="1">{
+        return &amp;AgentHook{
+                BaseHook: NewBaseHook(name, phase, def),
+                config:   cfg,
+        }
+}</span>
+
+// Execute runs the agent with the configured prompt.
+// It builds the prompt using task context and executes via the agent interface.
+func (h *AgentHook) Execute(ctx context.Context, hookCtx *HookContext) (*HookResult, error) <span class="cov8" title="1">{
+        if hookCtx == nil </span><span class="cov8" title="1">{
+                return nil, fmt.Errorf("hook context is required")
+        }</span>
+
+        <span class="cov8" title="1">prompt := h.definition.Command
+        if prompt == "" </span><span class="cov8" title="1">{
+                return nil, fmt.Errorf("agent hook prompt (command) is empty")
+        }</span>
+
+        // Expand template variables in the prompt
+        <span class="cov8" title="1">prompt = h.expandPromptVariables(prompt, hookCtx)
+
+        // Get the agent to use
+        selectedAgent, err := h.selectAgent()
+        if err != nil </span><span class="cov8" title="1">{
+                return h.CreateHookResult(false, "", fmt.Sprintf("failed to select agent: %v", err), 1), nil
+        }</span>
+
+        // Check agent availability
+        <span class="cov8" title="1">if !selectedAgent.IsAvailable() </span><span class="cov0" title="0">{
+                return h.CreateHookResult(false, "", fmt.Sprintf("agent %q is not available", selectedAgent.Name()), 1), nil
+        }</span>
+
+        // Build run options
+        <span class="cov8" title="1">opts := agent.RunOptions{
+                WorkDir: h.config.WorkDir,
+                Force:   true,
+                Timeout: h.config.Timeout,
+        }
+
+        // Use model from hook definition, config, or agent default
+        if h.definition.Model != "" </span><span class="cov8" title="1">{
+                opts.Model = h.definition.Model
+        }</span> else<span class="cov8" title="1"> if h.config.DefaultModel != "" </span><span class="cov8" title="1">{
+                opts.Model = h.config.DefaultModel
+        }</span>
+
+        // Execute the agent
+        <span class="cov8" title="1">result, err := selectedAgent.Run(ctx, prompt, opts)
+        if err != nil </span><span class="cov8" title="1">{
+                return h.CreateHookResult(false, "", fmt.Sprintf("agent execution failed: %v", err), 1), nil
+        }</span>
+
+        // Create hook result from agent result
+        <span class="cov8" title="1">success := result.ExitCode == 0 &amp;&amp; result.Status.IsSuccess()
+        var errMsg string
+        if !success </span><span class="cov8" title="1">{
+                errMsg = result.Error
+                if errMsg == "" &amp;&amp; result.ExitCode != 0 </span><span class="cov8" title="1">{
+                        errMsg = fmt.Sprintf("agent exited with code %d", result.ExitCode)
+                }</span>
+        }
+
+        <span class="cov8" title="1">return h.CreateHookResult(success, result.Output, errMsg, result.ExitCode), nil</span>
+}
+
+// selectAgent selects the agent to use for this hook.
+// Priority: hook definition &gt; config default &gt; registry default
+func (h *AgentHook) selectAgent() (agent.Agent, error) <span class="cov8" title="1">{
+        if h.config.Registry == nil </span><span class="cov8" title="1">{
+                return nil, fmt.Errorf("agent registry is not configured")
+        }</span>
+
+        // Try hook-specific agent first
+        <span class="cov8" title="1">agentName := h.definition.Agent
+        if agentName == "" </span><span class="cov8" title="1">{
+                agentName = h.config.DefaultAgent
+        }</span>
+
+        <span class="cov8" title="1">if agentName != "" </span><span class="cov8" title="1">{
+                return h.config.Registry.SelectAgent(agentName)
+        }</span>
+
+        // Fall back to any available agent
+        <span class="cov8" title="1">return h.config.Registry.GetOrDefault("")</span>
+}
+
+// expandPromptVariables expands ${VAR} patterns in the prompt using hook context.
+// This allows prompts like "Review the changes for ${TASK_ID}: ${TASK_NAME}".
+func (h *AgentHook) expandPromptVariables(prompt string, hookCtx *HookContext) string <span class="cov8" title="1">{
+        vars := make(map[string]string)
+
+        if hookCtx.Task != nil </span><span class="cov8" title="1">{
+                vars["TASK_ID"] = hookCtx.Task.ID
+                vars["TASK_NAME"] = hookCtx.Task.Name
+                vars["TASK_DESCRIPTION"] = hookCtx.Task.Description
+                vars["TASK_STATUS"] = string(hookCtx.Task.Status)
+        }</span>
+
+        <span class="cov8" title="1">vars["ITERATION"] = fmt.Sprintf("%d", hookCtx.Iteration)
+        vars["PROJECT_DIR"] = hookCtx.ProjectDir
+
+        if hookCtx.Result != nil </span><span class="cov8" title="1">{
+                vars["AGENT_OUTPUT"] = hookCtx.Result.Output
+                vars["AGENT_EXIT_CODE"] = fmt.Sprintf("%d", hookCtx.Result.ExitCode)
+                vars["AGENT_STATUS"] = string(hookCtx.Result.Status)
+        }</span>
+
+        <span class="cov8" title="1">result := prompt
+        for key, value := range vars </span><span class="cov8" title="1">{
+                result = strings.ReplaceAll(result, "${"+key+"}", value)
+        }</span>
+
+        <span class="cov8" title="1">return result</span>
+}
+
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">// Package hooks provides pre/post task hook functionality for ralph.
+// Hooks can execute shell commands or agent calls before or after each task.
+package hooks
+
+import (
+        "context"
+        "fmt"
+
+        "github.com/wexinc/ralph/internal/agent"
+        "github.com/wexinc/ralph/internal/config"
+        "github.com/wexinc/ralph/internal/task"
+)
+
+// HookPhase indicates when a hook runs relative to task execution.
+type HookPhase string
+
+const (
+        // HookPhasePre indicates the hook runs before the task.
+        HookPhasePre HookPhase = "pre"
+        // HookPhasePost indicates the hook runs after the task.
+        HookPhasePost HookPhase = "post"
+)
+
+// String returns the string representation of the hook phase.
+func (p HookPhase) String() string <span class="cov8" title="1">{
+        return string(p)
+}</span>
+
+// IsValid returns true if the hook phase is valid.
+func (p HookPhase) IsValid() bool <span class="cov8" title="1">{
+        return p == HookPhasePre || p == HookPhasePost
+}</span>
+
+// HookContext provides context information for hook execution.
+// This includes the current task state and agent result (for post-task hooks).
+type HookContext struct {
+        // Task is the current task being processed.
+        Task *task.Task
+        // Result is the agent result (only populated for post-task hooks).
+        Result *agent.Result
+        // Iteration is the current iteration number for the task.
+        Iteration int
+        // ProjectDir is the project root directory.
+        ProjectDir string
+}
+
+// HookResult represents the outcome of a hook execution.
+type HookResult struct {
+        // Success indicates whether the hook completed successfully.
+        Success bool
+        // Output is the captured output from the hook.
+        Output string
+        // Error contains any error message if the hook failed.
+        Error string
+        // ExitCode is the exit code for shell hooks (0 = success).
+        ExitCode int
+        // FailureMode is the configured failure handling mode.
+        FailureMode config.FailureMode
+}
+
+// IsSuccess returns true if the hook executed successfully.
+func (r HookResult) IsSuccess() bool <span class="cov8" title="1">{
+        return r.Success &amp;&amp; r.ExitCode == 0
+}</span>
+
+// ShouldAbort returns true if the hook failure should abort the loop.
+func (r HookResult) ShouldAbort() bool <span class="cov8" title="1">{
+        return !r.IsSuccess() &amp;&amp; r.FailureMode == config.FailureModeAbortLoop
+}</span>
+
+// ShouldSkipTask returns true if the hook failure should skip the current task.
+func (r HookResult) ShouldSkipTask() bool <span class="cov8" title="1">{
+        return !r.IsSuccess() &amp;&amp; r.FailureMode == config.FailureModeSkipTask
+}</span>
+
+// ShouldAskAgent returns true if the agent should decide how to handle the failure.
+func (r HookResult) ShouldAskAgent() bool <span class="cov8" title="1">{
+        return !r.IsSuccess() &amp;&amp; r.FailureMode == config.FailureModeAskAgent
+}</span>
+
+// ShouldWarnAndContinue returns true if the hook failure should log a warning and continue.
+func (r HookResult) ShouldWarnAndContinue() bool <span class="cov8" title="1">{
+        return !r.IsSuccess() &amp;&amp; r.FailureMode == config.FailureModeWarnContinue
+}</span>
+
+// Hook defines the interface that all hook implementations must satisfy.
+type Hook interface {
+        // Name returns a descriptive name for this hook (for logging/debugging).
+        Name() string
+
+        // Phase returns whether this is a pre-task or post-task hook.
+        Phase() HookPhase
+
+        // Type returns the hook type (shell or agent).
+        Type() config.HookType
+
+        // Definition returns the underlying hook definition from config.
+        Definition() config.HookDefinition
+
+        // Execute runs the hook with the given context.
+        // Returns a HookResult with the outcome of the execution.
+        Execute(ctx context.Context, hookCtx *HookContext) (*HookResult, error)
+}
+
+// BaseHook provides common functionality for hook implementations.
+// Embed this in concrete hook types (ShellHook, AgentHook).
+type BaseHook struct {
+        // name is a descriptive name for this hook instance.
+        name string
+        // phase indicates when this hook runs (pre/post task).
+        phase HookPhase
+        // definition is the hook configuration from config.yaml.
+        definition config.HookDefinition
+}
+
+// NewBaseHook creates a new BaseHook with the given parameters.
+func NewBaseHook(name string, phase HookPhase, def config.HookDefinition) BaseHook <span class="cov8" title="1">{
+        return BaseHook{
+                name:       name,
+                phase:      phase,
+                definition: def,
+        }
+}</span>
+
+// Name returns the hook name.
+func (h *BaseHook) Name() string <span class="cov8" title="1">{
+        return h.name
+}</span>
+
+// Phase returns the hook phase (pre/post).
+func (h *BaseHook) Phase() HookPhase <span class="cov8" title="1">{
+        return h.phase
+}</span>
+
+// Type returns the hook type from the definition.
+func (h *BaseHook) Type() config.HookType <span class="cov8" title="1">{
+        return h.definition.Type
+}</span>
+
+// Definition returns the hook definition.
+func (h *BaseHook) Definition() config.HookDefinition <span class="cov8" title="1">{
+        return h.definition
+}</span>
+
+// GetFailureMode returns the failure mode, defaulting to WarnContinue if not set.
+func (h *BaseHook) GetFailureMode() config.FailureMode <span class="cov8" title="1">{
+        if h.definition.OnFailure == "" </span><span class="cov8" title="1">{
+                return config.FailureModeWarnContinue
+        }</span>
+        <span class="cov8" title="1">return h.definition.OnFailure</span>
+}
+
+// CreateHookResult creates a HookResult with the hook's failure mode.
+func (h *BaseHook) CreateHookResult(success bool, output, errMsg string, exitCode int) *HookResult <span class="cov8" title="1">{
+        return &amp;HookResult{
+                Success:     success,
+                Output:      output,
+                Error:       errMsg,
+                ExitCode:    exitCode,
+                FailureMode: h.GetFailureMode(),
+        }
+}</span>
+
+// CreateHooksFromConfig creates Hook instances from the configuration.
+// This is a convenience function for shell-only hooks. For agent hooks,
+// use CreateHooksFromConfigWithAgents which provides the agent registry.
+func CreateHooksFromConfig(cfg *config.HooksConfig) (preHooks, postHooks []Hook, err error) <span class="cov8" title="1">{
+        return CreateHooksFromConfigWithAgents(cfg, AgentHookConfig{})
+}</span>
+
+// CreateHooksFromConfigWithAgents creates Hook instances from the configuration
+// with agent support. This is the full factory function that creates either
+// ShellHook or AgentHook based on type.
+func CreateHooksFromConfigWithAgents(cfg *config.HooksConfig, agentCfg AgentHookConfig) (preHooks, postHooks []Hook, err error) <span class="cov8" title="1">{
+        preHooks = make([]Hook, 0, len(cfg.PreTask))
+        postHooks = make([]Hook, 0, len(cfg.PostTask))
+
+        for i, def := range cfg.PreTask </span><span class="cov8" title="1">{
+                name := fmt.Sprintf("pre_task[%d]", i)
+                hook, err := createHookFromDefinition(name, HookPhasePre, def, agentCfg)
+                if err != nil </span><span class="cov8" title="1">{
+                        return nil, nil, fmt.Errorf("creating pre-task hook %d: %w", i, err)
+                }</span>
+                <span class="cov8" title="1">preHooks = append(preHooks, hook)</span>
+        }
+
+        <span class="cov8" title="1">for i, def := range cfg.PostTask </span><span class="cov8" title="1">{
+                name := fmt.Sprintf("post_task[%d]", i)
+                hook, err := createHookFromDefinition(name, HookPhasePost, def, agentCfg)
+                if err != nil </span><span class="cov8" title="1">{
+                        return nil, nil, fmt.Errorf("creating post-task hook %d: %w", i, err)
+                }</span>
+                <span class="cov8" title="1">postHooks = append(postHooks, hook)</span>
+        }
+
+        <span class="cov8" title="1">return preHooks, postHooks, nil</span>
+}
+
+// createHookFromDefinition creates a single hook from a definition.
+// Returns ShellHook for shell type, AgentHook for agent type.
+func createHookFromDefinition(name string, phase HookPhase, def config.HookDefinition, agentCfg AgentHookConfig) (Hook, error) <span class="cov8" title="1">{
+        switch def.Type </span>{
+        case config.HookTypeShell:<span class="cov8" title="1">
+                return NewShellHook(name, phase, def), nil</span>
+        case config.HookTypeAgent:<span class="cov8" title="1">
+                return NewAgentHook(name, phase, def, agentCfg), nil</span>
+        case "":<span class="cov8" title="1">
+                // Default to shell if type not specified
+                def.Type = config.HookTypeShell
+                return NewShellHook(name, phase, def), nil</span>
+        default:<span class="cov8" title="1">
+                return nil, fmt.Errorf("unknown hook type: %s", def.Type)</span>
+        }
+}
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">// Package hooks provides pre/post task hook functionality for ralph.
+package hooks
+
+import (
+        "context"
+        "fmt"
+
+        "github.com/wexinc/ralph/internal/agent"
+        "github.com/wexinc/ralph/internal/config"
+        "github.com/wexinc/ralph/internal/task"
+)
+
+// ManagerResult represents the aggregate outcome of executing a phase of hooks.
+type ManagerResult struct {
+        // AllSuccess is true if all hooks succeeded.
+        AllSuccess bool
+        // Results contains the individual result for each hook.
+        Results []*HookResult
+        // Action is the recommended action based on hook results.
+        Action ManagerAction
+        // FailedHook is the hook that caused a non-continue action (if any).
+        FailedHook Hook
+        // FailedResult is the result of the failed hook (if any).
+        FailedResult *HookResult
+}
+
+// ManagerAction defines the action the manager recommends after hook execution.
+type ManagerAction string
+
+const (
+        // ManagerActionContinue indicates all hooks passed or failed with warn_continue.
+        ManagerActionContinue ManagerAction = "continue"
+        // ManagerActionSkipTask indicates a hook failed with skip_task mode.
+        ManagerActionSkipTask ManagerAction = "skip_task"
+        // ManagerActionAbortLoop indicates a hook failed with abort_loop mode.
+        ManagerActionAbortLoop ManagerAction = "abort_loop"
+        // ManagerActionAskAgent indicates a hook failed with ask_agent mode.
+        ManagerActionAskAgent ManagerAction = "ask_agent"
+)
+
+// Manager orchestrates hook execution for the ralph loop.
+// It manages pre-task and post-task hooks, executing them in order
+// and handling failures according to each hook's configured failure mode.
+type Manager struct {
+        preHooks  []Hook
+        postHooks []Hook
+        // Logger is called for each hook execution (optional).
+        Logger func(phase HookPhase, hook Hook, result *HookResult)
+}
+
+// NewManager creates a new hook manager with the given hooks.
+func NewManager(preHooks, postHooks []Hook) *Manager <span class="cov8" title="1">{
+        return &amp;Manager{
+                preHooks:  preHooks,
+                postHooks: postHooks,
+        }
+}</span>
+
+// NewManagerFromConfig creates a Manager from configuration.
+// This is a convenience constructor that creates hooks from config.
+func NewManagerFromConfig(cfg *config.HooksConfig) (*Manager, error) <span class="cov8" title="1">{
+        preHooks, postHooks, err := CreateHooksFromConfig(cfg)
+        if err != nil </span><span class="cov8" title="1">{
+                return nil, fmt.Errorf("creating hooks from config: %w", err)
+        }</span>
+        <span class="cov8" title="1">return NewManager(preHooks, postHooks), nil</span>
+}
+
+// NewManagerFromConfigWithAgents creates a Manager from configuration with agent support.
+func NewManagerFromConfigWithAgents(cfg *config.HooksConfig, agentCfg AgentHookConfig) (*Manager, error) <span class="cov8" title="1">{
+        preHooks, postHooks, err := CreateHooksFromConfigWithAgents(cfg, agentCfg)
+        if err != nil </span><span class="cov8" title="1">{
+                return nil, fmt.Errorf("creating hooks from config: %w", err)
+        }</span>
+        <span class="cov8" title="1">return NewManager(preHooks, postHooks), nil</span>
+}
+
+// PreTaskHooks returns the pre-task hooks.
+func (m *Manager) PreTaskHooks() []Hook <span class="cov8" title="1">{
+        return m.preHooks
+}</span>
+
+// PostTaskHooks returns the post-task hooks.
+func (m *Manager) PostTaskHooks() []Hook <span class="cov8" title="1">{
+        return m.postHooks
+}</span>
+
+// HasPreTaskHooks returns true if there are pre-task hooks configured.
+func (m *Manager) HasPreTaskHooks() bool <span class="cov8" title="1">{
+        return len(m.preHooks) &gt; 0
+}</span>
+
+// HasPostTaskHooks returns true if there are post-task hooks configured.
+func (m *Manager) HasPostTaskHooks() bool <span class="cov8" title="1">{
+        return len(m.postHooks) &gt; 0
+}</span>
+
+// ExecutePreTaskHooks runs all pre-task hooks in order.
+// It stops execution if a hook fails with skip_task or abort_loop mode.
+// Returns a ManagerResult with the aggregate outcome.
+func (m *Manager) ExecutePreTaskHooks(ctx context.Context, hookCtx *HookContext) *ManagerResult <span class="cov8" title="1">{
+        return m.executeHooks(ctx, m.preHooks, hookCtx, HookPhasePre)
+}</span>
+
+// ExecutePostTaskHooks runs all post-task hooks in order.
+// It stops execution if a hook fails with skip_task or abort_loop mode.
+// Returns a ManagerResult with the aggregate outcome.
+func (m *Manager) ExecutePostTaskHooks(ctx context.Context, hookCtx *HookContext) *ManagerResult <span class="cov8" title="1">{
+        return m.executeHooks(ctx, m.postHooks, hookCtx, HookPhasePost)
+}</span>
+
+// BuildHookContextForPreTask creates a HookContext for pre-task hooks.
+// The task parameter is the current task being executed.
+// Result will be nil since the task hasn't run yet.
+func BuildHookContextForPreTask(t *task.Task, iteration int, projectDir string) *HookContext <span class="cov8" title="1">{
+        return &amp;HookContext{
+                Task:       t,
+                Iteration:  iteration,
+                ProjectDir: projectDir,
+        }
+}</span>
+
+// BuildHookContextForPostTask creates a HookContext for post-task hooks.
+// The task parameter is the current task, result is the agent's execution result.
+func BuildHookContextForPostTask(t *task.Task, result *agent.Result, iteration int, projectDir string) *HookContext <span class="cov8" title="1">{
+        return &amp;HookContext{
+                Task:       t,
+                Result:     result,
+                Iteration:  iteration,
+                ProjectDir: projectDir,
+        }
+}</span>
+
+// executeHooks runs a list of hooks in order, handling failures.
+func (m *Manager) executeHooks(ctx context.Context, hooks []Hook, hookCtx *HookContext, phase HookPhase) *ManagerResult <span class="cov8" title="1">{
+        result := &amp;ManagerResult{
+                AllSuccess: true,
+                Results:    make([]*HookResult, 0, len(hooks)),
+                Action:     ManagerActionContinue,
+        }
+
+        for _, hook := range hooks </span><span class="cov8" title="1">{
+                // Check context cancellation
+                if ctx.Err() != nil </span><span class="cov8" title="1">{
+                        result.AllSuccess = false
+                        result.Action = ManagerActionAbortLoop
+                        break</span>
+                }
+
+                <span class="cov8" title="1">hookResult, err := hook.Execute(ctx, hookCtx)
+                if err != nil </span><span class="cov8" title="1">{
+                        // Execution error (not hook failure) - treat as abort
+                        hookResult = &amp;HookResult{
+                                Success:     false,
+                                Error:       fmt.Sprintf("execution error: %v", err),
+                                ExitCode:    1,
+                                FailureMode: config.FailureModeAbortLoop,
+                        }
+                }</span>
+
+                <span class="cov8" title="1">result.Results = append(result.Results, hookResult)
+
+                // Log the result if logger is configured
+                if m.Logger != nil </span><span class="cov8" title="1">{
+                        m.Logger(phase, hook, hookResult)
+                }</span>
+
+                // Handle failure modes
+                <span class="cov8" title="1">if !hookResult.IsSuccess() </span><span class="cov8" title="1">{
+                        result.AllSuccess = false
+
+                        switch </span>{
+                        case hookResult.ShouldAbort():<span class="cov8" title="1">
+                                result.Action = ManagerActionAbortLoop
+                                result.FailedHook = hook
+                                result.FailedResult = hookResult
+                                return result</span>
+
+                        case hookResult.ShouldSkipTask():<span class="cov8" title="1">
+                                result.Action = ManagerActionSkipTask
+                                result.FailedHook = hook
+                                result.FailedResult = hookResult
+                                return result</span>
+
+                        case hookResult.ShouldAskAgent():<span class="cov8" title="1">
+                                result.Action = ManagerActionAskAgent
+                                result.FailedHook = hook
+                                result.FailedResult = hookResult
+                                return result</span>
+
+                        case hookResult.ShouldWarnAndContinue():<span class="cov8" title="1">
+                                // Continue with next hook
+                                continue</span>
+                        }
+                }
+        }
+
+        <span class="cov8" title="1">return result</span>
+}
+
+// GetFailedHookInfo returns a formatted string describing the failed hook for agent prompts.
+// This is useful for the ask_agent failure mode.
+func (m *Manager) GetFailedHookInfo(result *ManagerResult) string <span class="cov8" title="1">{
+        if result.FailedHook == nil || result.FailedResult == nil </span><span class="cov8" title="1">{
+                return ""
+        }</span>
+
+        <span class="cov8" title="1">return fmt.Sprintf(
+                "Hook '%s' (type: %s, phase: %s) failed with exit code %d.\nError: %s\nOutput: %s",
+                result.FailedHook.Name(),
+                result.FailedHook.Type(),
+                result.FailedHook.Phase(),
+                result.FailedResult.ExitCode,
+                result.FailedResult.Error,
+                result.FailedResult.Output,
+        )</span>
+}
+
+</pre>
+		
+		<pre class="file" id="file3" style="display: none">// Package hooks provides pre/post task hook functionality for ralph.
+package hooks
+
+import (
+        "bytes"
+        "context"
+        "fmt"
+        "os"
+        "os/exec"
+        "strconv"
+        "strings"
+
+        "github.com/wexinc/ralph/internal/config"
+)
+
+// ShellHook executes shell commands as hooks.
+// It supports environment variable injection for task context and
+// configurable failure handling modes.
+type ShellHook struct {
+        BaseHook
+}
+
+// NewShellHook creates a new shell hook with the given parameters.
+func NewShellHook(name string, phase HookPhase, def config.HookDefinition) *ShellHook <span class="cov8" title="1">{
+        return &amp;ShellHook{
+                BaseHook: NewBaseHook(name, phase, def),
+        }
+}</span>
+
+// Execute runs the shell command with the hook context.
+// It sets environment variables based on the current task state and
+// captures stdout/stderr. The result includes the exit code and output.
+func (h *ShellHook) Execute(ctx context.Context, hookCtx *HookContext) (*HookResult, error) <span class="cov8" title="1">{
+        if hookCtx == nil </span><span class="cov8" title="1">{
+                return nil, fmt.Errorf("hook context is required")
+        }</span>
+
+        <span class="cov8" title="1">command := h.definition.Command
+        if command == "" </span><span class="cov8" title="1">{
+                return nil, fmt.Errorf("shell hook command is empty")
+        }</span>
+
+        // Expand environment variables in the command
+        <span class="cov8" title="1">command = h.expandEnvVars(command, hookCtx)
+
+        // Create the command
+        cmd := exec.CommandContext(ctx, "sh", "-c", command)
+
+        // Set up environment variables
+        cmd.Env = h.buildEnv(hookCtx)
+
+        // Capture output
+        var stdout, stderr bytes.Buffer
+        cmd.Stdout = &amp;stdout
+        cmd.Stderr = &amp;stderr
+
+        // Run the command
+        err := cmd.Run()
+
+        // Combine stdout and stderr for output
+        output := strings.TrimSpace(stdout.String())
+        if stderr.Len() &gt; 0 </span><span class="cov8" title="1">{
+                stderrStr := strings.TrimSpace(stderr.String())
+                if output != "" </span><span class="cov8" title="1">{
+                        output = output + "\n" + stderrStr
+                }</span> else<span class="cov8" title="1"> {
+                        output = stderrStr
+                }</span>
+        }
+
+        // Determine success and exit code
+        <span class="cov8" title="1">exitCode := 0
+        var errMsg string
+        success := true
+
+        if err != nil </span><span class="cov8" title="1">{
+                success = false
+                if exitErr, ok := err.(*exec.ExitError); ok </span><span class="cov8" title="1">{
+                        exitCode = exitErr.ExitCode()
+                }</span> else<span class="cov0" title="0"> {
+                        exitCode = 1
+                }</span>
+                <span class="cov8" title="1">errMsg = err.Error()</span>
+        }
+
+        <span class="cov8" title="1">return h.CreateHookResult(success, output, errMsg, exitCode), nil</span>
+}
+
+// buildEnv creates the environment variables for the shell command.
+// It starts with the current process environment and adds hook-specific variables.
+func (h *ShellHook) buildEnv(hookCtx *HookContext) []string <span class="cov8" title="1">{
+        // Start with current environment
+        env := os.Environ()
+
+        // Add hook-specific environment variables
+        hookEnv := make(map[string]string)
+
+        if hookCtx.Task != nil </span><span class="cov8" title="1">{
+                hookEnv["TASK_ID"] = hookCtx.Task.ID
+                hookEnv["TASK_NAME"] = hookCtx.Task.Name
+                hookEnv["TASK_DESCRIPTION"] = hookCtx.Task.Description
+                hookEnv["TASK_STATUS"] = string(hookCtx.Task.Status)
+        }</span>
+
+        <span class="cov8" title="1">hookEnv["ITERATION"] = strconv.Itoa(hookCtx.Iteration)
+        hookEnv["PROJECT_DIR"] = hookCtx.ProjectDir
+
+        // Add result-specific variables for post-task hooks
+        if hookCtx.Result != nil </span><span class="cov8" title="1">{
+                hookEnv["AGENT_OUTPUT"] = hookCtx.Result.Output
+                hookEnv["AGENT_EXIT_CODE"] = strconv.Itoa(hookCtx.Result.ExitCode)
+                hookEnv["AGENT_STATUS"] = string(hookCtx.Result.Status)
+        }</span>
+
+        // Append hook env vars to environment
+        <span class="cov8" title="1">for key, value := range hookEnv </span><span class="cov8" title="1">{
+                env = append(env, fmt.Sprintf("%s=%s", key, value))
+        }</span>
+
+        <span class="cov8" title="1">return env</span>
+}
+
+// expandEnvVars expands ${VAR} patterns in the command string using hook context.
+// This allows commands like "echo 'Starting task: ${TASK_ID}'" to work.
+func (h *ShellHook) expandEnvVars(command string, hookCtx *HookContext) string <span class="cov8" title="1">{
+        // Build a map of variables for expansion
+        vars := make(map[string]string)
+
+        if hookCtx.Task != nil </span><span class="cov8" title="1">{
+                vars["TASK_ID"] = hookCtx.Task.ID
+                vars["TASK_NAME"] = hookCtx.Task.Name
+                vars["TASK_DESCRIPTION"] = hookCtx.Task.Description
+                vars["TASK_STATUS"] = string(hookCtx.Task.Status)
+        }</span>
+
+        <span class="cov8" title="1">vars["ITERATION"] = strconv.Itoa(hookCtx.Iteration)
+        vars["PROJECT_DIR"] = hookCtx.ProjectDir
+
+        if hookCtx.Result != nil </span><span class="cov8" title="1">{
+                vars["AGENT_OUTPUT"] = hookCtx.Result.Output
+                vars["AGENT_EXIT_CODE"] = strconv.Itoa(hookCtx.Result.ExitCode)
+                vars["AGENT_STATUS"] = string(hookCtx.Result.Status)
+        }</span>
+
+        // Expand ${VAR} patterns
+        <span class="cov8" title="1">result := command
+        for key, value := range vars </span><span class="cov8" title="1">{
+                result = strings.ReplaceAll(result, "${"+key+"}", value)
+        }</span>
+
+        <span class="cov8" title="1">return result</span>
+}
+
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>

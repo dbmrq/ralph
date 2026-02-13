@@ -320,3 +320,132 @@ func TestHookContext(t *testing.T) {
 		t.Errorf("ProjectDir = %v, want /home/user/project", ctx.ProjectDir)
 	}
 }
+
+func TestHookContext_Empty(t *testing.T) {
+	ctx := &HookContext{}
+
+	if ctx.Task != nil {
+		t.Error("Task should be nil")
+	}
+	if ctx.Result != nil {
+		t.Error("Result should be nil")
+	}
+	if ctx.Iteration != 0 {
+		t.Errorf("Iteration = %d, want 0", ctx.Iteration)
+	}
+	if ctx.ProjectDir != "" {
+		t.Errorf("ProjectDir = %q, want empty", ctx.ProjectDir)
+	}
+}
+
+func TestHookResult_AllMethods(t *testing.T) {
+	// Test HookResult with all fields populated
+	result := HookResult{
+		Success:     false,
+		Output:      "test output",
+		Error:       "test error",
+		ExitCode:    42,
+		FailureMode: config.FailureModeAbortLoop,
+	}
+
+	if result.IsSuccess() {
+		t.Error("IsSuccess() = true, want false")
+	}
+	if !result.ShouldAbort() {
+		t.Error("ShouldAbort() = false, want true")
+	}
+	if result.ShouldSkipTask() {
+		t.Error("ShouldSkipTask() = true, want false")
+	}
+	if result.ShouldAskAgent() {
+		t.Error("ShouldAskAgent() = true, want false")
+	}
+	if result.ShouldWarnAndContinue() {
+		t.Error("ShouldWarnAndContinue() = true, want false")
+	}
+}
+
+func TestBaseHook_AllFields(t *testing.T) {
+	def := config.HookDefinition{
+		Type:      config.HookTypeAgent,
+		Command:   "prompt",
+		Model:     "gpt-4",
+		Agent:     "custom",
+		OnFailure: config.FailureModeAbortLoop,
+	}
+	base := NewBaseHook("full-hook", HookPhasePost, def)
+
+	if base.Name() != "full-hook" {
+		t.Errorf("Name() = %v, want full-hook", base.Name())
+	}
+	if base.Phase() != HookPhasePost {
+		t.Errorf("Phase() = %v, want %v", base.Phase(), HookPhasePost)
+	}
+	if base.Type() != config.HookTypeAgent {
+		t.Errorf("Type() = %v, want %v", base.Type(), config.HookTypeAgent)
+	}
+
+	gotDef := base.Definition()
+	if gotDef.Model != "gpt-4" {
+		t.Errorf("Definition().Model = %v, want gpt-4", gotDef.Model)
+	}
+	if gotDef.Agent != "custom" {
+		t.Errorf("Definition().Agent = %v, want custom", gotDef.Agent)
+	}
+}
+
+func TestCreateHooksFromConfigWithAgents_MixedTypes(t *testing.T) {
+	registry := agent.NewRegistry()
+
+	cfg := &config.HooksConfig{
+		PreTask: []config.HookDefinition{
+			{Type: config.HookTypeShell, Command: "echo shell"},
+			{Type: config.HookTypeAgent, Command: "agent prompt"},
+		},
+		PostTask: []config.HookDefinition{
+			{Type: config.HookTypeShell, Command: "echo post"},
+		},
+	}
+
+	agentCfg := AgentHookConfig{Registry: registry}
+
+	preHooks, postHooks, err := CreateHooksFromConfigWithAgents(cfg, agentCfg)
+	if err != nil {
+		t.Fatalf("CreateHooksFromConfigWithAgents() error = %v", err)
+	}
+
+	if len(preHooks) != 2 {
+		t.Errorf("len(preHooks) = %d, want 2", len(preHooks))
+	}
+	if len(postHooks) != 1 {
+		t.Errorf("len(postHooks) = %d, want 1", len(postHooks))
+	}
+
+	// Verify types
+	if _, ok := preHooks[0].(*ShellHook); !ok {
+		t.Errorf("preHooks[0] is %T, want *ShellHook", preHooks[0])
+	}
+	if _, ok := preHooks[1].(*AgentHook); !ok {
+		t.Errorf("preHooks[1] is %T, want *AgentHook", preHooks[1])
+	}
+	if _, ok := postHooks[0].(*ShellHook); !ok {
+		t.Errorf("postHooks[0] is %T, want *ShellHook", postHooks[0])
+	}
+}
+
+func TestCreateHooksFromConfig_NilConfig(t *testing.T) {
+	// Verify behavior with empty/minimal config
+	cfg := &config.HooksConfig{}
+
+	preHooks, postHooks, err := CreateHooksFromConfig(cfg)
+	if err != nil {
+		t.Fatalf("CreateHooksFromConfig() error = %v", err)
+	}
+
+	if len(preHooks) != 0 {
+		t.Errorf("len(preHooks) = %d, want 0", len(preHooks))
+	}
+	if len(postHooks) != 0 {
+		t.Errorf("len(postHooks) = %d, want 0", len(postHooks))
+	}
+}

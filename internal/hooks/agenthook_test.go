@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/wexinc/ralph/internal/agent"
 	"github.com/wexinc/ralph/internal/config"
@@ -548,5 +549,210 @@ func TestAgentHook_Execute_PostTaskWithAgentResult(t *testing.T) {
 	expectedPrompt := "Verify task TASK-001 with status DONE (exit: 0)"
 	if mockAg.lastPrompt != expectedPrompt {
 		t.Errorf("lastPrompt = %v, want %v", mockAg.lastPrompt, expectedPrompt)
+	}
+}
+
+func TestAgentHook_Execute_FailureWithEmptyError(t *testing.T) {
+	// Test the branch where error message is empty but exit code is non-zero
+	registry := agent.NewRegistry()
+	mockAg := &mockAgent{
+		name:      "test-agent",
+		available: true,
+		runResult: agent.Result{
+			Output:   "Failed output",
+			ExitCode: 42,
+			Status:   agent.TaskStatusError,
+			Error:    "", // Empty error message
+		},
+	}
+	registry.Register(mockAg)
+
+	def := config.HookDefinition{
+		Type:      config.HookTypeAgent,
+		Command:   "Review code",
+		OnFailure: config.FailureModeWarnContinue,
+	}
+	cfg := AgentHookConfig{Registry: registry}
+
+	hook := NewAgentHook("empty-error-hook", HookPhasePre, def, cfg)
+
+	hookCtx := &HookContext{
+		Task:       task.NewTask("TASK-001", "Test", "Desc"),
+		Iteration:  1,
+		ProjectDir: "/tmp",
+	}
+
+	result, err := hook.Execute(context.Background(), hookCtx)
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if result.IsSuccess() {
+		t.Error("IsSuccess() = true, want false")
+	}
+	if result.ExitCode != 42 {
+		t.Errorf("ExitCode = %d, want 42", result.ExitCode)
+	}
+	// Error message should be auto-generated from exit code
+	if !strings.Contains(result.Error, "42") {
+		t.Errorf("Error should contain exit code; got: %s", result.Error)
+	}
+}
+
+func TestAgentHook_Execute_NilTaskInContext(t *testing.T) {
+	// Test variable expansion with nil task
+	registry := agent.NewRegistry()
+	mockAg := &mockAgent{
+		name:      "test-agent",
+		available: true,
+		runResult: agent.Result{ExitCode: 0, Status: agent.TaskStatusDone},
+	}
+	registry.Register(mockAg)
+
+	def := config.HookDefinition{
+		Type:    config.HookTypeAgent,
+		Command: "Review iteration ${ITERATION} in ${PROJECT_DIR}",
+	}
+	cfg := AgentHookConfig{Registry: registry}
+
+	hook := NewAgentHook("nil-task-hook", HookPhasePre, def, cfg)
+
+	hookCtx := &HookContext{
+		Task:       nil, // No task
+		Iteration:  5,
+		ProjectDir: "/project/path",
+	}
+
+	result, err := hook.Execute(context.Background(), hookCtx)
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if !result.IsSuccess() {
+		t.Errorf("IsSuccess() = false; error=%s", result.Error)
+	}
+
+	expectedPrompt := "Review iteration 5 in /project/path"
+	if mockAg.lastPrompt != expectedPrompt {
+		t.Errorf("lastPrompt = %v, want %v", mockAg.lastPrompt, expectedPrompt)
+	}
+}
+
+func TestAgentHook_Execute_AgentNotFound(t *testing.T) {
+	// Test when specified agent doesn't exist in registry
+	registry := agent.NewRegistry()
+	// Don't register any agents
+
+	def := config.HookDefinition{
+		Type:    config.HookTypeAgent,
+		Command: "Review code",
+		Agent:   "nonexistent-agent",
+	}
+	cfg := AgentHookConfig{Registry: registry}
+
+	hook := NewAgentHook("not-found-hook", HookPhasePre, def, cfg)
+
+	hookCtx := &HookContext{
+		Task:       task.NewTask("TASK-001", "Test", "Desc"),
+		Iteration:  1,
+		ProjectDir: "/tmp",
+	}
+
+	result, err := hook.Execute(context.Background(), hookCtx)
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if result.IsSuccess() {
+		t.Error("IsSuccess() = true, want false (agent not found)")
+	}
+	if !strings.Contains(result.Error, "select agent") || !strings.Contains(result.Error, "failed") {
+		t.Errorf("Error should mention agent selection failure; got: %s", result.Error)
+	}
+}
+
+func TestAgentHook_Execute_DefaultAgentFromConfig(t *testing.T) {
+	// Test agent selection priority: config default agent
+	registry := agent.NewRegistry()
+	defaultAg := &mockAgent{
+		name:      "default-agent",
+		available: true,
+		runResult: agent.Result{ExitCode: 0, Status: agent.TaskStatusDone},
+	}
+	registry.Register(defaultAg)
+
+	def := config.HookDefinition{
+		Type:    config.HookTypeAgent,
+		Command: "Review code",
+		// No agent specified in definition
+	}
+	cfg := AgentHookConfig{
+		Registry:     registry,
+		DefaultAgent: "default-agent",
+	}
+
+	hook := NewAgentHook("default-hook", HookPhasePre, def, cfg)
+
+	hookCtx := &HookContext{
+		Task:       task.NewTask("TASK-001", "Test", "Desc"),
+		Iteration:  1,
+		ProjectDir: "/tmp",
+	}
+
+	result, err := hook.Execute(context.Background(), hookCtx)
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if !result.IsSuccess() {
+		t.Errorf("IsSuccess() = false; error=%s", result.Error)
+	}
+	// Verify the default agent was used
+	if defaultAg.lastPrompt != "Review code" {
+		t.Errorf("Default agent should have been used; lastPrompt = %s", defaultAg.lastPrompt)
+	}
+}
+
+func TestAgentHook_Execute_WorkDirAndTimeout(t *testing.T) {
+	// Test that WorkDir and Timeout are passed correctly
+	registry := agent.NewRegistry()
+	mockAg := &mockAgent{
+		name:      "test-agent",
+		available: true,
+		runResult: agent.Result{ExitCode: 0, Status: agent.TaskStatusDone},
+	}
+	registry.Register(mockAg)
+
+	def := config.HookDefinition{
+		Type:    config.HookTypeAgent,
+		Command: "Review code",
+	}
+	cfg := AgentHookConfig{
+		Registry: registry,
+		WorkDir:  "/custom/workdir",
+		Timeout:  30 * time.Second,
+	}
+
+	hook := NewAgentHook("options-hook", HookPhasePre, def, cfg)
+
+	hookCtx := &HookContext{
+		Task:       task.NewTask("TASK-001", "Test", "Desc"),
+		Iteration:  1,
+		ProjectDir: "/tmp",
+	}
+
+	_, err := hook.Execute(context.Background(), hookCtx)
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if mockAg.lastOptions.WorkDir != "/custom/workdir" {
+		t.Errorf("WorkDir = %s, want /custom/workdir", mockAg.lastOptions.WorkDir)
+	}
+	if mockAg.lastOptions.Timeout != 30*time.Second {
+		t.Errorf("Timeout = %v, want 30s", mockAg.lastOptions.Timeout)
+	}
+	if !mockAg.lastOptions.Force {
+		t.Error("Force should be true")
 	}
 }

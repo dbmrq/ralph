@@ -544,3 +544,222 @@ func containsAll(s string, substrings ...string) bool {
 	return true
 }
 
+func TestManager_ExecuteHooks_ContextCancelledBeforeStart(t *testing.T) {
+	hooks := []Hook{
+		newSuccessHook("pre1", HookPhasePre),
+	}
+	m := NewManager(hooks, nil)
+
+	// Cancel context immediately
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	hookCtx := &HookContext{
+		Task:       task.NewTask("TASK-001", "Test", "Desc"),
+		Iteration:  1,
+		ProjectDir: "/tmp",
+	}
+
+	result := m.ExecutePreTaskHooks(ctx, hookCtx)
+
+	if result.AllSuccess {
+		t.Error("AllSuccess = true, want false (context cancelled)")
+	}
+	if result.Action != ManagerActionAbortLoop {
+		t.Errorf("Action = %v, want %v", result.Action, ManagerActionAbortLoop)
+	}
+	// No hooks should have been executed
+	if len(result.Results) != 0 {
+		t.Errorf("len(Results) = %d, want 0 (context cancelled before any execution)", len(result.Results))
+	}
+}
+
+func TestNewManagerFromConfigWithAgents_Error(t *testing.T) {
+	// Test error handling in NewManagerFromConfigWithAgents
+	cfg := &config.HooksConfig{
+		PreTask: []config.HookDefinition{
+			{Type: config.HookType("invalid-type"), Command: "echo test"},
+		},
+	}
+
+	agentCfg := AgentHookConfig{
+		WorkDir: "/tmp",
+	}
+
+	_, err := NewManagerFromConfigWithAgents(cfg, agentCfg)
+	if err == nil {
+		t.Error("NewManagerFromConfigWithAgents() with invalid type should return error")
+	}
+}
+
+func TestCreateHooksFromConfigWithAgents_PostTaskError(t *testing.T) {
+	// Test error handling for invalid post-task hook type
+	cfg := &config.HooksConfig{
+		PreTask: []config.HookDefinition{
+			{Type: config.HookTypeShell, Command: "echo pre"},
+		},
+		PostTask: []config.HookDefinition{
+			{Type: config.HookType("bad-type"), Command: "echo post"},
+		},
+	}
+
+	_, _, err := CreateHooksFromConfigWithAgents(cfg, AgentHookConfig{})
+	if err == nil {
+		t.Error("CreateHooksFromConfigWithAgents() with invalid post-task type should return error")
+	}
+	if !containsAll(err.Error(), "post-task", "hook") {
+		t.Errorf("Error should mention post-task hook; got: %v", err)
+	}
+}
+
+func TestManager_ExecuteHooks_MixedFailureModes(t *testing.T) {
+	// Test multiple hooks with different failure modes
+	// warn_continue followed by skip_task
+	hooks := []Hook{
+		newFailureHook("pre1", HookPhasePre, config.FailureModeWarnContinue),
+		newSuccessHook("pre2", HookPhasePre),
+		newFailureHook("pre3", HookPhasePre, config.FailureModeSkipTask),
+		newSuccessHook("pre4", HookPhasePre), // should not execute
+	}
+	m := NewManager(hooks, nil)
+
+	ctx := context.Background()
+	hookCtx := &HookContext{
+		Task:       task.NewTask("TASK-001", "Test", "Desc"),
+		Iteration:  1,
+		ProjectDir: "/tmp",
+	}
+
+	result := m.ExecutePreTaskHooks(ctx, hookCtx)
+
+	if result.AllSuccess {
+		t.Error("AllSuccess = true, want false")
+	}
+	if result.Action != ManagerActionSkipTask {
+		t.Errorf("Action = %v, want %v", result.Action, ManagerActionSkipTask)
+	}
+	// First three hooks should have executed
+	if len(result.Results) != 3 {
+		t.Errorf("len(Results) = %d, want 3", len(result.Results))
+	}
+	if result.FailedHook == nil || result.FailedHook.Name() != "pre3" {
+		t.Error("FailedHook should be 'pre3'")
+	}
+}
+
+func TestManager_LoggerCalledForFailures(t *testing.T) {
+	hooks := []Hook{
+		newFailureHook("fail1", HookPhasePre, config.FailureModeWarnContinue),
+	}
+	m := NewManager(hooks, nil)
+
+	var loggedPhases []HookPhase
+	var loggedResults []*HookResult
+	m.Logger = func(phase HookPhase, hook Hook, result *HookResult) {
+		loggedPhases = append(loggedPhases, phase)
+		loggedResults = append(loggedResults, result)
+	}
+
+	ctx := context.Background()
+	hookCtx := &HookContext{
+		Task:       task.NewTask("TASK-001", "Test", "Desc"),
+		Iteration:  1,
+		ProjectDir: "/tmp",
+	}
+
+	m.ExecutePreTaskHooks(ctx, hookCtx)
+
+	if len(loggedPhases) != 1 {
+		t.Errorf("logged %d hooks, want 1", len(loggedPhases))
+	}
+	if loggedPhases[0] != HookPhasePre {
+		t.Errorf("logged phase = %v, want %v", loggedPhases[0], HookPhasePre)
+	}
+	if loggedResults[0].IsSuccess() {
+		t.Error("logged result should be failure")
+	}
+}
+
+func TestManagerResult_AllCombinations(t *testing.T) {
+	tests := []struct {
+		name   string
+		result ManagerResult
+	}{
+		{
+			name: "all success with continue",
+			result: ManagerResult{
+				AllSuccess: true,
+				Action:     ManagerActionContinue,
+				Results:    []*HookResult{{Success: true}},
+			},
+		},
+		{
+			name: "partial success with skip",
+			result: ManagerResult{
+				AllSuccess:   false,
+				Action:       ManagerActionSkipTask,
+				Results:      []*HookResult{{Success: true}, {Success: false}},
+				FailedHook:   newFailureHook("h", HookPhasePre, config.FailureModeSkipTask),
+				FailedResult: &HookResult{Success: false, ExitCode: 1},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Just verify the struct is valid
+			if tt.result.Action == "" {
+				t.Error("Action should not be empty")
+			}
+		})
+	}
+}
+
+func TestBuildHookContextForPreTask_NilTask(t *testing.T) {
+	hookCtx := BuildHookContextForPreTask(nil, 1, "/project")
+
+	if hookCtx.Task != nil {
+		t.Error("Task should be nil")
+	}
+	if hookCtx.Result != nil {
+		t.Error("Result should be nil for pre-task")
+	}
+	if hookCtx.Iteration != 1 {
+		t.Errorf("Iteration = %d, want 1", hookCtx.Iteration)
+	}
+	if hookCtx.ProjectDir != "/project" {
+		t.Errorf("ProjectDir = %q, want /project", hookCtx.ProjectDir)
+	}
+}
+
+func TestBuildHookContextForPostTask_NilResult(t *testing.T) {
+	tk := task.NewTask("TASK-001", "Test", "Desc")
+	hookCtx := BuildHookContextForPostTask(tk, nil, 2, "/project")
+
+	if hookCtx.Task != tk {
+		t.Error("Task not set correctly")
+	}
+	if hookCtx.Result != nil {
+		t.Error("Result should be nil when passed nil")
+	}
+	if hookCtx.Iteration != 2 {
+		t.Errorf("Iteration = %d, want 2", hookCtx.Iteration)
+	}
+}
+
+func TestManager_GetFailedHookInfo_NilFailedResult(t *testing.T) {
+	m := NewManager(nil, nil)
+
+	result := &ManagerResult{
+		AllSuccess: false,
+		Action:     ManagerActionSkipTask,
+		FailedHook: newFailureHook("h", HookPhasePre, config.FailureModeSkipTask),
+		// FailedResult is nil
+	}
+
+	info := m.GetFailedHookInfo(result)
+	if info != "" {
+		t.Errorf("GetFailedHookInfo() = %q, want empty string when FailedResult is nil", info)
+	}
+}
+
