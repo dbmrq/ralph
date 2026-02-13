@@ -268,7 +268,7 @@
   > Log clear messages: "No tests yet", "Baseline captured", "N regressions detected"
   > Reference: FEATURES.md Section 5 "TDD Mode"
 
-- [ ] BUILD-005: Create verification gate logic
+- [x] BUILD-005: Create verification gate logic
   > Goal: Orchestrate project analysis → build → test → gate decision
   > Use ProjectAnalysis for all bootstrap/readiness checks
   > Support gate, tdd, and report modes
