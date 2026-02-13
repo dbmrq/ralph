@@ -38,7 +38,7 @@
 
 ## 🔧 Phase 2: Configuration System
 
-- [ ] CONFIG-001: Define configuration data structures
+- [x] CONFIG-001: Define configuration data structures
   > Goal: Create config.go with Config struct matching all settings
   > Include agent settings, loop settings, git settings, gates, hooks
   > YAML-only format (no shell script support needed)
