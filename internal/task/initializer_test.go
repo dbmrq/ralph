@@ -320,3 +320,294 @@ func TestOnProgress(t *testing.T) {
 	}
 }
 
+func TestImportFromDetection_JSON(t *testing.T) {
+	dir := t.TempDir()
+	ralphDir := filepath.Join(dir, ".ralph")
+	if err := os.MkdirAll(ralphDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a valid JSON task file
+	content := `{
+		"metadata": {"version": "1.0"},
+		"tasks": [
+			{
+				"id": "TASK-001",
+				"name": "First task",
+				"description": "Description 1",
+				"status": "pending",
+				"order": 1
+			},
+			{
+				"id": "TASK-002",
+				"name": "Second task",
+				"description": "Description 2",
+				"status": "completed",
+				"order": 2
+			}
+		]
+	}`
+	tasksFile := filepath.Join(ralphDir, "tasks.json")
+	if err := os.WriteFile(tasksFile, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	init := NewInitializer(dir, nil)
+	detection := init.DetectTaskList()
+
+	if detection == nil {
+		t.Fatal("DetectTaskList() returned nil")
+	}
+	if detection.Format != "json" {
+		t.Errorf("Format = %q, want %q", detection.Format, "json")
+	}
+
+	result, err := init.ImportFromDetection(detection)
+	if err != nil {
+		t.Fatalf("ImportFromDetection() error = %v", err)
+	}
+	if len(result.Tasks) != 2 {
+		t.Errorf("len(Tasks) = %d, want 2", len(result.Tasks))
+	}
+	if result.Tasks[0].ID != "TASK-001" {
+		t.Errorf("Tasks[0].ID = %q, want %q", result.Tasks[0].ID, "TASK-001")
+	}
+	if result.Tasks[1].Status != "completed" {
+		t.Errorf("Tasks[1].Status = %q, want %q", result.Tasks[1].Status, "completed")
+	}
+}
+
+func TestImportFromDetection_PlainText(t *testing.T) {
+	dir := t.TempDir()
+	docsDir := filepath.Join(dir, "docs")
+	if err := os.MkdirAll(docsDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a plain text task file (not markdown)
+	content := `1. TASK-001: First task
+2. TASK-002: Second task
+3. Third task
+`
+	tasksFile := filepath.Join(dir, "TASKS.txt")
+	if err := os.WriteFile(tasksFile, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	init := NewInitializer(dir, nil)
+	// Manually call ImportFromFile with auto-detection
+	result, err := init.ImportFromFile("TASKS.txt")
+	if err != nil {
+		t.Fatalf("ImportFromFile() error = %v", err)
+	}
+	if len(result.Tasks) != 3 {
+		t.Errorf("len(Tasks) = %d, want 3", len(result.Tasks))
+	}
+}
+
+func TestCountTasksInFile_PlainText(t *testing.T) {
+	dir := t.TempDir()
+	tasksFile := filepath.Join(dir, "tasks.txt")
+
+	// Plain text format
+	content := `- Task one
+- Task two
+* Task three
+1. Task four
+`
+	if err := os.WriteFile(tasksFile, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	init := NewInitializer(dir, nil)
+	count := init.countTasksInFile(tasksFile, "plaintext")
+
+	// Should count lines starting with -, *, or number.
+	if count < 4 {
+		t.Errorf("count = %d, want at least 4", count)
+	}
+}
+
+func TestCountTasksInFile_InvalidJSON(t *testing.T) {
+	dir := t.TempDir()
+	tasksFile := filepath.Join(dir, "tasks.json")
+
+	// Invalid JSON
+	content := `not valid json`
+	if err := os.WriteFile(tasksFile, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	init := NewInitializer(dir, nil)
+	count := init.countTasksInFile(tasksFile, "json")
+
+	// Should return 0 for invalid JSON
+	if count != 0 {
+		t.Errorf("count = %d, want 0 for invalid JSON", count)
+	}
+}
+
+func TestCountTasksInFile_NonExistent(t *testing.T) {
+	init := NewInitializer("/tmp", nil)
+	count := init.countTasksInFile("/nonexistent/file.md", "markdown")
+
+	if count != 0 {
+		t.Errorf("count = %d, want 0 for non-existent file", count)
+	}
+}
+
+func TestImportFromFile_AbsolutePath(t *testing.T) {
+	dir := t.TempDir()
+	tasksFile := filepath.Join(dir, "tasks.md")
+	content := `- [ ] TASK-001: Test task`
+	if err := os.WriteFile(tasksFile, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Initialize with different project dir but use absolute path
+	init := NewInitializer("/different/project", nil)
+	result, err := init.ImportFromFile(tasksFile)
+	if err != nil {
+		t.Fatalf("ImportFromFile() error = %v", err)
+	}
+	if len(result.Tasks) != 1 {
+		t.Errorf("len(Tasks) = %d, want 1", len(result.Tasks))
+	}
+}
+
+func TestExtractJSONArray_StringsWithBrackets(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "string containing open bracket",
+			input: `[{"text": "use [x] syntax"}]`,
+			want:  `[{"text": "use [x] syntax"}]`,
+		},
+		{
+			name:  "string containing close bracket",
+			input: `[{"text": "array] example"}]`,
+			want:  `[{"text": "array] example"}]`,
+		},
+		{
+			name:  "escaped quotes in string",
+			input: `[{"text": "say \"hello\""}]`,
+			want:  `[{"text": "say \"hello\""}]`,
+		},
+		{
+			name:  "multiple brackets in strings",
+			input: `[{"id": "1", "text": "[a][b]"}, {"id": "2", "text": "[c]"}]`,
+			want:  `[{"id": "1", "text": "[a][b]"}, {"id": "2", "text": "[c]"}]`,
+		},
+		{
+			name:  "unmatched bracket",
+			input: `[{"id": "1"} extra text`,
+			want:  "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := extractJSONArray(tt.input)
+			if got != tt.want {
+				t.Errorf("extractJSONArray() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseGeneratedTasks_WithSurroundingText(t *testing.T) {
+	output := `Here are the tasks I generated:
+
+[
+	{"id": "TASK-001", "name": "Setup project", "description": "Initialize the project"},
+	{"id": "TASK-002", "name": "Implement feature", "description": "Add the new feature"}
+]
+
+Let me know if you need any changes.`
+
+	tasks, err := parseGeneratedTasks(output)
+	if err != nil {
+		t.Fatalf("parseGeneratedTasks() error = %v", err)
+	}
+	if len(tasks) != 2 {
+		t.Errorf("len(tasks) = %d, want 2", len(tasks))
+	}
+}
+
+func TestParseGeneratedTasks_InvalidJSON(t *testing.T) {
+	output := `[{"id": "TASK-001", "name": "Missing close brace"]`
+	_, err := parseGeneratedTasks(output)
+	if err == nil {
+		t.Error("parseGeneratedTasks() should error on invalid JSON")
+	}
+}
+
+func TestSaveToStore_AbsolutePath(t *testing.T) {
+	dir := t.TempDir()
+	init := NewInitializer("/different/project", nil)
+
+	tasks := []*Task{
+		NewTask("TASK-001", "Test task", "Description"),
+	}
+
+	// Use absolute path
+	storePath := filepath.Join(dir, "tasks.json")
+	err := init.SaveToStore(tasks, storePath)
+	if err != nil {
+		t.Fatalf("SaveToStore() error = %v", err)
+	}
+
+	// Verify file was created
+	if _, err := os.Stat(storePath); err != nil {
+		t.Errorf("Store file not created: %v", err)
+	}
+}
+
+func TestDetectTaskList_Priority(t *testing.T) {
+	dir := t.TempDir()
+	ralphDir := filepath.Join(dir, ".ralph")
+	if err := os.MkdirAll(ralphDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create both .ralph/tasks.json and TASKS.md
+	jsonContent := `{"tasks": [{"id": "TASK-001"}]}`
+	mdContent := `- [ ] TASK-001: From markdown`
+
+	if err := os.WriteFile(filepath.Join(ralphDir, "tasks.json"), []byte(jsonContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "TASKS.md"), []byte(mdContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	init := NewInitializer(dir, nil)
+	detection := init.DetectTaskList()
+
+	// .ralph/tasks.json should have priority
+	if detection == nil {
+		t.Fatal("DetectTaskList() returned nil")
+	}
+	if detection.Path != ".ralph/tasks.json" {
+		t.Errorf("Path = %q, want .ralph/tasks.json (highest priority)", detection.Path)
+	}
+}
+
+func TestImportFromContent_PlainText(t *testing.T) {
+	init := NewInitializer(".", nil)
+	content := `1. First task
+2. Second task
+3. Third task
+`
+	result, err := init.ImportFromContent(content)
+	if err != nil {
+		t.Fatalf("ImportFromContent() error = %v", err)
+	}
+	if len(result.Tasks) != 3 {
+		t.Errorf("len(Tasks) = %d, want 3", len(result.Tasks))
+	}
+}
+

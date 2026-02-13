@@ -524,3 +524,116 @@ func TestTask_Clone(t *testing.T) {
 		t.Error("modifying clone should not affect original ID")
 	}
 }
+
+func TestTask_Clone_NilFields(t *testing.T) {
+	// Test cloning a task with nil iterations and metadata
+	task := &Task{
+		ID:     "TASK-001",
+		Name:   "Test",
+		Status: StatusPending,
+	}
+
+	clone := task.Clone()
+
+	// Should handle nil safely
+	if clone.Iterations != nil {
+		t.Error("Iterations should be nil when original is nil")
+	}
+	if clone.Metadata != nil {
+		t.Error("Metadata should be nil when original is nil")
+	}
+}
+
+func TestTask_GetMetadata_NilMetadata(t *testing.T) {
+	task := &Task{
+		ID:     "TASK-001",
+		Name:   "Test",
+		Status: StatusPending,
+	}
+
+	// Metadata is nil
+	val, ok := task.GetMetadata("key")
+	if ok {
+		t.Error("expected GetMetadata() to return false for nil metadata")
+	}
+	if val != "" {
+		t.Errorf("expected empty string, got %q", val)
+	}
+}
+
+func TestTask_SetMetadata_NilMetadata(t *testing.T) {
+	task := &Task{
+		ID:     "TASK-001",
+		Name:   "Test",
+		Status: StatusPending,
+	}
+
+	// Metadata starts nil
+	if task.Metadata != nil {
+		t.Error("Metadata should start nil")
+	}
+
+	// SetMetadata should initialize the map
+	task.SetMetadata("key", "value")
+
+	if task.Metadata == nil {
+		t.Error("Metadata should be initialized after SetMetadata")
+	}
+
+	val, ok := task.GetMetadata("key")
+	if !ok {
+		t.Error("expected GetMetadata() to return true")
+	}
+	if val != "value" {
+		t.Errorf("GetMetadata() = %q, want value", val)
+	}
+}
+
+func TestTask_EndIteration_WithNewSessionID(t *testing.T) {
+	task := NewTask("TASK-001", "Test", "Desc")
+	task.SessionID = "existing-session"
+	task.StartIteration()
+
+	// End iteration with new session ID
+	err := task.EndIteration("DONE", "output", "new-session")
+	if err != nil {
+		t.Fatalf("EndIteration() error = %v", err)
+	}
+
+	// SessionID should be updated to the new value
+	if task.SessionID != "new-session" {
+		t.Errorf("SessionID = %q, want %q", task.SessionID, "new-session")
+	}
+
+	// Iteration should also have the session ID
+	current := task.CurrentIteration()
+	if current.SessionID != "new-session" {
+		t.Errorf("Iteration.SessionID = %q, want %q", current.SessionID, "new-session")
+	}
+}
+
+func TestTask_MultipleIterations(t *testing.T) {
+	task := NewTask("TASK-001", "Test", "Desc")
+
+	// Start and complete 3 iterations
+	for i := 1; i <= 3; i++ {
+		iter := task.StartIteration()
+		if iter.Number != i {
+			t.Errorf("iteration %d: Number = %d, want %d", i, iter.Number, i)
+		}
+
+		err := task.EndIteration("NEXT", "output", "session")
+		if err != nil {
+			t.Fatalf("EndIteration() error = %v", err)
+		}
+	}
+
+	if task.IterationCount() != 3 {
+		t.Errorf("IterationCount() = %d, want 3", task.IterationCount())
+	}
+
+	// Total duration should be sum of all iterations
+	if task.TotalDuration() < 0 {
+		t.Error("TotalDuration() should be non-negative")
+	}
+}

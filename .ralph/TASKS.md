@@ -395,10 +395,14 @@
   > - Edge cases (empty config, partial config, zero timeouts)
   > - Total: 131 test cases in config package
 
-- [ ] TEST-002: Add unit tests for task management
+- [x] TEST-002: Add unit tests for task management
   > Goal: Test JSON storage read/write
   > Test task status updates
   > Test task import from various formats
+  > **Completed:** Added comprehensive tests improving coverage from 89.4% to 93.0%:
+  > - task_test.go: Clone with nil fields, GetMetadata/SetMetadata edge cases, iteration handling
+  > - store_test.go: JSON loading with metadata, timestamp updates, order preservation, concurrent access
+  > - initializer_test.go: JSON import, plaintext formats, countTasksInFile, extractJSONArray edge cases, path handling
 
 - [ ] TEST-003: Add unit tests for agents
   > Goal: Mock agent execution
