@@ -91,7 +91,7 @@
   > Define Model, RunOptions, Result types with SessionID field
   > Implement AgentRegistry for plugin management
 
-- [ ] AGENT-002: Implement Cursor agent plugin
+- [x] AGENT-002: Implement Cursor agent plugin
   > Goal: Create cursor.go implementing Agent interface
   > Register with AgentRegistry on init
   > Detect via `agent` command availability
