@@ -337,7 +337,7 @@
   > Scrollable with auto-follow
   > Option to open in $EDITOR
 
-- [ ] TUI-005: Implement task editor and model picker
+- [x] TUI-005: Implement task editor and model picker
   > Goal: Create components/taskEditor.go
   > Add new tasks inline (e key), edit task name/description
   > Reorder tasks, save to JSON storage
