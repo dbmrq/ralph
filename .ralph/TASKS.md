@@ -72,7 +72,7 @@
   > Define schema: id, name, description, status, created_at, completed_at
   > Support import from various text formats on init
 
-- [ ] TASK-003: Implement task manager
+- [x] TASK-003: Implement task manager
   > Goal: Create TaskManager for state management
   > Methods: GetNext(), MarkComplete(), Skip(), Pause(), CountRemaining()
   > Handle task ordering and dependencies
