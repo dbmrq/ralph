@@ -162,15 +162,22 @@ func (h *BaseHook) CreateHookResult(success bool, output, errMsg string, exitCod
 }
 
 // CreateHooksFromConfig creates Hook instances from the configuration.
-// This is a factory function that creates either ShellHook or AgentHook based on type.
-// Note: The actual ShellHook and AgentHook types will be implemented in HOOK-002 and HOOK-003.
+// This is a convenience function for shell-only hooks. For agent hooks,
+// use CreateHooksFromConfigWithAgents which provides the agent registry.
 func CreateHooksFromConfig(cfg *config.HooksConfig) (preHooks, postHooks []Hook, err error) {
+	return CreateHooksFromConfigWithAgents(cfg, AgentHookConfig{})
+}
+
+// CreateHooksFromConfigWithAgents creates Hook instances from the configuration
+// with agent support. This is the full factory function that creates either
+// ShellHook or AgentHook based on type.
+func CreateHooksFromConfigWithAgents(cfg *config.HooksConfig, agentCfg AgentHookConfig) (preHooks, postHooks []Hook, err error) {
 	preHooks = make([]Hook, 0, len(cfg.PreTask))
 	postHooks = make([]Hook, 0, len(cfg.PostTask))
 
 	for i, def := range cfg.PreTask {
 		name := fmt.Sprintf("pre_task[%d]", i)
-		hook, err := createHookFromDefinition(name, HookPhasePre, def)
+		hook, err := createHookFromDefinition(name, HookPhasePre, def, agentCfg)
 		if err != nil {
 			return nil, nil, fmt.Errorf("creating pre-task hook %d: %w", i, err)
 		}
@@ -179,7 +186,7 @@ func CreateHooksFromConfig(cfg *config.HooksConfig) (preHooks, postHooks []Hook,
 
 	for i, def := range cfg.PostTask {
 		name := fmt.Sprintf("post_task[%d]", i)
-		hook, err := createHookFromDefinition(name, HookPhasePost, def)
+		hook, err := createHookFromDefinition(name, HookPhasePost, def, agentCfg)
 		if err != nil {
 			return nil, nil, fmt.Errorf("creating post-task hook %d: %w", i, err)
 		}
@@ -190,14 +197,13 @@ func CreateHooksFromConfig(cfg *config.HooksConfig) (preHooks, postHooks []Hook,
 }
 
 // createHookFromDefinition creates a single hook from a definition.
-// Returns ShellHook for shell type, placeholder for agent type (until HOOK-003).
-func createHookFromDefinition(name string, phase HookPhase, def config.HookDefinition) (Hook, error) {
+// Returns ShellHook for shell type, AgentHook for agent type.
+func createHookFromDefinition(name string, phase HookPhase, def config.HookDefinition, agentCfg AgentHookConfig) (Hook, error) {
 	switch def.Type {
 	case config.HookTypeShell:
 		return NewShellHook(name, phase, def), nil
 	case config.HookTypeAgent:
-		// Agent hooks will be implemented in HOOK-003
-		return &placeholderHook{BaseHook: NewBaseHook(name, phase, def)}, nil
+		return NewAgentHook(name, phase, def, agentCfg), nil
 	case "":
 		// Default to shell if type not specified
 		def.Type = config.HookTypeShell
@@ -205,14 +211,4 @@ func createHookFromDefinition(name string, phase HookPhase, def config.HookDefin
 	default:
 		return nil, fmt.Errorf("unknown hook type: %s", def.Type)
 	}
-}
-
-// placeholderHook is a temporary implementation until HOOK-002 and HOOK-003.
-type placeholderHook struct {
-	BaseHook
-}
-
-// Execute returns a not-implemented error for placeholder hooks.
-func (h *placeholderHook) Execute(ctx context.Context, hookCtx *HookContext) (*HookResult, error) {
-	return nil, fmt.Errorf("hook type %s not yet implemented", h.Type())
 }

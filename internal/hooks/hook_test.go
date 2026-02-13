@@ -1,7 +1,6 @@
 package hooks
 
 import (
-	"context"
 	"testing"
 
 	"github.com/wexinc/ralph/internal/agent"
@@ -290,26 +289,6 @@ func TestCreateHooksFromConfig_InvalidType(t *testing.T) {
 	_, _, err := CreateHooksFromConfig(cfg)
 	if err == nil {
 		t.Error("CreateHooksFromConfig() with invalid type should return error")
-	}
-}
-
-func TestPlaceholderHook_Execute(t *testing.T) {
-	def := config.HookDefinition{
-		Type:    config.HookTypeShell,
-		Command: "echo test",
-	}
-	hook := &placeholderHook{BaseHook: NewBaseHook("test", HookPhasePre, def)}
-
-	ctx := context.Background()
-	hookCtx := &HookContext{
-		Task:       task.NewTask("TASK-001", "Test task", "Description"),
-		Iteration:  1,
-		ProjectDir: "/tmp/project",
-	}
-
-	_, err := hook.Execute(ctx, hookCtx)
-	if err == nil {
-		t.Error("placeholder Execute() should return error")
 	}
 }
 

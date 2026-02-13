@@ -130,7 +130,7 @@
   > Set environment variables (TASK_ID, TASK_NAME, TASK_STATUS, etc.)
   > Capture output and handle errors per on_failure mode
 
-- [ ] HOOK-003: Implement agent call hooks
+- [x] HOOK-003: Implement agent call hooks
   > Goal: Create agenthook.go for agent-based hooks
   > Run agent with custom prompt
   > Support optional model and agent specification
