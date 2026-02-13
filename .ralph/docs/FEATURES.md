@@ -147,6 +147,19 @@ Supported patterns (case-insensitive):
 
 When a task has these markers, the corresponding gate is skipped with an info message after that task completes.
 
+### Interactive Skip During Initial Checks
+During initial build and test verification (before the task loop starts), the user can press **'s'** to skip the check. This is useful when:
+- You know the project state is good and don't want to wait
+- The check is taking a long time (e.g., Go not in PATH causing fallback behavior)
+- You're in a greenfield/bootstrap phase with nothing to verify
+
+The skip option is shown in the spinner:
+```
+⠼ Running tests... 00:05  (press 's' to skip)
+```
+
+When skipped, the loop continues normally without attempting to fix anything.
+
 ### Transition Detection
 When bootstrap phase ends (first buildable code appears):
 1. Run initial build verification

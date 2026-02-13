@@ -747,6 +747,72 @@ stop_build_spinner() {
     printf "\033[?25h\r\033[K"
 }
 
+# Skippable verification - runs command in background with skip option
+# Returns: 0=success, 1=failed, 2=skipped by user
+# Usage: run_skippable_check "label" "command" output_var
+SKIPPED_BY_USER=2
+BACKGROUND_CMD_PID=""
+
+run_skippable_check() {
+    local label="$1"
+    local cmd="$2"
+    local output_file="$3"
+    local spinner_chars='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+    local spinner_idx=0
+    local start_time=$(date +%s)
+
+    # Run command in background
+    eval "$cmd" > "$output_file" 2>&1 &
+    BACKGROUND_CMD_PID=$!
+
+    # Hide cursor
+    printf "\033[?25l"
+
+    # Configure terminal for non-blocking input
+    local old_stty_settings=$(stty -g </dev/tty 2>/dev/null || true)
+    stty -echo -icanon min 0 time 0 </dev/tty 2>/dev/null || true
+
+    local result=""
+    while true; do
+        # Check if process finished
+        if ! kill -0 "$BACKGROUND_CMD_PID" 2>/dev/null; then
+            wait "$BACKGROUND_CMD_PID" 2>/dev/null
+            result=$?
+            break
+        fi
+
+        # Check for user input (non-blocking)
+        local key=$(dd bs=1 count=1 </dev/tty 2>/dev/null || true)
+        if [ "$key" = "s" ] || [ "$key" = "S" ]; then
+            # User wants to skip
+            kill "$BACKGROUND_CMD_PID" 2>/dev/null || true
+            wait "$BACKGROUND_CMD_PID" 2>/dev/null || true
+            result=$SKIPPED_BY_USER
+            break
+        fi
+
+        # Update spinner
+        local elapsed=$(($(date +%s) - start_time))
+        local mins=$((elapsed / 60))
+        local secs=$((elapsed % 60))
+        local spinner="${spinner_chars:$spinner_idx:1}"
+        spinner_idx=$(( (spinner_idx + 1) % ${#spinner_chars} ))
+
+        printf "\r\033[K${CYAN}%s %s${NC} %02d:%02d  ${YELLOW}(press 's' to skip)${NC}" "$spinner" "$label" "$mins" "$secs"
+
+        sleep 0.2
+    done
+
+    # Restore terminal settings
+    stty "$old_stty_settings" </dev/tty 2>/dev/null || true
+
+    # Show cursor and clear line
+    printf "\033[?25h\r\033[K"
+
+    BACKGROUND_CMD_PID=""
+    return $result
+}
+
 # Build script path
 BUILD_SCRIPT="$RALPH_CONFIG_DIR/build.sh"
 TEST_SCRIPT="$RALPH_CONFIG_DIR/test.sh"
@@ -849,6 +915,91 @@ verify_tests() {
     stop_build_spinner
 
     local elapsed=$(($(date +%s) - start_time))
+
+    if [ $test_result -ne 0 ]; then
+        log "${RED}❌ Tests failed${NC} (${elapsed}s)"
+        log ""
+        log "${YELLOW}Test output (last 30 lines):${NC}"
+        tail -30 "$test_log" | while IFS= read -r line; do
+            log "  $line"
+        done
+        rm -f "$test_log"
+        return 1
+    fi
+
+    log "${GREEN}✓ All tests passed${NC} (${elapsed}s)"
+    rm -f "$test_log"
+    return 0
+}
+
+# Skippable version of verify_build for initial checks
+# Returns: 0=success, 1=failed, 2=skipped by user
+verify_build_skippable() {
+    if [ "$BUILD_GATE_ENABLED" != "true" ]; then
+        return 0
+    fi
+
+    local build_log=$(mktemp)
+    local start_time=$(date +%s)
+
+    cd "$PROJECT_DIR"
+    run_skippable_check "Building..." "\"$BUILD_SCRIPT\"" "$build_log"
+    local build_result=$?
+    cd - > /dev/null
+
+    local elapsed=$(($(date +%s) - start_time))
+
+    if [ $build_result -eq $SKIPPED_BY_USER ]; then
+        log "${YELLOW}⏭ Build check skipped by user${NC}"
+        rm -f "$build_log"
+        return $SKIPPED_BY_USER
+    fi
+
+    if [ $build_result -ne 0 ]; then
+        log "${RED}❌ Build failed${NC} (${elapsed}s)"
+        log ""
+        log "${YELLOW}Build output (last 20 lines):${NC}"
+        tail -20 "$build_log" | while IFS= read -r line; do
+            log "  $line"
+        done
+        rm -f "$build_log"
+        return 1
+    fi
+
+    log "${GREEN}✓ Build succeeded${NC} (${elapsed}s)"
+    rm -f "$build_log"
+    return 0
+}
+
+# Skippable version of verify_tests for initial checks
+# Returns: 0=success, 1=failed, 2=skipped by user
+verify_tests_skippable() {
+    if [ "$TEST_GATE_ENABLED" != "true" ]; then
+        return 0
+    fi
+
+    # Check if test script exists and is executable
+    if [ ! -x "$TEST_SCRIPT" ]; then
+        log "${YELLOW}⚠ No test script found - skipping test verification${NC}"
+        log "${YELLOW}  Create .ralph/test.sh to enable test gates${NC}"
+        return 0
+    fi
+
+    local test_log=$(mktemp)
+    local start_time=$(date +%s)
+
+    cd "$PROJECT_DIR"
+    run_skippable_check "Running tests..." "\"$TEST_SCRIPT\"" "$test_log"
+    local test_result=$?
+    cd - > /dev/null
+
+    local elapsed=$(($(date +%s) - start_time))
+
+    if [ $test_result -eq $SKIPPED_BY_USER ]; then
+        log "${YELLOW}⏭ Test check skipped by user${NC}"
+        rm -f "$test_log"
+        return $SKIPPED_BY_USER
+    fi
 
     if [ $test_result -ne 0 ]; then
         log "${RED}❌ Tests failed${NC} (${elapsed}s)"
@@ -1157,10 +1308,12 @@ main() {
     fi
     log ""
 
-    # Initial build check
+    # Initial build check (skippable - user can press 's' to skip)
     if [ "$BUILD_GATE_ENABLED" = "true" ]; then
         log "${CYAN}Checking initial build state...${NC}"
-        if ! verify_build; then
+        verify_build_skippable
+        local build_result=$?
+        if [ $build_result -eq 1 ]; then
             log "${YELLOW}Build is broken - attempting fix before starting...${NC}"
             if ! attempt_build_fix; then
                 log "${RED}═══════════════════════════════════════════════════════════════${NC}"
@@ -1169,13 +1322,16 @@ main() {
                 exit 1
             fi
         fi
+        # result 0 = success, result 2 = skipped (both continue)
         log ""
     fi
 
-    # Initial test check
+    # Initial test check (skippable - user can press 's' to skip)
     if [ "$TEST_GATE_ENABLED" = "true" ]; then
         log "${CYAN}Checking initial test state...${NC}"
-        if ! verify_tests; then
+        verify_tests_skippable
+        local test_result=$?
+        if [ $test_result -eq 1 ]; then
             log "${YELLOW}Tests are failing - attempting fix before starting...${NC}"
             if ! attempt_test_fix; then
                 log "${RED}═══════════════════════════════════════════════════════════════${NC}"
@@ -1184,6 +1340,7 @@ main() {
                 exit 1
             fi
         fi
+        # result 0 = success, result 2 = skipped (both continue)
         log ""
     fi
 

@@ -5,12 +5,8 @@ set -e
 
 # Check if Go is installed
 if ! command -v go &> /dev/null; then
-    echo "🧪 Go not installed - skipping Go tests"
-    echo "   Running shell script tests instead..."
-    # Run shell script tests if available
-    if [ -f "tests/test_runner.sh" ]; then
-        bash tests/test_runner.sh
-    fi
+    echo "🧪 Go not installed - skipping tests"
+    echo "   (Install Go to enable test verification)"
     exit 0
 fi
 

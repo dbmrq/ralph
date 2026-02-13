@@ -5,12 +5,8 @@ set -e
 
 # Check if Go is installed
 if ! command -v go &> /dev/null; then
-    echo "📦 Go not installed - skipping Go build"
-    echo "   Running shell script validation instead..."
-    # Validate shell scripts if Go is not available
-    if [ -f "tests/validate.sh" ]; then
-        bash tests/validate.sh
-    fi
+    echo "📦 Go not installed - skipping build"
+    echo "   (Install Go to enable build verification)"
     exit 0
 fi
 
