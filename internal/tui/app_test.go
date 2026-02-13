@@ -294,9 +294,9 @@ func TestFormatDuration(t *testing.T) {
 
 	view := m.View()
 
-	// Should contain "Elapsed:" from the status bar
-	if !strings.Contains(view, "Elapsed:") {
-		t.Error("View should contain 'Elapsed:' from status bar")
+	// Should contain "Time:" from the status bar (provided by StatusBar component)
+	if !strings.Contains(view, "Time:") {
+		t.Error("View should contain 'Time:' from status bar")
 	}
 
 	// The elapsed time should be in MM:SS format (at least)

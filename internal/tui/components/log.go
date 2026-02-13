@@ -158,10 +158,39 @@ func (l *LogViewport) GotoTop() {
 	l.autoFollow = false
 }
 
+// GoToTop is an alias for GotoTop for consistency.
+func (l *LogViewport) GoToTop() {
+	l.GotoTop()
+}
+
 // GotoBottom scrolls to the bottom.
 func (l *LogViewport) GotoBottom() {
 	l.viewport.GotoBottom()
 	l.autoFollow = true
+}
+
+// GoToBottom is an alias for GotoBottom for consistency.
+func (l *LogViewport) GoToBottom() {
+	l.GotoBottom()
+}
+
+// ScrollUp scrolls up one line.
+func (l *LogViewport) ScrollUp() {
+	l.viewport.LineUp(1)
+	l.autoFollow = false
+}
+
+// ScrollDown scrolls down one line.
+func (l *LogViewport) ScrollDown() {
+	l.viewport.LineDown(1)
+}
+
+// ToggleAutoFollow toggles auto-follow mode.
+func (l *LogViewport) ToggleAutoFollow() {
+	l.autoFollow = !l.autoFollow
+	if l.autoFollow {
+		l.viewport.GotoBottom()
+	}
 }
 
 // Update handles keyboard events for scrolling.

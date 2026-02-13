@@ -345,7 +345,7 @@
   > List available models from current agent (m key)
   > Show current model indicator
 
-- [ ] TUI-006: Add keyboard controls and loop integration
+- [x] TUI-006: Add keyboard controls and loop integration
   > Goal: Handle p (pause), s (skip), a (abort), l (logs), h (help)
   > Confirmation dialogs for destructive actions, help overlay
   > Connect loop events to TUI updates

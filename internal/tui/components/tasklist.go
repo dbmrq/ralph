@@ -119,6 +119,35 @@ func (t *TaskList) MoveDown() {
 	}
 }
 
+// GoToTop moves selection to the first item.
+func (t *TaskList) GoToTop() {
+	t.selected = 0
+	t.updateScroll()
+}
+
+// GoToBottom moves selection to the last item.
+func (t *TaskList) GoToBottom() {
+	if len(t.items) > 0 {
+		t.selected = len(t.items) - 1
+		t.updateScroll()
+	}
+}
+
+// SetSize sets both width and height.
+func (t *TaskList) SetSize(width, height int) {
+	t.width = width
+	t.height = height
+	t.updateScroll()
+}
+
+// SetSelected sets the selected index.
+func (t *TaskList) SetSelected(index int) {
+	if index >= 0 && index < len(t.items) {
+		t.selected = index
+		t.updateScroll()
+	}
+}
+
 // updateScroll ensures the selected item is visible.
 func (t *TaskList) updateScroll() {
 	if t.selected < t.scrollStart {
