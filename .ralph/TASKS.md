@@ -366,10 +366,15 @@
   > - Refactored loop.go to use TaskPromptBuilder
   > - Comprehensive tests in task_builder_test.go
 
-- [ ] INSTR-002: Add plan evolution instructions
+- [x] INSTR-002: Add plan evolution instructions ✅
   > Goal: Instruct agents to update docs/tasks when plans change
   > "Update remaining tasks if implementation changes the plan"
   > "Document patterns and learnings in project files"
+  > **Completed:** Added Phase 6: Plan Evolution to base_prompt.txt (v2.3.0)
+  > - 6.1 Update Remaining Tasks when implementation changes approach
+  > - 6.2 Document Patterns and Learnings in project docs
+  > - 6.3 Keep Future Agents Informed with actionable notes
+  > - Added critical rule #10 about updating the plan
 
 ---
 
