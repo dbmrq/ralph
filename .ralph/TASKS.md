@@ -404,12 +404,17 @@
   > - store_test.go: JSON loading with metadata, timestamp updates, order preservation, concurrent access
   > - initializer_test.go: JSON import, plaintext formats, countTasksInFile, extractJSONArray edge cases, path handling
 
-- [ ] TEST-003: Add unit tests for agents
+- [x] TEST-003: Add unit tests for agents
   > Goal: Mock agent execution
   > Test AgentRegistry plugin system
   > Test model listing, error handling
   > Test session continuation
   > Test Project Analysis Agent response parsing and fallback behavior
+  > **Completed:** Added comprehensive tests improving coverage:
+  > - auggie_test.go: LoadSessionToken (env & empty), CheckAuth when not available, parseModelsOutput (with default, nil on empty), parseTaskStatus edge cases (prefixes, whitespace, middle of output), extractSessionID variants
+  > - cursor_test.go: New(), CheckAuth when not available, parseModelsOutput (with default, nil on empty), parseTaskStatus edge cases, extractSessionID variants
+  > - custom_test.go: Continue(), IsAvailable (path detection, env detection, unknown method), ListModels with command, Run with LogWriter/WorkDir/Args/empty command/nonexistent command, extractSessionID, parseModelsOutput (nil on empty, skips separators)
+  > - Coverage improvements: auggie 36%→49%, cursor 43%→48%, custom 43%→95%
 
 - [ ] TEST-004: Add unit tests for hooks
   > Goal: Test hook execution

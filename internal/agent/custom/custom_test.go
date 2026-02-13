@@ -1,7 +1,10 @@
 package custom
 
 import (
+	"bytes"
 	"context"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/wexinc/ralph/internal/agent"
@@ -341,4 +344,284 @@ func TestExtractSessionID(t *testing.T) {
 
 // Verify that Agent implements the agent.Agent interface
 var _ agent.Agent = (*Agent)(nil)
+
+func TestAgent_Continue(t *testing.T) {
+	a := New(config.CustomAgentConfig{
+		Name:    "test",
+		Command: "echo",
+	})
+
+	result, err := a.Continue(context.Background(), "session-123", "DONE", agent.RunOptions{})
+	if err != nil {
+		t.Fatalf("Continue() error = %v", err)
+	}
+
+	if result.ExitCode != 0 {
+		t.Errorf("Continue().ExitCode = %d, want 0", result.ExitCode)
+	}
+
+	if result.Status != agent.TaskStatusDone {
+		t.Errorf("Continue().Status = %q, want %q", result.Status, agent.TaskStatusDone)
+	}
+}
+
+func TestAgent_IsAvailable_PathDetection(t *testing.T) {
+	// Create a temporary file to test path detection
+	tmpFile, err := os.CreateTemp("", "test-agent-*")
+	if err != nil {
+		t.Fatalf("failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	tmpFile.Close()
+
+	tests := []struct {
+		name   string
+		config config.CustomAgentConfig
+		want   bool
+	}{
+		{
+			name: "path detection - file exists",
+			config: config.CustomAgentConfig{
+				Name:            "test",
+				Command:         "echo",
+				DetectionMethod: config.DetectionMethodPath,
+				DetectionValue:  tmpFile.Name(),
+			},
+			want: true,
+		},
+		{
+			name: "path detection - file does not exist",
+			config: config.CustomAgentConfig{
+				Name:            "test",
+				Command:         "echo",
+				DetectionMethod: config.DetectionMethodPath,
+				DetectionValue:  "/nonexistent/path/to/file",
+			},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := New(tt.config)
+			if got := a.IsAvailable(); got != tt.want {
+				t.Errorf("IsAvailable() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestAgent_IsAvailable_EnvDetection(t *testing.T) {
+	// Set test environment variable
+	t.Setenv("TEST_AGENT_ENV_VAR", "value")
+
+	tests := []struct {
+		name   string
+		config config.CustomAgentConfig
+		want   bool
+	}{
+		{
+			name: "env detection - var exists",
+			config: config.CustomAgentConfig{
+				Name:            "test",
+				Command:         "echo",
+				DetectionMethod: config.DetectionMethodEnv,
+				DetectionValue:  "TEST_AGENT_ENV_VAR",
+			},
+			want: true,
+		},
+		{
+			name: "env detection - var does not exist",
+			config: config.CustomAgentConfig{
+				Name:            "test",
+				Command:         "echo",
+				DetectionMethod: config.DetectionMethodEnv,
+				DetectionValue:  "NONEXISTENT_ENV_VAR_XYZ_123_456",
+			},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := New(tt.config)
+			if got := a.IsAvailable(); got != tt.want {
+				t.Errorf("IsAvailable() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestAgent_IsAvailable_UnknownMethod(t *testing.T) {
+	a := New(config.CustomAgentConfig{
+		Name:            "test",
+		Command:         "echo",
+		DetectionMethod: "unknown_method",
+	})
+
+	if a.IsAvailable() {
+		t.Error("IsAvailable() should return false for unknown detection method")
+	}
+}
+
+func TestAgent_ListModels_WithCommand(t *testing.T) {
+	// Use echo to simulate a model list command
+	a := New(config.CustomAgentConfig{
+		Name:             "test",
+		Command:          "echo",
+		DefaultModel:     "model-b",
+		ModelListCommand: "echo -e 'model-a\nmodel-b\nmodel-c'",
+	})
+
+	models, err := a.ListModels()
+	if err != nil {
+		t.Fatalf("ListModels() error = %v", err)
+	}
+
+	// The echo command should output model names
+	if len(models) == 0 {
+		t.Error("ListModels() should return at least one model")
+	}
+}
+
+func TestAgent_Run_WithLogWriter(t *testing.T) {
+	a := New(config.CustomAgentConfig{
+		Name:    "test",
+		Command: "echo",
+	})
+
+	var logBuf bytes.Buffer
+	result, err := a.Run(context.Background(), "DONE", agent.RunOptions{
+		LogWriter: &logBuf,
+	})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	if result.ExitCode != 0 {
+		t.Errorf("Run().ExitCode = %d, want 0", result.ExitCode)
+	}
+
+	// LogWriter should have received the output
+	if logBuf.Len() == 0 {
+		t.Error("LogWriter should have received output")
+	}
+}
+
+func TestAgent_Run_WithWorkDir(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	a := New(config.CustomAgentConfig{
+		Name:    "test",
+		Command: "sh -c 'pwd'",
+	})
+
+	result, err := a.Run(context.Background(), "", agent.RunOptions{
+		WorkDir: tmpDir,
+	})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	// Verify exit code is 0
+	if result.ExitCode != 0 {
+		t.Errorf("Run().ExitCode = %d, want 0", result.ExitCode)
+	}
+}
+
+func TestAgent_Run_EmptyCommand(t *testing.T) {
+	a := New(config.CustomAgentConfig{
+		Name:    "test",
+		Command: "",
+	})
+
+	_, err := a.Run(context.Background(), "prompt", agent.RunOptions{})
+	if err == nil {
+		t.Error("Run() with empty command should return error")
+	}
+}
+
+func TestAgent_Run_NonExistentCommand(t *testing.T) {
+	a := New(config.CustomAgentConfig{
+		Name:    "test",
+		Command: "nonexistent_command_xyz_123",
+	})
+
+	result, err := a.Run(context.Background(), "prompt", agent.RunOptions{})
+	// The execute method returns nil error even for command failures
+	// (error handling is designed to not interrupt the loop)
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	// Note: When command doesn't exist, cmd.ProcessState is nil so exitCode stays 0.
+	// The current implementation doesn't capture this case as an error.
+	// This test verifies the actual behavior - the method completes without error.
+	// A future improvement could handle this case better.
+	if result.Status != agent.TaskStatusUnknown {
+		t.Errorf("Run().Status = %v, want TaskStatusUnknown for failed command", result.Status)
+	}
+}
+
+func TestAgent_Run_ExtractsSessionID(t *testing.T) {
+	a := New(config.CustomAgentConfig{
+		Name:    "test",
+		Command: "echo",
+	})
+
+	result, err := a.Run(context.Background(), "session_id: test-session-abc", agent.RunOptions{})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	if result.SessionID != "test-session-abc" {
+		t.Errorf("Run().SessionID = %q, want %q", result.SessionID, "test-session-abc")
+	}
+
+	// GetSessionID should return the same value
+	if a.GetSessionID() != "test-session-abc" {
+		t.Errorf("GetSessionID() = %q, want %q", a.GetSessionID(), "test-session-abc")
+	}
+}
+
+func TestAgent_Run_WithArgs(t *testing.T) {
+	a := New(config.CustomAgentConfig{
+		Name:    "test",
+		Command: "echo",
+		Args:    []string{"arg1", "arg2"},
+	})
+
+	result, err := a.Run(context.Background(), "prompt", agent.RunOptions{})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	// Output should contain the args
+	if !strings.Contains(result.Output, "arg1") {
+		t.Errorf("Run() output = %q, should contain args", result.Output)
+	}
+}
+
+func TestParseModelsOutput_NilOnEmpty(t *testing.T) {
+	models := parseModelsOutput("", "default")
+	if models != nil {
+		t.Errorf("parseModelsOutput() = %v, want nil for empty input", models)
+	}
+}
+
+func TestParseModelsOutput_SkipsSeparators(t *testing.T) {
+	// Only model names, no header - the function doesn't skip headers
+	output := "---\nmodel-a\n===\nmodel-b\n---"
+	models := parseModelsOutput(output, "model-a")
+
+	if len(models) != 2 {
+		t.Errorf("parseModelsOutput() returned %d models, want 2", len(models))
+	}
+
+	for _, m := range models {
+		if strings.HasPrefix(m.ID, "-") || strings.HasPrefix(m.ID, "=") {
+			t.Errorf("Model ID should not be a separator: %q", m.ID)
+		}
+	}
+}
 

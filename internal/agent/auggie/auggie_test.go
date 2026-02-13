@@ -1,6 +1,7 @@
 package auggie
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/wexinc/ralph/internal/agent"
@@ -258,6 +259,179 @@ func TestNew(t *testing.T) {
 	}
 	if a.sessionToken != "" {
 		t.Error("New().sessionToken should be empty")
+	}
+}
+
+func TestAgent_LoadSessionToken_FromEnv(t *testing.T) {
+	a := New()
+
+	// Set environment variable
+	t.Setenv("AUGMENT_SESSION_AUTH", "test-token-from-env")
+
+	err := a.loadSessionToken()
+	if err != nil {
+		t.Fatalf("loadSessionToken() error = %v", err)
+	}
+
+	if a.sessionToken != "test-token-from-env" {
+		t.Errorf("sessionToken = %q, want %q", a.sessionToken, "test-token-from-env")
+	}
+}
+
+func TestAgent_LoadSessionToken_Empty(t *testing.T) {
+	a := New()
+
+	// Ensure environment variable is not set
+	t.Setenv("AUGMENT_SESSION_AUTH", "")
+
+	// This will fail since auggie is likely not installed in test environment
+	// and env var is empty, which is expected behavior
+	err := a.loadSessionToken()
+	// We expect an error when auggie is not installed and no env var is set
+	if err == nil {
+		// If no error, auggie must be installed and tokens work
+		if a.sessionToken == "" {
+			t.Error("loadSessionToken() returned nil error but sessionToken is empty")
+		}
+	}
+}
+
+func TestAgent_CheckAuth_NotAvailable(t *testing.T) {
+	// Create a new agent without auggie being available (typical in CI)
+	a := New()
+
+	// If auggie is not available, CheckAuth should return an error
+	if !a.IsAvailable() {
+		err := a.CheckAuth()
+		if err == nil {
+			t.Error("CheckAuth() should return error when auggie is not available")
+		}
+		if !strings.Contains(err.Error(), "auggie CLI not found") {
+			t.Errorf("CheckAuth() error = %v, should contain 'auggie CLI not found'", err)
+		}
+	}
+}
+
+func TestParseModelsOutput_WithDefault(t *testing.T) {
+	output := "claude-sonnet-4\nclaude-opus-4\ngpt-4o"
+	defaultModel := "claude-opus-4"
+
+	models := parseModelsOutput(output, defaultModel)
+
+	if len(models) != 3 {
+		t.Fatalf("parseModelsOutput() returned %d models, want 3", len(models))
+	}
+
+	// Check default is marked correctly
+	for _, m := range models {
+		if m.ID == defaultModel && !m.IsDefault {
+			t.Errorf("Model %q should be marked as default", defaultModel)
+		}
+		if m.ID != defaultModel && m.IsDefault {
+			t.Errorf("Model %q should not be marked as default", m.ID)
+		}
+	}
+}
+
+func TestParseModelsOutput_NilOnEmpty(t *testing.T) {
+	// Verify empty input returns nil, not empty slice
+	models := parseModelsOutput("", "default")
+	if models != nil {
+		t.Errorf("parseModelsOutput() = %v, want nil for empty input", models)
+	}
+
+	models = parseModelsOutput("   \n  ", "default")
+	if models != nil {
+		t.Errorf("parseModelsOutput() = %v, want nil for whitespace-only input", models)
+	}
+}
+
+func TestParseTaskStatus_EdgeCases(t *testing.T) {
+	tests := []struct {
+		name   string
+		output string
+		want   agent.TaskStatus
+	}{
+		{
+			name:   "DONE in middle of last lines",
+			output: "line1\nline2\nline3\nline4\nline5\nDONE\nline7\nline8",
+			want:   agent.TaskStatusDone,
+		},
+		{
+			name:   "NEXT with colon",
+			output: "work continues\nNEXT: more tasks remain",
+			want:   agent.TaskStatusNext,
+		},
+		{
+			name:   "ERROR with message",
+			output: "failed\nERROR: Build failed",
+			want:   agent.TaskStatusError,
+		},
+		{
+			name:   "FIXED marker",
+			output: "fixed the issue\nFIXED: resolved compilation error",
+			want:   agent.TaskStatusFixed,
+		},
+		{
+			name:   "whitespace around DONE",
+			output: "task done\n  DONE  \n",
+			want:   agent.TaskStatusDone,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := parseTaskStatus(tt.output); got != tt.want {
+				t.Errorf("parseTaskStatus() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestExtractSessionID_Variants(t *testing.T) {
+	tests := []struct {
+		name   string
+		output string
+		want   string
+	}{
+		{
+			name:   "session_id format",
+			output: "session_id: abc-123-def",
+			want:   "abc-123-def",
+		},
+		{
+			name:   "session-id format",
+			output: "session-id: xyz_456",
+			want:   "xyz_456",
+		},
+		{
+			name:   "sessionid single word",
+			output: "sessionid abc123",
+			want:   "abc123",
+		},
+		{
+			name:   "multiple session ids - returns first",
+			output: "session_id: first\nsession_id: second",
+			want:   "first",
+		},
+		{
+			name:   "session id with underscores",
+			output: "session_id: test_session_id_123",
+			want:   "test_session_id_123",
+		},
+		{
+			name:   "empty string",
+			output: "",
+			want:   "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := extractSessionID(tt.output); got != tt.want {
+				t.Errorf("extractSessionID() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
 
