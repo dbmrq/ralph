@@ -815,3 +815,519 @@ func runGitCommand(t *testing.T, dir string, args ...string) {
 		t.Fatalf("git %v failed: %v", args, err)
 	}
 }
+
+// ============================================
+// Error Recovery Tests (LOOP-004)
+// ============================================
+
+func TestIsRetryableError(t *testing.T) {
+	tests := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{
+			name:     "nil error",
+			err:      nil,
+			expected: false,
+		},
+		{
+			name:     "timeout error",
+			err:      errors.New("connection timeout"),
+			expected: true,
+		},
+		{
+			name:     "connection refused",
+			err:      errors.New("dial tcp: connection refused"),
+			expected: true,
+		},
+		{
+			name:     "connection reset",
+			err:      errors.New("connection reset by peer"),
+			expected: true,
+		},
+		{
+			name:     "context deadline exceeded",
+			err:      errors.New("context deadline exceeded"),
+			expected: true,
+		},
+		{
+			name:     "EOF error",
+			err:      errors.New("unexpected EOF"),
+			expected: true,
+		},
+		{
+			name:     "broken pipe",
+			err:      errors.New("write: broken pipe"),
+			expected: true,
+		},
+		{
+			name:     "network unreachable",
+			err:      errors.New("network unreachable"),
+			expected: true,
+		},
+		{
+			name:     "non-retryable error",
+			err:      errors.New("file not found"),
+			expected: false,
+		},
+		{
+			name:     "syntax error",
+			err:      errors.New("syntax error in code"),
+			expected: false,
+		},
+		{
+			name:     "agent error",
+			err:      errors.New("agent returned error status"),
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IsRetryableError(tt.err)
+			if result != tt.expected {
+				t.Errorf("IsRetryableError(%v) = %v, want %v", tt.err, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestDefaultRecoveryConfig(t *testing.T) {
+	cfg := DefaultRecoveryConfig()
+
+	if cfg.MaxAgentRetries != 3 {
+		t.Errorf("MaxAgentRetries = %d, want 3", cfg.MaxAgentRetries)
+	}
+	if cfg.RetryBackoff != 5*time.Second {
+		t.Errorf("RetryBackoff = %v, want 5s", cfg.RetryBackoff)
+	}
+	if cfg.MaxRetryBackoff != 60*time.Second {
+		t.Errorf("MaxRetryBackoff = %v, want 60s", cfg.MaxRetryBackoff)
+	}
+	if !cfg.EnableAutoFix {
+		t.Error("EnableAutoFix should be true by default")
+	}
+}
+
+func TestNewErrorRecovery(t *testing.T) {
+	mockAg := &mockAgent{name: "test-agent"}
+	taskMgr := newTestManager(t)
+	cfg := newTestConfig()
+	l := NewLoop(mockAg, taskMgr, nil, cfg, "/tmp/project")
+
+	t.Run("with nil config uses defaults", func(t *testing.T) {
+		recovery := NewErrorRecovery(l, nil)
+		if recovery.config.MaxAgentRetries != 3 {
+			t.Errorf("MaxAgentRetries = %d, want 3", recovery.config.MaxAgentRetries)
+		}
+	})
+
+	t.Run("with custom config", func(t *testing.T) {
+		customCfg := &RecoveryConfig{
+			MaxAgentRetries: 5,
+			RetryBackoff:    10 * time.Second,
+			MaxRetryBackoff: 120 * time.Second,
+			EnableAutoFix:   false,
+		}
+		recovery := NewErrorRecovery(l, customCfg)
+		if recovery.config.MaxAgentRetries != 5 {
+			t.Errorf("MaxAgentRetries = %d, want 5", recovery.config.MaxAgentRetries)
+		}
+		if recovery.config.EnableAutoFix {
+			t.Error("EnableAutoFix should be false")
+		}
+	})
+}
+
+func TestLoop_SetRecoveryConfig(t *testing.T) {
+	mockAg := &mockAgent{name: "test-agent"}
+	taskMgr := newTestManager(t)
+	cfg := newTestConfig()
+	l := NewLoop(mockAg, taskMgr, nil, cfg, "/tmp/project")
+
+	customCfg := &RecoveryConfig{
+		MaxAgentRetries: 7,
+		EnableAutoFix:   false,
+	}
+	l.SetRecoveryConfig(customCfg)
+
+	if l.recovery.config.MaxAgentRetries != 7 {
+		t.Errorf("MaxAgentRetries = %d, want 7", l.recovery.config.MaxAgentRetries)
+	}
+}
+
+func TestRetryWithBackoff_Success(t *testing.T) {
+	mockAg := &mockAgent{name: "test-agent"}
+	taskMgr := newTestManager(t)
+	cfg := newTestConfig()
+	l := NewLoop(mockAg, taskMgr, nil, cfg, "/tmp/project")
+
+	recoveryCfg := &RecoveryConfig{
+		MaxAgentRetries: 3,
+		RetryBackoff:    10 * time.Millisecond,
+		MaxRetryBackoff: 50 * time.Millisecond,
+	}
+	recovery := NewErrorRecovery(l, recoveryCfg)
+
+	callCount := 0
+	err := recovery.RetryWithBackoff(context.Background(), "test-op", func() error {
+		callCount++
+		return nil
+	})
+
+	if err != nil {
+		t.Errorf("RetryWithBackoff() error = %v, want nil", err)
+	}
+	if callCount != 1 {
+		t.Errorf("function called %d times, want 1", callCount)
+	}
+}
+
+func TestRetryWithBackoff_RetryableError(t *testing.T) {
+	mockAg := &mockAgent{name: "test-agent"}
+	taskMgr := newTestManager(t)
+	cfg := newTestConfig()
+	l := NewLoop(mockAg, taskMgr, nil, cfg, "/tmp/project")
+
+	recoveryCfg := &RecoveryConfig{
+		MaxAgentRetries: 3,
+		RetryBackoff:    10 * time.Millisecond,
+		MaxRetryBackoff: 50 * time.Millisecond,
+	}
+	recovery := NewErrorRecovery(l, recoveryCfg)
+
+	callCount := 0
+	err := recovery.RetryWithBackoff(context.Background(), "test-op", func() error {
+		callCount++
+		if callCount < 3 {
+			return errors.New("connection timeout")
+		}
+		return nil
+	})
+
+	if err != nil {
+		t.Errorf("RetryWithBackoff() error = %v, want nil", err)
+	}
+	if callCount != 3 {
+		t.Errorf("function called %d times, want 3", callCount)
+	}
+}
+
+func TestRetryWithBackoff_MaxRetriesExceeded(t *testing.T) {
+	mockAg := &mockAgent{name: "test-agent"}
+	taskMgr := newTestManager(t)
+	cfg := newTestConfig()
+	l := NewLoop(mockAg, taskMgr, nil, cfg, "/tmp/project")
+
+	recoveryCfg := &RecoveryConfig{
+		MaxAgentRetries: 2,
+		RetryBackoff:    10 * time.Millisecond,
+		MaxRetryBackoff: 50 * time.Millisecond,
+	}
+	recovery := NewErrorRecovery(l, recoveryCfg)
+
+	callCount := 0
+	err := recovery.RetryWithBackoff(context.Background(), "test-op", func() error {
+		callCount++
+		return errors.New("connection timeout")
+	})
+
+	if err == nil {
+		t.Error("RetryWithBackoff() expected error, got nil")
+	}
+	if !contains(err.Error(), "max retries") {
+		t.Errorf("error = %v, should contain 'max retries'", err)
+	}
+	// Should be called MaxAgentRetries + 1 times (initial + retries)
+	if callCount != 3 {
+		t.Errorf("function called %d times, want 3", callCount)
+	}
+}
+
+func TestRetryWithBackoff_NonRetryableError(t *testing.T) {
+	mockAg := &mockAgent{name: "test-agent"}
+	taskMgr := newTestManager(t)
+	cfg := newTestConfig()
+	l := NewLoop(mockAg, taskMgr, nil, cfg, "/tmp/project")
+
+	recoveryCfg := &RecoveryConfig{
+		MaxAgentRetries: 3,
+		RetryBackoff:    10 * time.Millisecond,
+		MaxRetryBackoff: 50 * time.Millisecond,
+	}
+	recovery := NewErrorRecovery(l, recoveryCfg)
+
+	callCount := 0
+	err := recovery.RetryWithBackoff(context.Background(), "test-op", func() error {
+		callCount++
+		return errors.New("file not found")
+	})
+
+	if err == nil {
+		t.Error("RetryWithBackoff() expected error, got nil")
+	}
+	// Non-retryable errors should not be retried
+	if callCount != 1 {
+		t.Errorf("function called %d times, want 1 (non-retryable)", callCount)
+	}
+}
+
+func TestRetryWithBackoff_ContextCancellation(t *testing.T) {
+	mockAg := &mockAgent{name: "test-agent"}
+	taskMgr := newTestManager(t)
+	cfg := newTestConfig()
+	l := NewLoop(mockAg, taskMgr, nil, cfg, "/tmp/project")
+
+	recoveryCfg := &RecoveryConfig{
+		MaxAgentRetries: 3,
+		RetryBackoff:    100 * time.Millisecond, // Longer backoff
+		MaxRetryBackoff: 500 * time.Millisecond,
+	}
+	recovery := NewErrorRecovery(l, recoveryCfg)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	callCount := 0
+
+	// Start retry in goroutine
+	errChan := make(chan error, 1)
+	go func() {
+		err := recovery.RetryWithBackoff(ctx, "test-op", func() error {
+			callCount++
+			return errors.New("timeout")
+		})
+		errChan <- err
+	}()
+
+	// Wait for first call, then cancel
+	time.Sleep(50 * time.Millisecond)
+	cancel()
+
+	err := <-errChan
+	if err != context.Canceled {
+		t.Errorf("RetryWithBackoff() error = %v, want context.Canceled", err)
+	}
+}
+
+// ============================================
+// Fix Prompt Builder Tests
+// ============================================
+
+func TestFixPromptBuilder_BuildBuildFixPrompt(t *testing.T) {
+	builder := NewFixPromptBuilder("/tmp/project")
+	tsk := task.NewTask("TEST-001", "Test Task", "Test description")
+
+	t.Run("with build errors", func(t *testing.T) {
+		result := &build.BuildResult{
+			Success: false,
+			Errors: []build.BuildError{
+				{
+					File:    "main.go",
+					Line:    10,
+					Message: "undefined: foo",
+				},
+				{
+					File:    "util.go",
+					Line:    25,
+					Message: "syntax error",
+				},
+			},
+		}
+
+		prompt := builder.BuildBuildFixPrompt(tsk, result)
+
+		if !contains(prompt, "Build Fix Required") {
+			t.Error("missing 'Build Fix Required' header")
+		}
+		if !contains(prompt, "TEST-001") {
+			t.Error("missing task ID")
+		}
+		if !contains(prompt, "main.go:10") {
+			t.Error("missing first error file:line")
+		}
+		if !contains(prompt, "undefined: foo") {
+			t.Error("missing first error message")
+		}
+		if !contains(prompt, "util.go:25") {
+			t.Error("missing second error file:line")
+		}
+		if !contains(prompt, "Report FIXED when done") {
+			t.Error("missing instruction to report FIXED")
+		}
+	})
+
+	t.Run("without parsed errors", func(t *testing.T) {
+		result := &build.BuildResult{
+			Success: false,
+			Output:  "build failed: some error",
+			Errors:  []build.BuildError{},
+		}
+
+		prompt := builder.BuildBuildFixPrompt(tsk, result)
+
+		if !contains(prompt, "Build command failed") {
+			t.Error("missing 'Build command failed' section")
+		}
+		if !contains(prompt, "build failed: some error") {
+			t.Error("missing raw output")
+		}
+	})
+}
+
+func TestFixPromptBuilder_BuildTestFixPrompt(t *testing.T) {
+	builder := NewFixPromptBuilder("/tmp/project")
+	tsk := task.NewTask("TEST-002", "Test Task", "Test description")
+
+	t.Run("with test failures", func(t *testing.T) {
+		result := &build.TestResult{
+			Success: false,
+			Failures: []build.TestFailure{
+				{
+					TestName: "TestFoo",
+					Package:  "pkg/foo",
+					File:     "foo_test.go",
+					Line:     42,
+					Message:  "expected true, got false",
+				},
+				{
+					TestName: "TestBar",
+					Package:  "pkg/bar",
+					Message:  "assertion failed",
+				},
+			},
+		}
+
+		prompt := builder.BuildTestFixPrompt(tsk, result)
+
+		if !contains(prompt, "Test Fix Required") {
+			t.Error("missing 'Test Fix Required' header")
+		}
+		if !contains(prompt, "TEST-002") {
+			t.Error("missing task ID")
+		}
+		if !contains(prompt, "### TestFoo") {
+			t.Error("missing first test name")
+		}
+		if !contains(prompt, "Package: `pkg/foo`") {
+			t.Error("missing first package")
+		}
+		if !contains(prompt, "foo_test.go:42") {
+			t.Error("missing first test location")
+		}
+		if !contains(prompt, "expected true, got false") {
+			t.Error("missing first error message")
+		}
+		if !contains(prompt, "### TestBar") {
+			t.Error("missing second test name")
+		}
+	})
+
+	t.Run("with unknown test name", func(t *testing.T) {
+		result := &build.TestResult{
+			Success: false,
+			Failures: []build.TestFailure{
+				{
+					Message: "some failure",
+				},
+			},
+		}
+
+		prompt := builder.BuildTestFixPrompt(tsk, result)
+
+		if !contains(prompt, "Unknown test") {
+			t.Error("missing 'Unknown test' fallback for empty test name")
+		}
+	})
+
+	t.Run("without parsed failures", func(t *testing.T) {
+		result := &build.TestResult{
+			Success:  false,
+			Output:   "FAIL: tests failed with some error",
+			Failures: []build.TestFailure{},
+		}
+
+		prompt := builder.BuildTestFixPrompt(tsk, result)
+
+		if !contains(prompt, "Test command failed") {
+			t.Error("missing 'Test command failed' section")
+		}
+		if !contains(prompt, "FAIL: tests failed") {
+			t.Error("missing raw output")
+		}
+	})
+
+	t.Run("long output is truncated", func(t *testing.T) {
+		// Create output longer than 500 chars
+		longOutput := make([]byte, 600)
+		for i := range longOutput {
+			longOutput[i] = 'x'
+		}
+
+		result := &build.TestResult{
+			Success:  false,
+			Output:   string(longOutput),
+			Failures: []build.TestFailure{},
+		}
+
+		prompt := builder.BuildTestFixPrompt(tsk, result)
+
+		if !contains(prompt, "...") {
+			t.Error("long output should be truncated with ...")
+		}
+	})
+}
+
+func TestFixPromptBuilder_BuildVerificationFixPrompt(t *testing.T) {
+	builder := NewFixPromptBuilder("/tmp/project")
+	tsk := task.NewTask("TEST-003", "Test Task", "Test description")
+
+	t.Run("build failure uses build fix prompt", func(t *testing.T) {
+		gateResult := &build.GateResult{
+			BuildResult: &build.BuildResult{
+				Success: false,
+				Errors:  []build.BuildError{{File: "main.go", Message: "error"}},
+			},
+			Reason: "build failed",
+		}
+
+		prompt := builder.BuildVerificationFixPrompt(tsk, gateResult)
+
+		if !contains(prompt, "Build Fix Required") {
+			t.Error("should use build fix prompt for build failures")
+		}
+	})
+
+	t.Run("test failure uses test fix prompt", func(t *testing.T) {
+		gateResult := &build.GateResult{
+			BuildResult: &build.BuildResult{Success: true},
+			TestResult: &build.TestResult{
+				Success:  false,
+				Failures: []build.TestFailure{{TestName: "TestFoo"}},
+			},
+			Reason: "tests failed",
+		}
+
+		prompt := builder.BuildVerificationFixPrompt(tsk, gateResult)
+
+		if !contains(prompt, "Test Fix Required") {
+			t.Error("should use test fix prompt for test failures")
+		}
+	})
+
+	t.Run("generic failure", func(t *testing.T) {
+		gateResult := &build.GateResult{
+			BuildResult: &build.BuildResult{Success: true},
+			TestResult:  &build.TestResult{Success: true},
+			Reason:      "TDD regression detected",
+		}
+
+		prompt := builder.BuildVerificationFixPrompt(tsk, gateResult)
+
+		if !contains(prompt, "Verification Fix Required") {
+			t.Error("should use generic verification prompt")
+		}
+		if !contains(prompt, "TDD regression detected") {
+			t.Error("should include reason")
+		}
+	})
+}

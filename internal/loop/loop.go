@@ -106,6 +106,9 @@ type Loop struct {
 	persistence *StatePersistence
 	projectDir  string
 
+	// Error recovery
+	recovery *ErrorRecovery
+
 	// Options
 	opts *Options
 }
@@ -118,7 +121,7 @@ func NewLoop(
 	cfg *config.Config,
 	projectDir string,
 ) *Loop {
-	return &Loop{
+	l := &Loop{
 		agent:        ag,
 		taskManager:  taskMgr,
 		hookManager:  hookMgr,
@@ -129,6 +132,9 @@ func NewLoop(
 		gitOps:       NewGitOperations(projectDir, cfg.Git),
 		opts:         DefaultOptions(),
 	}
+	// Initialize error recovery with default config
+	l.recovery = NewErrorRecovery(l, nil)
+	return l
 }
 
 // SetOptions sets the loop options.
@@ -136,6 +142,11 @@ func (l *Loop) SetOptions(opts *Options) {
 	if opts != nil {
 		l.opts = opts
 	}
+}
+
+// SetRecoveryConfig sets the error recovery configuration.
+func (l *Loop) SetRecoveryConfig(cfg *RecoveryConfig) {
+	l.recovery = NewErrorRecovery(l, cfg)
 }
 
 // SetAnalysis sets a pre-computed project analysis (skips analysis phase).
@@ -171,6 +182,12 @@ func (l *Loop) emit(eventType EventType, taskID, taskName string, iteration int,
 // 3. For each task: pre-hooks → agent → verify → post-hooks → state update
 // 4. Handle errors, pauses, and completions
 func (l *Loop) Run(ctx context.Context, sessionID string) error {
+	// Setup signal handler for graceful shutdown
+	if l.recovery != nil {
+		cleanup := l.recovery.SetupSignalHandler()
+		defer cleanup()
+	}
+
 	// Initialize context
 	l.context = NewLoopContext(sessionID, l.projectDir, l.agent.Name())
 	l.context.MaxFixAttempts = l.opts.MaxFixAttempts
@@ -340,13 +357,33 @@ func (l *Loop) runTask(ctx context.Context, t *task.Task) (*agent.Result, error)
 
 		// Phase 3: Verification
 		if result.Status.IsSuccess() {
-			passed, err := l.runVerification(ctx, t)
+			passed, gateResult, err := l.runVerification(ctx, t)
 			if err != nil {
 				return lastResult, fmt.Errorf("verification error: %w", err)
 			}
 			if !passed {
-				// Verification failed, but we might retry
-				if iteration < l.opts.MaxIterationsPerTask && l.context.CanAttemptFix() {
+				// Verification failed - attempt auto-fix if enabled
+				if l.recovery != nil && l.recovery.config.EnableAutoFix &&
+					iteration < l.opts.MaxIterationsPerTask && l.context.CanAttemptFix() {
+
+					// Transition to awaiting fix state and increment fix attempts
+					_ = l.context.Transition(StateAwaitingFix)
+
+					// Run auto-fix attempt
+					fixResult, fixErr := l.runAutoFix(ctx, t, gateResult, iteration)
+					if fixErr != nil {
+						l.emit(EventError, t.ID, t.Name, iteration, "Auto-fix failed", fixErr)
+						// Continue to next iteration anyway
+					} else if fixResult != nil && fixResult.Status == agent.TaskStatusFixed {
+						// Fix was successful, update lastResult and continue to verify again
+						lastResult = fixResult
+						// Transition back to running
+						_ = l.context.Transition(StateRunning)
+						continue
+					}
+
+					// Transition back to running for next iteration
+					_ = l.context.Transition(StateRunning)
 					l.emit(EventVerifyFailed, t.ID, t.Name, iteration, "Verification failed, will retry", nil)
 					continue // Retry
 				}
@@ -391,7 +428,7 @@ func (l *Loop) runTask(ctx context.Context, t *task.Task) (*agent.Result, error)
 	return lastResult, fmt.Errorf("maximum iterations (%d) reached", l.opts.MaxIterationsPerTask)
 }
 
-// runAgentForTask runs the agent with the task prompt.
+// runAgentForTask runs the agent with the task prompt, including retry logic.
 func (l *Loop) runAgentForTask(ctx context.Context, t *task.Task, iteration int) (agent.Result, error) {
 	// Build prompt
 	taskPrompt, err := l.buildTaskPrompt(t, iteration)
@@ -411,13 +448,36 @@ func (l *Loop) runAgentForTask(ctx context.Context, t *task.Task, iteration int)
 	// Check if this is a continuation
 	if iteration > 1 && t.SessionID != "" {
 		l.context.SetAgentSession(t.SessionID)
-		return l.agent.Continue(ctx, t.SessionID, taskPrompt, opts)
+		return l.runAgentWithRetry(ctx, t.SessionID, taskPrompt, opts, true)
 	}
 
-	// New run
-	result, err := l.agent.Run(ctx, taskPrompt, opts)
+	// New run with retry
+	return l.runAgentWithRetry(ctx, "", taskPrompt, opts, false)
+}
+
+// runAgentWithRetry executes agent with retry logic for transient failures.
+func (l *Loop) runAgentWithRetry(ctx context.Context, sessionID, prompt string, opts agent.RunOptions, isContinue bool) (agent.Result, error) {
+	if l.recovery == nil {
+		// No recovery configured, run directly
+		if isContinue {
+			return l.agent.Continue(ctx, sessionID, prompt, opts)
+		}
+		return l.agent.Run(ctx, prompt, opts)
+	}
+
+	var result agent.Result
+	err := l.recovery.RetryWithBackoff(ctx, "agent execution", func() error {
+		var runErr error
+		if isContinue {
+			result, runErr = l.agent.Continue(ctx, sessionID, prompt, opts)
+		} else {
+			result, runErr = l.agent.Run(ctx, prompt, opts)
+		}
+		return runErr
+	})
+
 	if err != nil {
-		return agent.Result{}, err
+		return result, err
 	}
 
 	// Save session ID for potential continuation
@@ -531,7 +591,8 @@ func (l *Loop) buildTaskContent(t *task.Task, iteration int) string {
 }
 
 // runVerification runs build and test verification gates.
-func (l *Loop) runVerification(ctx context.Context, t *task.Task) (bool, error) {
+// Returns (passed, gateResult, error) where gateResult is used for fix prompts.
+func (l *Loop) runVerification(ctx context.Context, t *task.Task) (bool, *build.GateResult, error) {
 	l.emit(EventVerifyStarted, t.ID, t.Name, l.context.CurrentIteration, "Running verification", nil)
 
 	gate := build.NewVerificationGate(l.projectDir, l.config.Build, l.config.Test, l.analysis)
@@ -539,16 +600,16 @@ func (l *Loop) runVerification(ctx context.Context, t *task.Task) (bool, error) 
 
 	result, err := gate.Verify(ctx, t)
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
 
 	if result.Passed() {
 		l.emit(EventVerifyPassed, t.ID, t.Name, l.context.CurrentIteration, result.Reason, nil)
-		return true, nil
+		return true, result, nil
 	}
 
 	l.emit(EventVerifyFailed, t.ID, t.Name, l.context.CurrentIteration, result.Reason, nil)
-	return false, nil
+	return false, result, nil
 }
 
 // handleTaskResult processes the result of a task execution.
@@ -665,5 +726,46 @@ func truncateOutput(output string) string {
 		return output
 	}
 	return "..." + output[len(output)-maxLen:]
+}
+
+// runAutoFix runs an automatic fix attempt for verification failures.
+// It builds a fix prompt with failure details and asks the agent to fix the issues.
+func (l *Loop) runAutoFix(ctx context.Context, t *task.Task, gateResult *build.GateResult, iteration int) (*agent.Result, error) {
+	if gateResult == nil {
+		return nil, fmt.Errorf("no gate result for fix prompt")
+	}
+
+	// Build fix prompt
+	fixBuilder := NewFixPromptBuilder(l.projectDir)
+	fixPrompt := fixBuilder.BuildVerificationFixPrompt(t, gateResult)
+
+	l.emit(EventIterationStarted, t.ID, t.Name, iteration,
+		fmt.Sprintf("Auto-fix attempt %d for verification failure", l.context.FixAttempts), nil)
+
+	// Configure agent options
+	opts := agent.RunOptions{
+		Model:     l.config.Agent.Model,
+		WorkDir:   l.projectDir,
+		Timeout:   l.config.Timeout.Active,
+		Force:     true,
+		LogWriter: l.opts.LogWriter,
+	}
+
+	// Use session continuation if available
+	if t.SessionID != "" {
+		result, err := l.runAgentWithRetry(ctx, t.SessionID, fixPrompt, opts, true)
+		if err != nil {
+			return nil, err
+		}
+		return &result, nil
+	}
+
+	// New run
+	result, err := l.runAgentWithRetry(ctx, "", fixPrompt, opts, false)
+	if err != nil {
+		return nil, err
+	}
+
+	return &result, nil
 }
 
