@@ -330,3 +330,372 @@ func containsAll(s string, substrs ...string) bool {
 	return true
 }
 
+// TEST-001: Additional comprehensive tests for configuration
+
+func TestConfig_Validate_CustomAgentMissingName(t *testing.T) {
+	cfg := &Config{
+		Agent: AgentConfig{
+			Custom: []CustomAgentConfig{
+				{
+					Name:    "", // Missing name
+					Command: "my-agent",
+				},
+			},
+		},
+	}
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("expected validation error for missing agent name")
+	}
+	expected := "agent.custom[0].name: is required"
+	if err.Error() != expected {
+		t.Errorf("expected error %q, got %q", expected, err.Error())
+	}
+}
+
+func TestConfig_Validate_CustomAgentMissingCommand(t *testing.T) {
+	cfg := &Config{
+		Agent: AgentConfig{
+			Custom: []CustomAgentConfig{
+				{
+					Name:    "my-agent",
+					Command: "", // Missing command
+				},
+			},
+		},
+	}
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("expected validation error for missing agent command")
+	}
+	expected := "agent.custom[0].command: is required"
+	if err.Error() != expected {
+		t.Errorf("expected error %q, got %q", expected, err.Error())
+	}
+}
+
+func TestConfig_Validate_CustomAgentInvalidDetectionMethod(t *testing.T) {
+	cfg := &Config{
+		Agent: AgentConfig{
+			Custom: []CustomAgentConfig{
+				{
+					Name:            "my-agent",
+					Command:         "my-agent",
+					DetectionMethod: "invalid",
+				},
+			},
+		},
+	}
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("expected validation error for invalid detection method")
+	}
+	expected := "agent.custom[0].detection_method: must be 'command', 'path', 'env', or 'always'"
+	if err.Error() != expected {
+		t.Errorf("expected error %q, got %q", expected, err.Error())
+	}
+}
+
+func TestConfig_Validate_CustomAgentValidDetectionMethods(t *testing.T) {
+	methods := []DetectionMethod{
+		DetectionMethodCommand,
+		DetectionMethodPath,
+		DetectionMethodEnv,
+		DetectionMethodAlways,
+	}
+
+	for _, method := range methods {
+		t.Run(string(method), func(t *testing.T) {
+			cfg := &Config{
+				Agent: AgentConfig{
+					Custom: []CustomAgentConfig{
+						{
+							Name:            "my-agent",
+							Command:         "my-agent",
+							DetectionMethod: method,
+						},
+					},
+				},
+			}
+
+			err := cfg.Validate()
+			if err != nil {
+				t.Errorf("expected valid config for detection method %q, got error: %v", method, err)
+			}
+		})
+	}
+}
+
+func TestConfig_Validate_ValidHookTypes(t *testing.T) {
+	hookTypes := []HookType{
+		HookTypeShell,
+		HookTypeAgent,
+	}
+
+	for _, ht := range hookTypes {
+		t.Run(string(ht), func(t *testing.T) {
+			cfg := &Config{
+				Hooks: HooksConfig{
+					PreTask: []HookDefinition{
+						{Type: ht, Command: "echo test"},
+					},
+				},
+			}
+
+			err := cfg.Validate()
+			if err != nil {
+				t.Errorf("expected valid config for hook type %q, got error: %v", ht, err)
+			}
+		})
+	}
+}
+
+func TestConfig_Validate_ValidFailureModes(t *testing.T) {
+	modes := []FailureMode{
+		FailureModeSkipTask,
+		FailureModeWarnContinue,
+		FailureModeAbortLoop,
+		FailureModeAskAgent,
+	}
+
+	for _, mode := range modes {
+		t.Run(string(mode), func(t *testing.T) {
+			cfg := &Config{
+				Hooks: HooksConfig{
+					PostTask: []HookDefinition{
+						{Type: HookTypeShell, Command: "echo test", OnFailure: mode},
+					},
+				},
+			}
+
+			err := cfg.Validate()
+			if err != nil {
+				t.Errorf("expected valid config for failure mode %q, got error: %v", mode, err)
+			}
+		})
+	}
+}
+
+func TestConfig_Validate_ValidBootstrapDetectionModes(t *testing.T) {
+	modes := []BootstrapDetection{
+		BootstrapDetectionAuto,
+		BootstrapDetectionManual,
+		BootstrapDetectionDisabled,
+	}
+
+	for _, mode := range modes {
+		t.Run(string(mode), func(t *testing.T) {
+			cfg := &Config{
+				Build: BuildConfig{
+					BootstrapDetection: mode,
+				},
+			}
+
+			err := cfg.Validate()
+			if err != nil {
+				t.Errorf("expected valid config for bootstrap detection %q, got error: %v", mode, err)
+			}
+		})
+	}
+}
+
+func TestConfig_Validate_ValidTestModes(t *testing.T) {
+	modes := []TestMode{
+		TestModeGate,
+		TestModeTDD,
+		TestModeReport,
+	}
+
+	for _, mode := range modes {
+		t.Run(string(mode), func(t *testing.T) {
+			cfg := &Config{
+				Test: TestConfig{
+					Mode: mode,
+				},
+			}
+
+			err := cfg.Validate()
+			if err != nil {
+				t.Errorf("expected valid config for test mode %q, got error: %v", mode, err)
+			}
+		})
+	}
+}
+
+func TestConfig_Validate_ValidBaselineScopes(t *testing.T) {
+	scopes := []BaselineScope{
+		BaselineScopeGlobal,
+		BaselineScopeSession,
+		BaselineScopeTask,
+	}
+
+	for _, scope := range scopes {
+		t.Run(string(scope), func(t *testing.T) {
+			cfg := &Config{
+				Test: TestConfig{
+					BaselineScope: scope,
+				},
+			}
+
+			err := cfg.Validate()
+			if err != nil {
+				t.Errorf("expected valid config for baseline scope %q, got error: %v", scope, err)
+			}
+		})
+	}
+}
+
+func TestConfig_Validate_MultipleCustomAgents(t *testing.T) {
+	cfg := &Config{
+		Agent: AgentConfig{
+			Custom: []CustomAgentConfig{
+				{Name: "agent1", Command: "agent1-cmd"},
+				{Name: "", Command: "agent2-cmd"}, // Missing name
+				{Name: "agent3", Command: ""},     // Missing command
+			},
+		},
+	}
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("expected validation error for invalid custom agents")
+	}
+
+	// Validation catches all errors, so both missing name and missing command should be reported
+	verrs, ok := err.(ValidationErrors)
+	if !ok {
+		t.Fatalf("expected ValidationErrors, got %T", err)
+	}
+	if len(verrs) != 2 {
+		t.Errorf("expected 2 validation errors, got %d", len(verrs))
+	}
+
+	// Verify both errors are present
+	errStr := err.Error()
+	if !containsAll(errStr, "agent.custom[1].name: is required", "agent.custom[2].command: is required") {
+		t.Errorf("expected both validation errors in message, got %q", errStr)
+	}
+}
+
+func TestConfig_Validate_PostTaskHookInvalidFailureMode(t *testing.T) {
+	cfg := &Config{
+		Hooks: HooksConfig{
+			PostTask: []HookDefinition{
+				{Type: HookTypeShell, Command: "echo 1"},
+				{Type: HookTypeShell, Command: "echo 2", OnFailure: "invalid"},
+			},
+		},
+	}
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("expected validation error")
+	}
+	expected := "hooks.post_task[1].on_failure: must be 'skip_task', 'warn_continue', 'abort_loop', or 'ask_agent'"
+	if err.Error() != expected {
+		t.Errorf("expected error %q, got %q", expected, err.Error())
+	}
+}
+
+func TestConfig_ApplyDefaults_ZeroValues(t *testing.T) {
+	// Test that ApplyDefaults doesn't override with zero values when already set
+	cfg := &Config{
+		Timeout: TimeoutConfig{
+			Active: 0, // Should get default
+			Stuck:  0, // Should get default
+		},
+		Git: GitConfig{
+			CommitPrefix: "", // Should get default
+		},
+		Build: BuildConfig{
+			BootstrapDetection: "", // Should get default
+		},
+		Test: TestConfig{
+			Mode:          "", // Should get default
+			BaselineFile:  "", // Should get default
+			BaselineScope: "", // Should get default
+		},
+	}
+
+	cfg.ApplyDefaults()
+
+	if cfg.Timeout.Active != DefaultActiveTimeout {
+		t.Errorf("expected Active timeout %v, got %v", DefaultActiveTimeout, cfg.Timeout.Active)
+	}
+	if cfg.Timeout.Stuck != DefaultStuckTimeout {
+		t.Errorf("expected Stuck timeout %v, got %v", DefaultStuckTimeout, cfg.Timeout.Stuck)
+	}
+	if cfg.Git.CommitPrefix != DefaultCommitPrefix {
+		t.Errorf("expected CommitPrefix %q, got %q", DefaultCommitPrefix, cfg.Git.CommitPrefix)
+	}
+	if cfg.Build.BootstrapDetection != BootstrapDetectionAuto {
+		t.Errorf("expected BootstrapDetection %q, got %q", BootstrapDetectionAuto, cfg.Build.BootstrapDetection)
+	}
+	if cfg.Test.Mode != TestModeGate {
+		t.Errorf("expected Test.Mode %q, got %q", TestModeGate, cfg.Test.Mode)
+	}
+	if cfg.Test.BaselineFile != DefaultBaselineFile {
+		t.Errorf("expected BaselineFile %q, got %q", DefaultBaselineFile, cfg.Test.BaselineFile)
+	}
+	if cfg.Test.BaselineScope != BaselineScopeGlobal {
+		t.Errorf("expected BaselineScope %q, got %q", BaselineScopeGlobal, cfg.Test.BaselineScope)
+	}
+}
+
+func TestConfig_Validate_ZeroTimeoutsAreValid(t *testing.T) {
+	// Zero timeouts should be valid (they will get defaults applied)
+	cfg := &Config{
+		Timeout: TimeoutConfig{
+			Active: 0,
+			Stuck:  0,
+		},
+	}
+
+	err := cfg.Validate()
+	if err != nil {
+		t.Errorf("expected zero timeouts to be valid, got error: %v", err)
+	}
+}
+
+func TestConfig_Validate_EqualTimeoutsAreValid(t *testing.T) {
+	// Equal timeouts should be valid
+	cfg := &Config{
+		Timeout: TimeoutConfig{
+			Active: 30 * time.Minute,
+			Stuck:  30 * time.Minute,
+		},
+	}
+
+	err := cfg.Validate()
+	if err != nil {
+		t.Errorf("expected equal timeouts to be valid, got error: %v", err)
+	}
+}
+
+func TestConfig_Validate_EmptyConfig(t *testing.T) {
+	// Completely empty config should be valid (will get defaults)
+	cfg := &Config{}
+
+	err := cfg.Validate()
+	if err != nil {
+		t.Errorf("expected empty config to be valid, got error: %v", err)
+	}
+}
+
+func TestConfig_Validate_EmptyHooks(t *testing.T) {
+	cfg := &Config{
+		Hooks: HooksConfig{
+			PreTask:  []HookDefinition{},
+			PostTask: []HookDefinition{},
+		},
+	}
+
+	err := cfg.Validate()
+	if err != nil {
+		t.Errorf("expected config with empty hooks to be valid, got error: %v", err)
+	}
+}
+

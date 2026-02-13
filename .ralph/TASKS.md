@@ -383,10 +383,17 @@
 > **Note**: Unit tests are written alongside each task (per base_prompt.txt Phase 4).
 > This phase adds **comprehensive integration tests** and improves coverage.
 
-- [ ] TEST-001: Add unit tests for configuration
+- [x] TEST-001: Add unit tests for configuration
   > Goal: Test config loading, validation, defaults
   > Test environment variable overrides
   > Test timeout configuration
+  > **Completed:** Added comprehensive tests to config_test.go and loader_test.go:
+  > - Custom agent validation (missing name, missing command, invalid detection method)
+  > - All valid enum values (DetectionMethod, HookType, FailureMode, BootstrapDetection, TestMode, BaselineScope)
+  > - Save function tests (basic, nested directories, with hooks, with custom agents)
+  > - Environment variable overrides for all settings (build, test, git)
+  > - Edge cases (empty config, partial config, zero timeouts)
+  > - Total: 131 test cases in config package
 
 - [ ] TEST-002: Add unit tests for task management
   > Goal: Test JSON storage read/write

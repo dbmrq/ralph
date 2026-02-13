@@ -430,3 +430,530 @@ hooks:
 	}
 }
 
+// TEST-001: Additional comprehensive tests for configuration loading
+
+func TestLoad_CustomAgents(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	configContent := `
+agent:
+  default: my-custom-agent
+  custom:
+    - name: my-custom-agent
+      description: "A custom agent for testing"
+      command: my-agent-cli
+      detection_method: command
+      detection_value: my-agent-cli
+      model_list_command: "my-agent-cli models"
+      default_model: gpt-4
+      args:
+        - "--verbose"
+        - "--format=json"
+`
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+
+	cfg, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	if len(cfg.Agent.Custom) != 1 {
+		t.Fatalf("expected 1 custom agent, got %d", len(cfg.Agent.Custom))
+	}
+
+	agent := cfg.Agent.Custom[0]
+	if agent.Name != "my-custom-agent" {
+		t.Errorf("expected name 'my-custom-agent', got %q", agent.Name)
+	}
+	if agent.Description != "A custom agent for testing" {
+		t.Errorf("expected description 'A custom agent for testing', got %q", agent.Description)
+	}
+	if agent.Command != "my-agent-cli" {
+		t.Errorf("expected command 'my-agent-cli', got %q", agent.Command)
+	}
+	if agent.DetectionMethod != DetectionMethodCommand {
+		t.Errorf("expected detection_method 'command', got %q", agent.DetectionMethod)
+	}
+	if agent.DetectionValue != "my-agent-cli" {
+		t.Errorf("expected detection_value 'my-agent-cli', got %q", agent.DetectionValue)
+	}
+	if agent.ModelListCommand != "my-agent-cli models" {
+		t.Errorf("expected model_list_command 'my-agent-cli models', got %q", agent.ModelListCommand)
+	}
+	if agent.DefaultModel != "gpt-4" {
+		t.Errorf("expected default_model 'gpt-4', got %q", agent.DefaultModel)
+	}
+	if len(agent.Args) != 2 {
+		t.Fatalf("expected 2 args, got %d", len(agent.Args))
+	}
+	if agent.Args[0] != "--verbose" || agent.Args[1] != "--format=json" {
+		t.Errorf("unexpected args: %v", agent.Args)
+	}
+}
+
+func TestLoad_EnvOverrides_BuildAndTestSettings(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	configContent := `
+agent:
+  default: cursor
+build:
+  command: "make build"
+  bootstrap_detection: auto
+test:
+  command: "make test"
+  baseline_file: .ralph/baseline.json
+  baseline_scope: global
+`
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+
+	// Set environment variables to override
+	envVars := map[string]string{
+		"RALPH_BUILD_COMMAND":             "go build ./...",
+		"RALPH_BUILD_BOOTSTRAP_DETECTION": "disabled",
+		"RALPH_BUILD_BOOTSTRAP_CHECK":     "test -f go.mod",
+		"RALPH_TEST_COMMAND":              "go test ./...",
+		"RALPH_TEST_BASELINE_FILE":        ".ralph/my_baseline.json",
+		"RALPH_TEST_BASELINE_SCOPE":       "session",
+	}
+
+	for k, v := range envVars {
+		os.Setenv(k, v)
+	}
+	defer func() {
+		for k := range envVars {
+			os.Unsetenv(k)
+		}
+	}()
+
+	cfg, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	// Verify build settings from environment
+	if cfg.Build.Command != "go build ./..." {
+		t.Errorf("expected build.command 'go build ./...' from env, got %q", cfg.Build.Command)
+	}
+	if cfg.Build.BootstrapDetection != BootstrapDetectionDisabled {
+		t.Errorf("expected build.bootstrap_detection 'disabled' from env, got %q", cfg.Build.BootstrapDetection)
+	}
+	if cfg.Build.BootstrapCheck != "test -f go.mod" {
+		t.Errorf("expected build.bootstrap_check 'test -f go.mod' from env, got %q", cfg.Build.BootstrapCheck)
+	}
+
+	// Verify test settings from environment
+	if cfg.Test.Command != "go test ./..." {
+		t.Errorf("expected test.command 'go test ./...' from env, got %q", cfg.Test.Command)
+	}
+	if cfg.Test.BaselineFile != ".ralph/my_baseline.json" {
+		t.Errorf("expected test.baseline_file '.ralph/my_baseline.json' from env, got %q", cfg.Test.BaselineFile)
+	}
+	if cfg.Test.BaselineScope != BaselineScopeSession {
+		t.Errorf("expected test.baseline_scope 'session' from env, got %q", cfg.Test.BaselineScope)
+	}
+}
+
+func TestLoad_EnvOverrides_GitCommitPrefix(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	configContent := `
+agent:
+  default: cursor
+git:
+  commit_prefix: "[original]"
+`
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+
+	os.Setenv("RALPH_GIT_COMMIT_PREFIX", "[overridden]")
+	defer os.Unsetenv("RALPH_GIT_COMMIT_PREFIX")
+
+	cfg, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	if cfg.Git.CommitPrefix != "[overridden]" {
+		t.Errorf("expected git.commit_prefix '[overridden]' from env, got %q", cfg.Git.CommitPrefix)
+	}
+}
+
+func TestLoad_EnvOverrides_DurationParsing(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	configContent := `
+agent:
+  default: cursor
+timeout:
+  active: 1h
+  stuck: 15m
+`
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+
+	// Set valid duration in env - should override file values
+	os.Setenv("RALPH_TIMEOUT_ACTIVE", "4h")
+	os.Setenv("RALPH_TIMEOUT_STUCK", "20m")
+	defer func() {
+		os.Unsetenv("RALPH_TIMEOUT_ACTIVE")
+		os.Unsetenv("RALPH_TIMEOUT_STUCK")
+	}()
+
+	cfg, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	// Environment values should override file values
+	if cfg.Timeout.Active != 4*time.Hour {
+		t.Errorf("expected timeout.active 4h from env, got %v", cfg.Timeout.Active)
+	}
+	if cfg.Timeout.Stuck != 20*time.Minute {
+		t.Errorf("expected timeout.stuck 20m from env, got %v", cfg.Timeout.Stuck)
+	}
+}
+
+func TestSave_BasicConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	cfg := &Config{
+		Agent: AgentConfig{
+			Default: "cursor",
+			Model:   "claude-opus",
+		},
+		Timeout: TimeoutConfig{
+			Active: 2 * time.Hour,
+			Stuck:  30 * time.Minute,
+		},
+		Git: GitConfig{
+			AutoCommit:   true,
+			CommitPrefix: "[ralph]",
+			Push:         false,
+		},
+	}
+
+	err := Save(cfg, configPath)
+	if err != nil {
+		t.Fatalf("failed to save config: %v", err)
+	}
+
+	// Verify file was created
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		t.Fatal("config file was not created")
+	}
+
+	// Load the saved config and verify
+	loadedCfg, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("failed to load saved config: %v", err)
+	}
+
+	if loadedCfg.Agent.Default != "cursor" {
+		t.Errorf("expected agent.default 'cursor', got %q", loadedCfg.Agent.Default)
+	}
+	if loadedCfg.Agent.Model != "claude-opus" {
+		t.Errorf("expected agent.model 'claude-opus', got %q", loadedCfg.Agent.Model)
+	}
+}
+
+func TestSave_CreatesParentDirectory(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "nested", "dir", "config.yaml")
+
+	cfg := NewConfig()
+	cfg.Agent.Default = "auggie"
+
+	err := Save(cfg, configPath)
+	if err != nil {
+		t.Fatalf("failed to save config: %v", err)
+	}
+
+	// Verify parent directories were created
+	if _, err := os.Stat(filepath.Dir(configPath)); os.IsNotExist(err) {
+		t.Fatal("parent directory was not created")
+	}
+
+	// Verify file was created
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		t.Fatal("config file was not created")
+	}
+}
+
+func TestSave_DefaultPath(t *testing.T) {
+	// Save to current directory's .ralph/config.yaml
+	tmpDir := t.TempDir()
+	originalWd, _ := os.Getwd()
+	defer os.Chdir(originalWd)
+	os.Chdir(tmpDir)
+
+	cfg := NewConfig()
+	cfg.Agent.Default = "test-agent"
+
+	err := Save(cfg, "")
+	if err != nil {
+		t.Fatalf("failed to save config with default path: %v", err)
+	}
+
+	// Verify file was created at default path
+	if _, err := os.Stat(DefaultConfigPath); os.IsNotExist(err) {
+		t.Fatal("config file was not created at default path")
+	}
+}
+
+func TestSave_WithHooks(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	cfg := &Config{
+		Agent: AgentConfig{Default: "cursor"},
+		Hooks: HooksConfig{
+			PreTask: []HookDefinition{
+				{Type: HookTypeShell, Command: "echo pre", OnFailure: FailureModeWarnContinue},
+			},
+			PostTask: []HookDefinition{
+				{Type: HookTypeAgent, Command: "review", Model: "gpt-4", OnFailure: FailureModeSkipTask},
+			},
+		},
+	}
+
+	err := Save(cfg, configPath)
+	if err != nil {
+		t.Fatalf("failed to save config: %v", err)
+	}
+
+	loadedCfg, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("failed to load saved config: %v", err)
+	}
+
+	if len(loadedCfg.Hooks.PreTask) != 1 {
+		t.Fatalf("expected 1 pre_task hook, got %d", len(loadedCfg.Hooks.PreTask))
+	}
+	if loadedCfg.Hooks.PreTask[0].Type != HookTypeShell {
+		t.Errorf("expected hook type 'shell', got %q", loadedCfg.Hooks.PreTask[0].Type)
+	}
+	if loadedCfg.Hooks.PreTask[0].Command != "echo pre" {
+		t.Errorf("expected hook command 'echo pre', got %q", loadedCfg.Hooks.PreTask[0].Command)
+	}
+}
+
+func TestSave_WithCustomAgents(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	cfg := &Config{
+		Agent: AgentConfig{
+			Default: "my-agent",
+			Custom: []CustomAgentConfig{
+				{
+					Name:            "my-agent",
+					Description:     "My custom agent",
+					Command:         "my-agent-cmd",
+					DetectionMethod: DetectionMethodCommand,
+					DetectionValue:  "my-agent-cmd",
+					Args:            []string{"--flag1", "--flag2"},
+				},
+			},
+		},
+	}
+
+	err := Save(cfg, configPath)
+	if err != nil {
+		t.Fatalf("failed to save config: %v", err)
+	}
+
+	loadedCfg, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("failed to load saved config: %v", err)
+	}
+
+	if len(loadedCfg.Agent.Custom) != 1 {
+		t.Fatalf("expected 1 custom agent, got %d", len(loadedCfg.Agent.Custom))
+	}
+	if loadedCfg.Agent.Custom[0].Name != "my-agent" {
+		t.Errorf("expected name 'my-agent', got %q", loadedCfg.Agent.Custom[0].Name)
+	}
+	if len(loadedCfg.Agent.Custom[0].Args) != 2 {
+		t.Errorf("expected 2 args, got %d", len(loadedCfg.Agent.Custom[0].Args))
+	}
+}
+
+func TestLoad_EmptyConfigFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	// Write an empty config file
+	if err := os.WriteFile(configPath, []byte(""), 0644); err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+
+	cfg, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("failed to load empty config: %v", err)
+	}
+
+	// Should have all defaults applied
+	if cfg.Timeout.Active != DefaultActiveTimeout {
+		t.Errorf("expected default active timeout, got %v", cfg.Timeout.Active)
+	}
+	if cfg.Git.CommitPrefix != DefaultCommitPrefix {
+		t.Errorf("expected default commit prefix, got %q", cfg.Git.CommitPrefix)
+	}
+}
+
+func TestLoad_PartialConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	// Only set some values, rest should get defaults
+	configContent := `
+timeout:
+  active: 3h
+`
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+
+	cfg, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	// Set value should be used
+	if cfg.Timeout.Active != 3*time.Hour {
+		t.Errorf("expected timeout.active 3h, got %v", cfg.Timeout.Active)
+	}
+
+	// Unset value should get default
+	if cfg.Timeout.Stuck != DefaultStuckTimeout {
+		t.Errorf("expected default stuck timeout %v, got %v", DefaultStuckTimeout, cfg.Timeout.Stuck)
+	}
+}
+
+func TestNewLoader(t *testing.T) {
+	loader := NewLoader()
+	if loader == nil {
+		t.Fatal("NewLoader returned nil")
+	}
+	if loader.v == nil {
+		t.Fatal("NewLoader did not initialize viper instance")
+	}
+}
+
+func TestLoad_AllTestModes(t *testing.T) {
+	modes := []struct {
+		mode     string
+		expected TestMode
+	}{
+		{"gate", TestModeGate},
+		{"tdd", TestModeTDD},
+		{"report", TestModeReport},
+	}
+
+	for _, tt := range modes {
+		t.Run(tt.mode, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			configPath := filepath.Join(tmpDir, "config.yaml")
+
+			configContent := "test:\n  mode: " + tt.mode
+			if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+				t.Fatalf("failed to write config file: %v", err)
+			}
+
+			cfg, err := Load(configPath)
+			if err != nil {
+				t.Fatalf("failed to load config: %v", err)
+			}
+
+			if cfg.Test.Mode != tt.expected {
+				t.Errorf("expected mode %q, got %q", tt.expected, cfg.Test.Mode)
+			}
+		})
+	}
+}
+
+func TestLoad_AllBootstrapDetectionModes(t *testing.T) {
+	modes := []struct {
+		mode     string
+		expected BootstrapDetection
+	}{
+		{"auto", BootstrapDetectionAuto},
+		{"manual", BootstrapDetectionManual},
+		{"disabled", BootstrapDetectionDisabled},
+	}
+
+	for _, tt := range modes {
+		t.Run(tt.mode, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			configPath := filepath.Join(tmpDir, "config.yaml")
+
+			configContent := "build:\n  bootstrap_detection: " + tt.mode
+			if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+				t.Fatalf("failed to write config file: %v", err)
+			}
+
+			cfg, err := Load(configPath)
+			if err != nil {
+				t.Fatalf("failed to load config: %v", err)
+			}
+
+			if cfg.Build.BootstrapDetection != tt.expected {
+				t.Errorf("expected bootstrap_detection %q, got %q", tt.expected, cfg.Build.BootstrapDetection)
+			}
+		})
+	}
+}
+
+func TestLoad_AllDetectionMethods(t *testing.T) {
+	methods := []struct {
+		method   string
+		expected DetectionMethod
+	}{
+		{"command", DetectionMethodCommand},
+		{"path", DetectionMethodPath},
+		{"env", DetectionMethodEnv},
+		{"always", DetectionMethodAlways},
+	}
+
+	for _, tt := range methods {
+		t.Run(tt.method, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			configPath := filepath.Join(tmpDir, "config.yaml")
+
+			configContent := `
+agent:
+  custom:
+    - name: test-agent
+      command: test-cmd
+      detection_method: ` + tt.method
+			if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+				t.Fatalf("failed to write config file: %v", err)
+			}
+
+			cfg, err := Load(configPath)
+			if err != nil {
+				t.Fatalf("failed to load config: %v", err)
+			}
+
+			if len(cfg.Agent.Custom) != 1 {
+				t.Fatalf("expected 1 custom agent, got %d", len(cfg.Agent.Custom))
+			}
+			if cfg.Agent.Custom[0].DetectionMethod != tt.expected {
+				t.Errorf("expected detection_method %q, got %q", tt.expected, cfg.Agent.Custom[0].DetectionMethod)
+			}
+		})
+	}
+}
+
