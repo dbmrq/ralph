@@ -82,19 +82,28 @@ type GitConfig struct {
 type BootstrapDetection string
 
 const (
-	// BootstrapDetectionAuto auto-detects based on project type markers.
+	// BootstrapDetectionAuto uses AI-driven ProjectAnalysis for detection.
+	// The Project Analysis Agent runs before the task loop to detect project
+	// characteristics including build/test readiness. This is the default mode.
 	BootstrapDetectionAuto BootstrapDetection = "auto"
 	// BootstrapDetectionManual uses a custom command for detection.
+	// Configure with BuildConfig.BootstrapCheck command.
+	// Exit 0 = still bootstrapping, non-zero = ready for verification.
 	BootstrapDetectionManual BootstrapDetection = "manual"
-	// BootstrapDetectionDisabled always runs build/test commands.
+	// BootstrapDetectionDisabled always considers the project ready.
+	// Build and test commands will always be run.
 	BootstrapDetectionDisabled BootstrapDetection = "disabled"
 )
 
 // BuildConfig configures build verification settings.
 type BuildConfig struct {
-	// Command is the build command. Empty means auto-detect based on project type.
+	// Command is the build command. Empty means use AI-detected command from ProjectAnalysis.
+	// If set, this overrides the AI-detected command.
 	Command string `yaml:"command" json:"command" mapstructure:"command"`
 	// BootstrapDetection configures how bootstrap state is detected (default: auto).
+	// - "auto": Uses AI-driven ProjectAnalysis (recommended)
+	// - "manual": Uses BootstrapCheck command
+	// - "disabled": Always considers the project ready
 	BootstrapDetection BootstrapDetection `yaml:"bootstrap_detection" json:"bootstrap_detection" mapstructure:"bootstrap_detection"`
 	// BootstrapCheck is the custom command for manual mode (exit 0 = bootstrap, non-zero = ready).
 	BootstrapCheck string `yaml:"bootstrap_check" json:"bootstrap_check" mapstructure:"bootstrap_check"`

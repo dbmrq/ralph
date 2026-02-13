@@ -4,10 +4,7 @@ package build
 import (
 	"context"
 	"fmt"
-	"os"
 	"os/exec"
-	"path/filepath"
-	"strings"
 
 	"github.com/wexinc/ralph/internal/config"
 )
@@ -22,26 +19,143 @@ type BootstrapState struct {
 	Reason string `json:"reason"`
 }
 
-// ProjectType represents the detected project type.
-type ProjectType string
+// BuildAnalysis contains build-related analysis results from the AI.
+type BuildAnalysis struct {
+	// Ready indicates whether the project can be built.
+	Ready bool `json:"ready"`
+	// Command is the detected build command, nil if not detected.
+	Command *string `json:"command"`
+	// Reason provides a human-readable explanation.
+	Reason string `json:"reason"`
+}
 
-const (
-	ProjectTypeGo      ProjectType = "go"
-	ProjectTypeNode    ProjectType = "node"
-	ProjectTypePython  ProjectType = "python"
-	ProjectTypeRust    ProjectType = "rust"
-	ProjectTypeUnknown ProjectType = "unknown"
-)
+// TestAnalysis contains test-related analysis results from the AI.
+type TestAnalysis struct {
+	// Ready indicates whether tests can be run.
+	Ready bool `json:"ready"`
+	// Command is the detected test command, nil if not detected.
+	Command *string `json:"command"`
+	// HasTestFiles indicates whether test files were found.
+	HasTestFiles bool `json:"has_test_files"`
+	// Reason provides a human-readable explanation.
+	Reason string `json:"reason"`
+}
+
+// LintAnalysis contains linting-related analysis results from the AI.
+type LintAnalysis struct {
+	// Command is the detected lint command, nil if not detected.
+	Command *string `json:"command"`
+	// Available indicates whether linting is available.
+	Available bool `json:"available"`
+}
+
+// DependencyAnalysis contains dependency-related analysis results from the AI.
+type DependencyAnalysis struct {
+	// Manager is the detected package manager (e.g., "go mod", "npm", "pip").
+	Manager string `json:"manager"`
+	// Installed indicates whether dependencies are installed.
+	Installed bool `json:"installed"`
+}
+
+// TaskListAnalysis contains task list detection results from the AI.
+type TaskListAnalysis struct {
+	// Detected indicates whether a task list was found.
+	Detected bool `json:"detected"`
+	// Path is the path to the detected task list file.
+	Path string `json:"path"`
+	// Format is the format of the task list (e.g., "markdown", "json").
+	Format string `json:"format"`
+	// TaskCount is the number of tasks detected.
+	TaskCount int `json:"task_count"`
+}
+
+// ProjectAnalysis contains the AI-driven analysis results for a project.
+// This struct is populated by the Project Analysis Agent (BUILD-001) before
+// the task loop starts. It replaces the previous hardcoded pattern-based detection.
+type ProjectAnalysis struct {
+	// ProjectType is the detected project type (e.g., "go", "node", "python", "rust", "mixed", "unknown").
+	ProjectType string `json:"project_type"`
+	// Languages is a list of programming languages detected in the project.
+	Languages []string `json:"languages"`
+	// IsGreenfield indicates whether this is a new project with no buildable code yet.
+	IsGreenfield bool `json:"is_greenfield"`
+	// IsMonorepo indicates whether this is a monorepo with multiple packages/projects.
+	IsMonorepo bool `json:"is_monorepo"`
+
+	// Build contains build-related analysis.
+	Build BuildAnalysis `json:"build"`
+	// Test contains test-related analysis.
+	Test TestAnalysis `json:"test"`
+	// Lint contains linting-related analysis.
+	Lint LintAnalysis `json:"lint"`
+	// Dependencies contains dependency-related analysis.
+	Dependencies DependencyAnalysis `json:"dependencies"`
+	// TaskList contains task list detection results.
+	TaskList TaskListAnalysis `json:"task_list"`
+
+	// ProjectContext is a human-readable description of the project for injection into prompts.
+	ProjectContext string `json:"project_context"`
+}
+
+// ToBootstrapState converts the ProjectAnalysis to a BootstrapState.
+// This allows the rest of the system to work with the simplified BootstrapState
+// while the AI-driven analysis provides the detailed ProjectAnalysis.
+func (p *ProjectAnalysis) ToBootstrapState() *BootstrapState {
+	var reason string
+	if p.IsGreenfield {
+		reason = "greenfield project (no buildable code yet)"
+	} else {
+		reasons := []string{}
+		if p.Build.Ready {
+			reasons = append(reasons, "build ready")
+		} else {
+			reasons = append(reasons, "build not ready: "+p.Build.Reason)
+		}
+		if p.Test.Ready {
+			reasons = append(reasons, "tests ready")
+		} else {
+			reasons = append(reasons, "tests not ready: "+p.Test.Reason)
+		}
+		reason = joinReasons(reasons)
+	}
+
+	return &BootstrapState{
+		BuildReady: p.Build.Ready,
+		TestReady:  p.Test.Ready,
+		Reason:     reason,
+	}
+}
+
+// joinReasons joins multiple reasons with semicolons.
+func joinReasons(reasons []string) string {
+	if len(reasons) == 0 {
+		return ""
+	}
+	result := reasons[0]
+	for i := 1; i < len(reasons); i++ {
+		result += "; " + reasons[i]
+	}
+	return result
+}
 
 // BootstrapDetector detects the bootstrap state of a project.
+// It supports three modes:
+//   - "auto" (default): Uses AI-driven ProjectAnalysis for detection
+//   - "manual": Uses a custom bootstrap_check command
+//   - "disabled": Always considers the project ready
 type BootstrapDetector struct {
 	// ProjectDir is the root directory of the project.
 	ProjectDir string
 	// Config is the build configuration.
 	Config config.BuildConfig
+	// Analysis is the AI-driven project analysis (used in "auto" mode).
+	// When nil in "auto" mode, the detector will return an error indicating
+	// that analysis is required.
+	Analysis *ProjectAnalysis
 }
 
 // NewBootstrapDetector creates a new BootstrapDetector.
+// For "auto" mode detection, call SetAnalysis() before calling Detect().
 func NewBootstrapDetector(projectDir string, cfg config.BuildConfig) *BootstrapDetector {
 	return &BootstrapDetector{
 		ProjectDir: projectDir,
@@ -49,7 +163,15 @@ func NewBootstrapDetector(projectDir string, cfg config.BuildConfig) *BootstrapD
 	}
 }
 
+// SetAnalysis sets the AI-driven project analysis for use in "auto" mode.
+func (d *BootstrapDetector) SetAnalysis(analysis *ProjectAnalysis) {
+	d.Analysis = analysis
+}
+
 // Detect returns the bootstrap state of the project.
+// In "auto" mode, this uses the ProjectAnalysis set via SetAnalysis().
+// In "manual" mode, this runs the configured bootstrap_check command.
+// In "disabled" mode, this always returns a ready state.
 func (d *BootstrapDetector) Detect(ctx context.Context) (*BootstrapState, error) {
 	switch d.Config.BootstrapDetection {
 	case config.BootstrapDetectionDisabled:
@@ -100,289 +222,13 @@ func (d *BootstrapDetector) detectManual(ctx context.Context) (*BootstrapState, 
 	}, nil
 }
 
-// detectAuto automatically detects project state based on project type.
+// detectAuto uses the AI-driven ProjectAnalysis to determine bootstrap state.
+// If no analysis is available, it returns an error indicating that analysis is required.
 func (d *BootstrapDetector) detectAuto() (*BootstrapState, error) {
-	projectType := d.DetectProjectType()
-
-	var buildReady, testReady bool
-	var reasons []string
-
-	switch projectType {
-	case ProjectTypeGo:
-		buildReady, testReady, reasons = d.detectGoProject()
-	case ProjectTypeNode:
-		buildReady, testReady, reasons = d.detectNodeProject()
-	case ProjectTypePython:
-		buildReady, testReady, reasons = d.detectPythonProject()
-	case ProjectTypeRust:
-		buildReady, testReady, reasons = d.detectRustProject()
-	default:
-		buildReady, testReady, reasons = d.detectGenericProject()
+	if d.Analysis == nil {
+		return nil, fmt.Errorf("bootstrap_detection is 'auto' but no ProjectAnalysis is available; run Project Analysis Agent first")
 	}
 
-	return &BootstrapState{
-		BuildReady: buildReady,
-		TestReady:  testReady,
-		Reason:     strings.Join(reasons, "; "),
-	}, nil
-}
-
-// DetectProjectType determines the project type based on markers.
-func (d *BootstrapDetector) DetectProjectType() ProjectType {
-	// Check for Go
-	if d.fileExists("go.mod") {
-		return ProjectTypeGo
-	}
-	// Check for Node/JavaScript
-	if d.fileExists("package.json") {
-		return ProjectTypeNode
-	}
-	// Check for Python
-	if d.fileExists("pyproject.toml") || d.fileExists("setup.py") || d.fileExists("requirements.txt") {
-		return ProjectTypePython
-	}
-	// Check for Rust
-	if d.fileExists("Cargo.toml") {
-		return ProjectTypeRust
-	}
-	return ProjectTypeUnknown
-}
-
-// detectGoProject checks if a Go project is build/test ready.
-func (d *BootstrapDetector) detectGoProject() (buildReady, testReady bool, reasons []string) {
-	// Build ready: go.mod exists AND at least one .go file exists
-	if !d.fileExists("go.mod") {
-		reasons = append(reasons, "no go.mod found")
-		return false, false, reasons
-	}
-
-	goFiles := d.findFiles("*.go")
-	if len(goFiles) == 0 {
-		reasons = append(reasons, "go.mod exists but no .go files found")
-		return false, false, reasons
-	}
-
-	buildReady = true
-	reasons = append(reasons, fmt.Sprintf("Go project: go.mod and %d .go file(s) found", len(goFiles)))
-
-	// Test ready: at least one *_test.go file exists
-	testFiles := d.findFiles("*_test.go")
-	if len(testFiles) > 0 {
-		testReady = true
-		reasons = append(reasons, fmt.Sprintf("%d test file(s) found", len(testFiles)))
-	} else {
-		reasons = append(reasons, "no *_test.go files found")
-	}
-
-	return buildReady, testReady, reasons
-}
-
-// detectNodeProject checks if a Node.js project is build/test ready.
-func (d *BootstrapDetector) detectNodeProject() (buildReady, testReady bool, reasons []string) {
-	// Build ready: package.json exists
-	if !d.fileExists("package.json") {
-		reasons = append(reasons, "no package.json found")
-		return false, false, reasons
-	}
-
-	// Check for node_modules (dependencies installed)
-	if !d.dirExists("node_modules") {
-		reasons = append(reasons, "package.json exists but node_modules not found (run npm install)")
-		return false, false, reasons
-	}
-
-	buildReady = true
-	reasons = append(reasons, "Node project: package.json and node_modules found")
-
-	// Test ready: check for test files
-	testPatterns := []string{"*.test.js", "*.spec.js", "*.test.ts", "*.spec.ts", "*.test.jsx", "*.spec.jsx", "*.test.tsx", "*.spec.tsx"}
-	totalTests := 0
-	for _, pattern := range testPatterns {
-		totalTests += len(d.findFiles(pattern))
-	}
-
-	if totalTests > 0 {
-		testReady = true
-		reasons = append(reasons, fmt.Sprintf("%d test file(s) found", totalTests))
-	} else {
-		reasons = append(reasons, "no test files found (*.test.js, *.spec.js, etc.)")
-	}
-
-	return buildReady, testReady, reasons
-}
-
-// detectPythonProject checks if a Python project is build/test ready.
-func (d *BootstrapDetector) detectPythonProject() (buildReady, testReady bool, reasons []string) {
-	// Build ready: has pyproject.toml, setup.py, or at least one .py file
-	hasPyproject := d.fileExists("pyproject.toml")
-	hasSetupPy := d.fileExists("setup.py")
-	pyFiles := d.findFiles("*.py")
-
-	if !hasPyproject && !hasSetupPy && len(pyFiles) == 0 {
-		reasons = append(reasons, "no Python project markers found")
-		return false, false, reasons
-	}
-
-	buildReady = true
-	if hasPyproject {
-		reasons = append(reasons, "Python project: pyproject.toml found")
-	} else if hasSetupPy {
-		reasons = append(reasons, "Python project: setup.py found")
-	} else {
-		reasons = append(reasons, fmt.Sprintf("Python project: %d .py file(s) found", len(pyFiles)))
-	}
-
-	// Test ready: check for test files (test_*.py or *_test.py)
-	testFiles := d.findFiles("test_*.py")
-	testFiles = append(testFiles, d.findFiles("*_test.py")...)
-
-	if len(testFiles) > 0 {
-		testReady = true
-		reasons = append(reasons, fmt.Sprintf("%d test file(s) found", len(testFiles)))
-	} else {
-		reasons = append(reasons, "no test files found (test_*.py, *_test.py)")
-	}
-
-	return buildReady, testReady, reasons
-}
-
-// detectRustProject checks if a Rust project is build/test ready.
-func (d *BootstrapDetector) detectRustProject() (buildReady, testReady bool, reasons []string) {
-	// Build ready: Cargo.toml exists AND at least one .rs file in src/
-	if !d.fileExists("Cargo.toml") {
-		reasons = append(reasons, "no Cargo.toml found")
-		return false, false, reasons
-	}
-
-	rsFiles := d.findFilesInDir("src", "*.rs")
-	if len(rsFiles) == 0 {
-		reasons = append(reasons, "Cargo.toml exists but no .rs files in src/")
-		return false, false, reasons
-	}
-
-	buildReady = true
-	reasons = append(reasons, fmt.Sprintf("Rust project: Cargo.toml and %d .rs file(s) found", len(rsFiles)))
-
-	// Test ready: check for tests directory or #[test] in source (we check tests/ dir for simplicity)
-	testFiles := d.findFilesInDir("tests", "*.rs")
-	if len(testFiles) > 0 {
-		testReady = true
-		reasons = append(reasons, fmt.Sprintf("%d integration test file(s) found", len(testFiles)))
-	} else {
-		// Rust tests can also be inline; assume test ready if we have source files
-		testReady = true
-		reasons = append(reasons, "assuming unit tests may exist inline in source files")
-	}
-
-	return buildReady, testReady, reasons
-}
-
-// detectGenericProject provides a fallback for unknown project types.
-func (d *BootstrapDetector) detectGenericProject() (buildReady, testReady bool, reasons []string) {
-	// Look for any source-like files
-	sourcePatterns := []string{"*.go", "*.py", "*.js", "*.ts", "*.rs", "*.java", "*.c", "*.cpp", "*.rb"}
-	var foundSources []string
-	for _, pattern := range sourcePatterns {
-		files := d.findFiles(pattern)
-		if len(files) > 0 {
-			foundSources = append(foundSources, fmt.Sprintf("%d %s", len(files), pattern))
-		}
-	}
-
-	if len(foundSources) == 0 {
-		reasons = append(reasons, "no source files found")
-		return false, false, reasons
-	}
-
-	buildReady = true
-	reasons = append(reasons, fmt.Sprintf("Generic project: found %s", strings.Join(foundSources, ", ")))
-
-	// Assume tests might exist but we can't reliably detect them
-	testReady = false
-	reasons = append(reasons, "unknown project type, cannot detect tests")
-
-	return buildReady, testReady, reasons
-}
-
-
-// Helper methods
-
-// fileExists checks if a file exists in the project directory.
-func (d *BootstrapDetector) fileExists(name string) bool {
-	path := filepath.Join(d.ProjectDir, name)
-	info, err := os.Stat(path)
-	if err != nil {
-		return false
-	}
-	return !info.IsDir()
-}
-
-// dirExists checks if a directory exists in the project directory.
-func (d *BootstrapDetector) dirExists(name string) bool {
-	path := filepath.Join(d.ProjectDir, name)
-	info, err := os.Stat(path)
-	if err != nil {
-		return false
-	}
-	return info.IsDir()
-}
-
-// findFiles finds files matching a pattern recursively in the project directory.
-// It skips common non-source directories (vendor, node_modules, .git, etc.)
-func (d *BootstrapDetector) findFiles(pattern string) []string {
-	var matches []string
-
-	skipDirs := map[string]bool{
-		"vendor":       true,
-		"node_modules": true,
-		".git":         true,
-		".ralph":       true,
-		"__pycache__":  true,
-		".venv":        true,
-		"venv":         true,
-		"target":       true, // Rust build dir
-	}
-
-	_ = filepath.Walk(d.ProjectDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return nil // skip errors
-		}
-		if info.IsDir() {
-			if skipDirs[info.Name()] {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		matched, _ := filepath.Match(pattern, info.Name())
-		if matched {
-			matches = append(matches, path)
-		}
-		return nil
-	})
-
-	return matches
-}
-
-// findFilesInDir finds files matching a pattern in a specific subdirectory.
-func (d *BootstrapDetector) findFilesInDir(dir, pattern string) []string {
-	var matches []string
-	searchDir := filepath.Join(d.ProjectDir, dir)
-
-	if !d.dirExists(dir) {
-		return matches
-	}
-
-	_ = filepath.Walk(searchDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
-			return nil
-		}
-		matched, _ := filepath.Match(pattern, info.Name())
-		if matched {
-			matches = append(matches, path)
-		}
-		return nil
-	})
-
-	return matches
+	return d.Analysis.ToBootstrapState(), nil
 }
 
