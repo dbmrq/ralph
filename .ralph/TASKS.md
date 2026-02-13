@@ -67,7 +67,7 @@
   > Support task states: pending, in_progress, completed, skipped, paused, failed
   > Include iteration history per task
 
-- [ ] TASK-002: Implement JSON task storage
+- [x] TASK-002: Implement JSON task storage
   > Goal: Store tasks internally as JSON (.ralph/tasks.json)
   > Define schema: id, name, description, status, created_at, completed_at
   > Support import from various text formats on init
