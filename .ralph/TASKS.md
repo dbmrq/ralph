@@ -331,7 +331,7 @@
   > Create components/status.go - elapsed time, iteration count, build/test status
   > Display keyboard shortcuts in status bar
 
-- [ ] TUI-004: Implement log viewport component
+- [x] TUI-004: Implement log viewport component
   > Goal: Create components/log.go
   > Real-time agent output streaming
   > Scrollable with auto-follow

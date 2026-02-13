@@ -1,0 +1,307 @@
+// Package components provides reusable TUI components for ralph.
+package components
+
+import (
+	"fmt"
+	"os"
+	"os/exec"
+	"strings"
+
+	"github.com/charmbracelet/bubbles/viewport"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/wexinc/ralph/internal/tui/styles"
+)
+
+// LogViewport is a scrollable log viewer with auto-follow support.
+type LogViewport struct {
+	viewport   viewport.Model
+	content    strings.Builder
+	lines      []string
+	autoFollow bool
+	focused    bool
+	title      string
+	width      int
+	height     int
+}
+
+// NewLogViewport creates a new LogViewport component.
+func NewLogViewport() *LogViewport {
+	vp := viewport.New(80, 20)
+	vp.Style = lipgloss.NewStyle().
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(styles.BorderColor)
+
+	return &LogViewport{
+		viewport:   vp,
+		lines:      []string{},
+		autoFollow: true,
+		focused:    false,
+		title:      "Log Output",
+		width:      80,
+		height:     20,
+	}
+}
+
+// SetTitle sets the viewport title.
+func (l *LogViewport) SetTitle(title string) {
+	l.title = title
+}
+
+// SetSize sets the viewport dimensions.
+func (l *LogViewport) SetSize(width, height int) {
+	l.width = width
+	l.height = height
+	// Account for border and title
+	l.viewport.Width = width - 2
+	l.viewport.Height = height - 2
+}
+
+// SetFocused sets whether the viewport is focused.
+func (l *LogViewport) SetFocused(focused bool) {
+	l.focused = focused
+	if focused {
+		l.viewport.Style = lipgloss.NewStyle().
+			BorderStyle(lipgloss.RoundedBorder()).
+			BorderForeground(styles.Primary)
+	} else {
+		l.viewport.Style = lipgloss.NewStyle().
+			BorderStyle(lipgloss.RoundedBorder()).
+			BorderForeground(styles.BorderColor)
+	}
+}
+
+// SetAutoFollow enables or disables auto-follow mode.
+func (l *LogViewport) SetAutoFollow(enabled bool) {
+	l.autoFollow = enabled
+}
+
+// AutoFollow returns the current auto-follow state.
+func (l *LogViewport) AutoFollow() bool {
+	return l.autoFollow
+}
+
+// Clear clears all log content.
+func (l *LogViewport) Clear() {
+	l.content.Reset()
+	l.lines = []string{}
+	l.viewport.SetContent("")
+}
+
+// Write implements io.Writer for direct streaming.
+func (l *LogViewport) Write(p []byte) (n int, err error) {
+	l.AppendText(string(p))
+	return len(p), nil
+}
+
+// AppendText appends text to the log.
+func (l *LogViewport) AppendText(text string) {
+	l.content.WriteString(text)
+	l.updateLines()
+	l.viewport.SetContent(strings.Join(l.lines, "\n"))
+
+	if l.autoFollow {
+		l.viewport.GotoBottom()
+	}
+}
+
+// AppendLine appends a line to the log.
+func (l *LogViewport) AppendLine(line string) {
+	// Add newline if content already exists
+	if l.content.Len() > 0 {
+		l.content.WriteString("\n")
+	}
+	l.content.WriteString(line)
+	l.lines = append(l.lines, line)
+	l.viewport.SetContent(strings.Join(l.lines, "\n"))
+
+	if l.autoFollow {
+		l.viewport.GotoBottom()
+	}
+}
+
+// SetContent sets the entire log content.
+func (l *LogViewport) SetContent(content string) {
+	l.content.Reset()
+	l.content.WriteString(content)
+	l.updateLines()
+	l.viewport.SetContent(strings.Join(l.lines, "\n"))
+
+	if l.autoFollow {
+		l.viewport.GotoBottom()
+	}
+}
+
+// updateLines splits content into lines.
+func (l *LogViewport) updateLines() {
+	l.lines = strings.Split(l.content.String(), "\n")
+}
+
+// Content returns the full log content.
+func (l *LogViewport) Content() string {
+	return l.content.String()
+}
+
+// LineCount returns the number of lines.
+func (l *LogViewport) LineCount() int {
+	return len(l.lines)
+}
+
+// ScrollPercent returns the scroll position as a percentage.
+func (l *LogViewport) ScrollPercent() float64 {
+	return l.viewport.ScrollPercent()
+}
+
+// GotoTop scrolls to the top.
+func (l *LogViewport) GotoTop() {
+	l.viewport.GotoTop()
+	l.autoFollow = false
+}
+
+// GotoBottom scrolls to the bottom.
+func (l *LogViewport) GotoBottom() {
+	l.viewport.GotoBottom()
+	l.autoFollow = true
+}
+
+// Update handles keyboard events for scrolling.
+func (l *LogViewport) Update(msg tea.Msg) tea.Cmd {
+	var cmd tea.Cmd
+
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "up", "k":
+			l.autoFollow = false
+			l.viewport.LineUp(1)
+		case "down", "j":
+			l.viewport.LineDown(1)
+			// Re-enable auto-follow if at bottom
+			if l.viewport.AtBottom() {
+				l.autoFollow = true
+			}
+		case "pgup", "ctrl+u":
+			l.autoFollow = false
+			l.viewport.HalfViewUp()
+		case "pgdown", "ctrl+d":
+			l.viewport.HalfViewDown()
+			if l.viewport.AtBottom() {
+				l.autoFollow = true
+			}
+		case "home", "g":
+			l.GotoTop()
+		case "end", "G":
+			l.GotoBottom()
+		case "f":
+			// Toggle auto-follow
+			l.autoFollow = !l.autoFollow
+			if l.autoFollow {
+				l.viewport.GotoBottom()
+			}
+		default:
+			l.viewport, cmd = l.viewport.Update(msg)
+		}
+	default:
+		l.viewport, cmd = l.viewport.Update(msg)
+	}
+
+	return cmd
+}
+
+// View renders the log viewport.
+func (l *LogViewport) View() string {
+	// Title bar
+	titleStyle := lipgloss.NewStyle().
+		Foreground(styles.Foreground).
+		Background(styles.Primary).
+		Bold(true).
+		Padding(0, 1).
+		Width(l.width)
+
+	title := l.title
+	if l.autoFollow {
+		title += " [auto-follow]"
+	}
+
+	// Scroll position indicator
+	scrollInfo := lipgloss.NewStyle().
+		Foreground(styles.MutedLight).
+		Render(fmt.Sprintf(" %.0f%%", l.viewport.ScrollPercent()*100))
+
+	titleLine := titleStyle.Render(title) + scrollInfo
+
+	// Viewport content
+	viewportStyle := lipgloss.NewStyle()
+	if l.focused {
+		viewportStyle = viewportStyle.
+			BorderStyle(lipgloss.RoundedBorder()).
+			BorderForeground(styles.Primary)
+	} else {
+		viewportStyle = viewportStyle.
+			BorderStyle(lipgloss.RoundedBorder()).
+			BorderForeground(styles.BorderColor)
+	}
+
+	content := viewportStyle.Render(l.viewport.View())
+
+	// Help line
+	helpStyle := lipgloss.NewStyle().
+		Foreground(styles.Muted).
+		Italic(true)
+	help := helpStyle.Render("j/k: scroll  f: toggle follow  e: open in $EDITOR")
+
+	return titleLine + "\n" + content + "\n" + help
+}
+
+// OpenInEditor opens the log content in the user's $EDITOR.
+// Returns a tea.Cmd that executes the editor.
+func (l *LogViewport) OpenInEditor() tea.Cmd {
+	return func() tea.Msg {
+		// Get editor from environment
+		editor := os.Getenv("EDITOR")
+		if editor == "" {
+			editor = "vi" // Default fallback
+		}
+
+		// Create temp file
+		tmpFile, err := os.CreateTemp("", "ralph-log-*.txt")
+		if err != nil {
+			return EditorErrorMsg{Error: err}
+		}
+
+		// Write content
+		_, err = tmpFile.WriteString(l.content.String())
+		if err != nil {
+			tmpFile.Close()
+			os.Remove(tmpFile.Name())
+			return EditorErrorMsg{Error: err}
+		}
+		tmpFile.Close()
+
+		// Open editor
+		cmd := exec.Command(editor, tmpFile.Name())
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+
+		err = cmd.Run()
+
+		// Clean up temp file
+		os.Remove(tmpFile.Name())
+
+		if err != nil {
+			return EditorErrorMsg{Error: err}
+		}
+
+		return EditorClosedMsg{}
+	}
+}
+
+// EditorErrorMsg is sent when opening the editor fails.
+type EditorErrorMsg struct {
+	Error error
+}
+
+// EditorClosedMsg is sent when the editor is closed.
+type EditorClosedMsg struct{}
+
