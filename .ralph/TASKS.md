@@ -189,7 +189,7 @@
   > Keep helper methods (fileExists, dirExists) - may be useful elsewhere
   > Tests: Update bootstrap_test.go to reflect simplified interface
 
-- [ ] BUILD-001: Implement Project Analysis Agent
+- [x] BUILD-001: Implement Project Analysis Agent
   > Goal: Create analysis.go with AI-driven project detection
   > Run an implicit "analysis" agent before the task loop starts
   > Agent prompt asks for structured JSON with project characteristics
