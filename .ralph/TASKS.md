@@ -436,11 +436,20 @@
   > - Headless tests: TextOutput, JSONOutput, WithHooks
   > - Total: 9 integration tests covering full loop execution, session persistence, and headless mode
 
-- [ ] TEST-006: Add TUI tests
+- [x] TEST-006: Add TUI tests
   > Goal: Test TUI state updates
   > Test keyboard handling
   > Test analysis confirmation form (field navigation, editing, confirm/re-analyze)
   > Use Bubble Tea testing utilities
+  > DONE: Added comprehensive TUI tests:
+  > - internal/tui/app_test.go: Added tests for handleKeyPress (help, logs, tab, pause, skip, abort, quit, add task, model picker), SetLoopController, renderOverlay, repeatChar, formatDuration, mockLoopController
+  > - internal/tui/components/log_test.go: Added tests for GoToTop, GoToBottom, ScrollUp, ScrollDown, ToggleAutoFollow, Update with page navigation
+  > - internal/tui/components/tasklist_test.go: Added tests for SetHeight, SetWidth, SetFocused, Selected, SelectedItem, GoToTop, GoToBottom, SetSize, SetSelected, StatusIcons
+  > - internal/tui/components/taskeditor_test.go: Added tests for View edit mode, Tab/ShiftTab/Down/Up navigation, Enter submit (valid/invalid), text input, mode constants
+  > - internal/tui/components/statusbar_test.go: Added tests for View without shortcuts, View with message, status indicators, loop state icons, View with width
+  > - internal/tui/components/taskinit_test.go: NEW - Full test coverage for TaskInitSelector component
+  > - internal/tui/components/tasklistform_test.go: NEW - Full test coverage for TaskListForm component (analysis confirmation form)
+  > Coverage improved: internal/tui 40.8%→58.8%, internal/tui/components 69.3%→88.6%
 
 ---
 

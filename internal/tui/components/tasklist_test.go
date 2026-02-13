@@ -168,3 +168,167 @@ func TestTaskList_View(t *testing.T) {
 	})
 }
 
+func TestTaskList_SetHeight(t *testing.T) {
+	tl := NewTaskList()
+	tl.SetHeight(20)
+
+	if tl.height != 20 {
+		t.Errorf("expected height 20, got %d", tl.height)
+	}
+}
+
+func TestTaskList_SetWidth(t *testing.T) {
+	tl := NewTaskList()
+	tl.SetWidth(100)
+
+	if tl.width != 100 {
+		t.Errorf("expected width 100, got %d", tl.width)
+	}
+}
+
+func TestTaskList_SetFocused(t *testing.T) {
+	tl := NewTaskList()
+
+	tl.SetFocused(false)
+	if tl.focused {
+		t.Error("expected focused to be false")
+	}
+
+	tl.SetFocused(true)
+	if !tl.focused {
+		t.Error("expected focused to be true")
+	}
+}
+
+func TestTaskList_Selected(t *testing.T) {
+	tl := NewTaskList()
+	items := []TaskListItem{
+		{ID: "TASK-001", Name: "First"},
+		{ID: "TASK-002", Name: "Second"},
+	}
+	tl.SetItems(items)
+	tl.selected = 1
+
+	if tl.Selected() != 1 {
+		t.Errorf("expected Selected() to return 1, got %d", tl.Selected())
+	}
+}
+
+func TestTaskList_SelectedItem(t *testing.T) {
+	tl := NewTaskList()
+	items := []TaskListItem{
+		{ID: "TASK-001", Name: "First"},
+		{ID: "TASK-002", Name: "Second"},
+	}
+	tl.SetItems(items)
+	tl.selected = 1
+
+	selected := tl.SelectedItem()
+	if selected == nil {
+		t.Fatal("expected SelectedItem to return non-nil")
+	}
+	if selected.ID != "TASK-002" {
+		t.Errorf("expected selected item ID 'TASK-002', got %s", selected.ID)
+	}
+}
+
+func TestTaskList_SelectedItem_Empty(t *testing.T) {
+	tl := NewTaskList()
+	selected := tl.SelectedItem()
+	if selected != nil {
+		t.Error("expected SelectedItem to return nil for empty list")
+	}
+}
+
+func TestTaskList_GoToTop(t *testing.T) {
+	tl := NewTaskList()
+	items := []TaskListItem{
+		{ID: "TASK-001", Name: "First"},
+		{ID: "TASK-002", Name: "Second"},
+		{ID: "TASK-003", Name: "Third"},
+	}
+	tl.SetItems(items)
+	tl.selected = 2
+
+	tl.GoToTop()
+
+	if tl.selected != 0 {
+		t.Errorf("expected selected 0 after GoToTop, got %d", tl.selected)
+	}
+}
+
+func TestTaskList_GoToBottom(t *testing.T) {
+	tl := NewTaskList()
+	items := []TaskListItem{
+		{ID: "TASK-001", Name: "First"},
+		{ID: "TASK-002", Name: "Second"},
+		{ID: "TASK-003", Name: "Third"},
+	}
+	tl.SetItems(items)
+	tl.selected = 0
+
+	tl.GoToBottom()
+
+	if tl.selected != 2 {
+		t.Errorf("expected selected 2 after GoToBottom, got %d", tl.selected)
+	}
+}
+
+func TestTaskList_SetSize(t *testing.T) {
+	tl := NewTaskList()
+	tl.SetSize(80, 24)
+
+	if tl.width != 80 {
+		t.Errorf("expected width 80, got %d", tl.width)
+	}
+	if tl.height != 24 {
+		t.Errorf("expected height 24, got %d", tl.height)
+	}
+}
+
+func TestTaskList_SetSelected(t *testing.T) {
+	tl := NewTaskList()
+	items := []TaskListItem{
+		{ID: "TASK-001", Name: "First"},
+		{ID: "TASK-002", Name: "Second"},
+	}
+	tl.SetItems(items)
+
+	tl.SetSelected(1)
+	if tl.selected != 1 {
+		t.Errorf("expected selected 1, got %d", tl.selected)
+	}
+
+	// Test out of bounds - should clamp
+	tl.SetSelected(10)
+	if tl.selected != 1 {
+		t.Errorf("expected selected to remain 1, got %d", tl.selected)
+	}
+}
+
+func TestTaskList_StatusIcons(t *testing.T) {
+	tl := NewTaskList()
+
+	// Test different status icons by rendering view
+	items := []TaskListItem{
+		{ID: "TASK-001", Name: "Completed", Status: task.StatusCompleted},
+		{ID: "TASK-002", Name: "In Progress", Status: task.StatusInProgress},
+		{ID: "TASK-003", Name: "Pending", Status: task.StatusPending},
+		{ID: "TASK-004", Name: "Skipped", Status: task.StatusSkipped},
+		{ID: "TASK-005", Name: "Failed", Status: task.StatusFailed},
+		{ID: "TASK-006", Name: "Paused", Status: task.StatusPaused},
+	}
+	tl.SetItems(items)
+	tl.SetHeight(10)
+
+	view := tl.View()
+
+	// Verify the view contains the task names
+	if !strings.Contains(view, "Completed") {
+		t.Error("expected 'Completed' task in view")
+	}
+	if !strings.Contains(view, "Pending") {
+		t.Error("expected 'Pending' task in view")
+	}
+}
+

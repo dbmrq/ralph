@@ -261,3 +261,120 @@ func TestLogViewport_ScrollPercent(t *testing.T) {
 	}
 }
 
+func TestLogViewport_GoToTop(t *testing.T) {
+	lv := NewLogViewport()
+	lv.SetSize(80, 5)
+
+	// Add enough content to scroll
+	for i := 0; i < 30; i++ {
+		lv.AppendLine("Line content")
+	}
+
+	lv.SetAutoFollow(true)
+	lv.GoToTop()
+
+	if lv.AutoFollow() {
+		t.Error("expected auto-follow to be false after GoToTop")
+	}
+}
+
+func TestLogViewport_GoToBottom(t *testing.T) {
+	lv := NewLogViewport()
+	lv.SetSize(80, 5)
+
+	// Add content
+	for i := 0; i < 30; i++ {
+		lv.AppendLine("Line content")
+	}
+
+	lv.SetAutoFollow(false)
+	lv.GoToBottom()
+
+	if !lv.AutoFollow() {
+		t.Error("expected auto-follow to be true after GoToBottom")
+	}
+}
+
+func TestLogViewport_ScrollUp(t *testing.T) {
+	lv := NewLogViewport()
+	lv.SetSize(80, 5)
+
+	// Add content
+	for i := 0; i < 30; i++ {
+		lv.AppendLine("Line content")
+	}
+
+	lv.SetAutoFollow(true)
+	lv.ScrollUp()
+
+	if lv.AutoFollow() {
+		t.Error("expected auto-follow to be false after ScrollUp")
+	}
+}
+
+func TestLogViewport_ScrollDown(t *testing.T) {
+	lv := NewLogViewport()
+	lv.SetSize(80, 5)
+
+	// Add content
+	for i := 0; i < 30; i++ {
+		lv.AppendLine("Line content")
+	}
+
+	// ScrollDown should not error and should work
+	lv.ScrollDown()
+	// Just verify no panic
+}
+
+func TestLogViewport_ToggleAutoFollow(t *testing.T) {
+	lv := NewLogViewport()
+	lv.SetSize(80, 5)
+
+	// Add content
+	for i := 0; i < 30; i++ {
+		lv.AppendLine("Line content")
+	}
+
+	lv.SetAutoFollow(true)
+	lv.ToggleAutoFollow()
+	if lv.AutoFollow() {
+		t.Error("expected auto-follow to be toggled off")
+	}
+
+	lv.ToggleAutoFollow()
+	if !lv.AutoFollow() {
+		t.Error("expected auto-follow to be toggled on")
+	}
+}
+
+func TestLogViewport_Update_PageNavigation(t *testing.T) {
+	lv := NewLogViewport()
+	lv.SetSize(80, 5)
+
+	// Add content
+	for i := 0; i < 50; i++ {
+		lv.AppendLine("Line content")
+	}
+
+	// Test pgup disables auto-follow
+	lv.SetAutoFollow(true)
+	lv.Update(tea.KeyMsg{Type: tea.KeyPgUp})
+	if lv.AutoFollow() {
+		t.Error("expected auto-follow to be false after pgup")
+	}
+
+	// Test home key
+	lv.SetAutoFollow(true)
+	lv.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("g")})
+	if lv.AutoFollow() {
+		t.Error("expected auto-follow to be false after home (g)")
+	}
+
+	// Test end key enables auto-follow
+	lv.SetAutoFollow(false)
+	lv.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("G")})
+	if !lv.AutoFollow() {
+		t.Error("expected auto-follow to be true after end (G)")
+	}
+}
+

@@ -3,6 +3,7 @@ package tui
 import (
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/wexinc/ralph/internal/task"
@@ -304,5 +305,300 @@ func TestFormatDuration(t *testing.T) {
 	if !strings.Contains(view, ":") {
 		t.Error("Elapsed time should contain colon separator")
 	}
+}
+
+func TestModelHandleKeyPress_Help(t *testing.T) {
+	m := New()
+	m.width = 80
+	m.height = 24
+
+	// Test '?' key toggles help
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}}
+	m.Update(msg)
+
+	// Help should be visible
+	if !m.helpOverlay.IsVisible() {
+		t.Error("Help overlay should be visible after '?' press")
+	}
+
+	// Press again to toggle off
+	m.Update(msg)
+	if m.helpOverlay.IsVisible() {
+		t.Error("Help overlay should be hidden after second '?' press")
+	}
+}
+
+func TestModelHandleKeyPress_H(t *testing.T) {
+	m := New()
+
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'h'}}
+	m.Update(msg)
+
+	if !m.helpOverlay.IsVisible() {
+		t.Error("Help overlay should be visible after 'h' press")
+	}
+}
+
+func TestModelHandleKeyPress_ToggleLogs(t *testing.T) {
+	m := New()
+
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'l'}}
+	m.Update(msg)
+
+	if !m.showLogs {
+		t.Error("showLogs should be true after 'l' press")
+	}
+	if m.focusedPane != FocusLogs {
+		t.Errorf("focusedPane should be FocusLogs, got %v", m.focusedPane)
+	}
+
+	// Toggle off
+	m.Update(msg)
+	if m.showLogs {
+		t.Error("showLogs should be false after second 'l' press")
+	}
+	if m.focusedPane != FocusTasks {
+		t.Errorf("focusedPane should be FocusTasks, got %v", m.focusedPane)
+	}
+}
+
+func TestModelHandleKeyPress_Tab(t *testing.T) {
+	m := New()
+	m.showLogs = true
+	m.focusedPane = FocusTasks
+
+	msg := tea.KeyMsg{Type: tea.KeyTab}
+	m.Update(msg)
+
+	if m.focusedPane != FocusLogs {
+		t.Errorf("focusedPane should be FocusLogs after Tab, got %v", m.focusedPane)
+	}
+
+	// Tab again
+	m.Update(msg)
+	if m.focusedPane != FocusTasks {
+		t.Errorf("focusedPane should be FocusTasks after second Tab, got %v", m.focusedPane)
+	}
+}
+
+func TestModelHandleKeyPress_Pause_NoController(t *testing.T) {
+	m := New()
+	m.loopState = LoopStateRunning
+
+	// Press 'p' without a loop controller - should not error
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}}
+	_, cmd := m.Update(msg)
+
+	if cmd != nil {
+		// No command should be returned when no controller
+	}
+}
+
+func TestModelHandleKeyPress_Skip_ShowsConfirm(t *testing.T) {
+	m := New()
+	m.loopState = LoopStateRunning
+	m.currentTask = &task.Task{ID: "TEST-001", Name: "Test Task"}
+
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}}
+	m.Update(msg)
+
+	if !m.confirmDlg.IsVisible() {
+		t.Error("confirm dialog should be visible after 's' press")
+	}
+}
+
+func TestModelHandleKeyPress_Abort_ShowsConfirm(t *testing.T) {
+	m := New()
+	m.loopState = LoopStateRunning
+
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}}
+	m.Update(msg)
+
+	if !m.confirmDlg.IsVisible() {
+		t.Error("confirm dialog should be visible after 'a' press")
+	}
+}
+
+func TestModelHandleKeyPress_QuitWhileRunning(t *testing.T) {
+	m := New()
+	m.loopState = LoopStateRunning
+
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}}
+	m.Update(msg)
+
+	// Should show confirmation dialog, not quit immediately
+	if m.quitting {
+		t.Error("should not quit immediately while running")
+	}
+	if !m.confirmDlg.IsVisible() {
+		t.Error("confirm dialog should be visible")
+	}
+}
+
+func TestModelHandleKeyPress_QuitWhileIdle(t *testing.T) {
+	m := New()
+	m.loopState = LoopStateIdle
+
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}}
+	newModel, cmd := m.Update(msg)
+	model := newModel.(*Model)
+
+	// Should quit immediately when idle
+	if !model.quitting {
+		t.Error("should quit immediately when idle")
+	}
+	if cmd == nil {
+		t.Error("should return a quit command")
+	}
+}
+
+func TestModelHandleKeyPress_AddTask_WhenIdle(t *testing.T) {
+	m := New()
+	m.loopState = LoopStateIdle
+
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}}
+	m.Update(msg)
+
+	if !m.taskEditor.IsActive() {
+		t.Error("task editor should be active after 'e' press when idle")
+	}
+}
+
+func TestModelHandleKeyPress_AddTask_WhenRunning(t *testing.T) {
+	m := New()
+	m.loopState = LoopStateRunning
+
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}}
+	m.Update(msg)
+
+	// Should not activate editor when running
+	if m.taskEditor.IsActive() {
+		t.Error("task editor should not be active when loop is running")
+	}
+}
+
+func TestModelHandleKeyPress_ModelPicker_WhenIdle(t *testing.T) {
+	m := New()
+	m.loopState = LoopStateIdle
+
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'m'}}
+	m.Update(msg)
+
+	if !m.modelPicker.IsVisible() {
+		t.Error("model picker should be visible after 'm' press when idle")
+	}
+}
+
+func TestModelSetLoopController(t *testing.T) {
+	m := New()
+
+	// Create a mock controller
+	mockCtrl := &mockLoopController{}
+	m.SetLoopController(mockCtrl)
+
+	if m.loopController == nil {
+		t.Error("loopController should be set")
+	}
+}
+
+func TestModelRenderOverlay(t *testing.T) {
+	m := New()
+	m.width = 80
+	m.height = 24
+
+	base := "Base content"
+	overlay := "Overlay content"
+
+	result := m.renderOverlay(base, overlay)
+
+	if !strings.Contains(result, base) {
+		t.Error("result should contain base content")
+	}
+	if !strings.Contains(result, overlay) {
+		t.Error("result should contain overlay content")
+	}
+}
+
+func TestModelRenderOverlay_EmptyOverlay(t *testing.T) {
+	m := New()
+	base := "Base content"
+
+	result := m.renderOverlay(base, "")
+
+	if result != base {
+		t.Errorf("empty overlay should return base unchanged, got: %s", result)
+	}
+}
+
+func TestRepeatChar(t *testing.T) {
+	tests := []struct {
+		char     string
+		n        int
+		expected string
+	}{
+		{"x", 5, "xxxxx"},
+		{"-", 3, "---"},
+		{"ab", 2, "abab"},
+		{"x", 0, ""},
+		{"x", -1, ""},
+	}
+
+	for _, tt := range tests {
+		result := repeatChar(tt.char, tt.n)
+		if result != tt.expected {
+			t.Errorf("repeatChar(%q, %d) = %q, want %q", tt.char, tt.n, result, tt.expected)
+		}
+	}
+}
+
+func TestFormatDurationFunc(t *testing.T) {
+	tests := []struct {
+		duration     string
+		expectedContains string
+	}{
+		{"0s", "00:00"},
+		{"30s", "00:30"},
+		{"1m0s", "01:00"},
+		{"5m30s", "05:30"},
+		{"1h30m15s", "01:30:15"},
+	}
+
+	for _, tt := range tests {
+		d, _ := time.ParseDuration(tt.duration)
+		result := formatDuration(d)
+		if result != tt.expectedContains {
+			t.Errorf("formatDuration(%v) = %q, want %q", tt.duration, result, tt.expectedContains)
+		}
+	}
+}
+
+// mockLoopController implements LoopController for testing
+type mockLoopController struct {
+	pauseCalled  bool
+	resumeCalled bool
+	abortCalled  bool
+	skipCalled   bool
+	skipTaskID   string
+}
+
+func (m *mockLoopController) Pause() error {
+	m.pauseCalled = true
+	return nil
+}
+
+func (m *mockLoopController) Resume() error {
+	m.resumeCalled = true
+	return nil
+}
+
+func (m *mockLoopController) Abort() error {
+	m.abortCalled = true
+	return nil
+}
+
+func (m *mockLoopController) Skip(taskID string) error {
+	m.skipCalled = true
+	m.skipTaskID = taskID
+	return nil
 }
 

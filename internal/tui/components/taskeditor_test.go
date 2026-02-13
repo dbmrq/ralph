@@ -162,3 +162,131 @@ func TestTaskEditor_View_ShowsTitle(t *testing.T) {
 	}
 }
 
+func TestTaskEditor_View_EditMode(t *testing.T) {
+	e := NewTaskEditor()
+	testTask := task.NewTask("TEST-001", "Test Task", "Test Description")
+
+	e.StartEdit(testTask)
+	view := e.View()
+
+	if !strings.Contains(view, "Edit Task") {
+		t.Errorf("expected view to contain 'Edit Task' when editing")
+	}
+}
+
+func TestTaskEditor_Update_TabNavigation(t *testing.T) {
+	e := NewTaskEditor()
+	e.StartAdd()
+
+	// Tab should navigate to next field
+	e.Update(tea.KeyMsg{Type: tea.KeyTab})
+	if e.focusField != 1 {
+		t.Errorf("expected focusField 1 after Tab, got %d", e.focusField)
+	}
+
+	// Tab again should wrap to first field
+	e.Update(tea.KeyMsg{Type: tea.KeyTab})
+	if e.focusField != 0 {
+		t.Errorf("expected focusField 0 after Tab wrap, got %d", e.focusField)
+	}
+}
+
+func TestTaskEditor_Update_ShiftTabNavigation(t *testing.T) {
+	e := NewTaskEditor()
+	e.StartAdd()
+	e.focusField = 0
+
+	// Shift+Tab should navigate to previous field (wrap around)
+	e.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
+	if e.focusField != 1 {
+		t.Errorf("expected focusField 1 after Shift+Tab, got %d", e.focusField)
+	}
+}
+
+func TestTaskEditor_Update_DownNavigation(t *testing.T) {
+	e := NewTaskEditor()
+	e.StartAdd()
+
+	// Down should navigate like Tab
+	e.Update(tea.KeyMsg{Type: tea.KeyDown})
+	if e.focusField != 1 {
+		t.Errorf("expected focusField 1 after Down, got %d", e.focusField)
+	}
+}
+
+func TestTaskEditor_Update_UpNavigation(t *testing.T) {
+	e := NewTaskEditor()
+	e.StartAdd()
+	e.focusField = 1
+
+	// Up should navigate like Shift+Tab
+	e.Update(tea.KeyMsg{Type: tea.KeyUp})
+	if e.focusField != 0 {
+		t.Errorf("expected focusField 0 after Up, got %d", e.focusField)
+	}
+}
+
+func TestTaskEditor_Update_EnterSubmits(t *testing.T) {
+	e := NewTaskEditor()
+	e.StartAdd()
+	e.nameInput.SetValue("Valid Task Name")
+
+	cmd := e.Update(tea.KeyMsg{Type: tea.KeyEnter})
+
+	// Should return a submit message
+	if cmd == nil {
+		t.Fatal("expected a command from Enter")
+	}
+	msg := cmd()
+	submitMsg, ok := msg.(TaskEditorSubmitMsg)
+	if !ok {
+		t.Fatalf("expected TaskEditorSubmitMsg, got %T", msg)
+	}
+	if submitMsg.Name != "Valid Task Name" {
+		t.Errorf("expected name 'Valid Task Name', got '%s'", submitMsg.Name)
+	}
+	if submitMsg.Mode != TaskEditorModeAdd {
+		t.Errorf("expected mode TaskEditorModeAdd, got %v", submitMsg.Mode)
+	}
+}
+
+func TestTaskEditor_Update_EnterInvalidDoesNotSubmit(t *testing.T) {
+	e := NewTaskEditor()
+	e.StartAdd()
+	// Leave name empty
+
+	cmd := e.Update(tea.KeyMsg{Type: tea.KeyEnter})
+
+	// Should return nil (no submission)
+	if cmd != nil {
+		t.Error("expected no command when name is empty")
+	}
+	if !e.IsActive() {
+		t.Error("expected editor to still be active")
+	}
+}
+
+func TestTaskEditor_Update_TextInput(t *testing.T) {
+	e := NewTaskEditor()
+	e.StartAdd()
+
+	// Type a character
+	e.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("T")})
+
+	// The name input should have received the input
+	// (Bubble Tea text inputs handle this automatically)
+}
+
+func TestTaskEditorModeConstants(t *testing.T) {
+	// Verify mode constants have expected values
+	if TaskEditorModeView != 0 {
+		t.Errorf("expected TaskEditorModeView = 0, got %d", TaskEditorModeView)
+	}
+	if TaskEditorModeAdd != 1 {
+		t.Errorf("expected TaskEditorModeAdd = 1, got %d", TaskEditorModeAdd)
+	}
+	if TaskEditorModeEdit != 2 {
+		t.Errorf("expected TaskEditorModeEdit = 2, got %d", TaskEditorModeEdit)
+	}
+}
+

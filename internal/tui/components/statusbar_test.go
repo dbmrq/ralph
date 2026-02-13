@@ -152,3 +152,96 @@ func TestStatusBar_formatDuration(t *testing.T) {
 	}
 }
 
+func TestStatusBar_View_NoShortcuts(t *testing.T) {
+	sb := NewStatusBar()
+	sb.SetShowShortcuts(false)
+
+	view := sb.View()
+
+	// Should not contain shortcut keys when disabled
+	if strings.Contains(view, "pause") && strings.Contains(view, "skip") {
+		t.Error("expected shortcuts to be hidden")
+	}
+}
+
+func TestStatusBar_View_WithMessage(t *testing.T) {
+	sb := NewStatusBar()
+	sb.SetMessage("Processing task...")
+
+	view := sb.View()
+
+	if !strings.Contains(view, "Processing task...") {
+		t.Errorf("expected message in view, got: %s", view)
+	}
+}
+
+func TestStatusBar_View_StatusIndicators(t *testing.T) {
+	sb := NewStatusBar()
+
+	// Test pass status
+	sb.SetBuildStatus("pass")
+	sb.SetTestStatus("pass")
+	view := sb.View()
+	if !strings.Contains(view, "✓") {
+		t.Error("expected checkmark for pass status")
+	}
+
+	// Test fail status
+	sb.SetBuildStatus("fail")
+	view = sb.View()
+	if !strings.Contains(view, "✗") {
+		t.Error("expected X for fail status")
+	}
+
+	// Test running status
+	sb.SetBuildStatus("running")
+	view = sb.View()
+	if !strings.Contains(view, "◐") {
+		t.Error("expected running indicator")
+	}
+
+	// Test pending (default)
+	sb.SetBuildStatus("pending")
+	view = sb.View()
+	if !strings.Contains(view, "○") {
+		t.Error("expected pending indicator")
+	}
+}
+
+func TestStatusBar_View_LoopStateIcons(t *testing.T) {
+	sb := NewStatusBar()
+
+	tests := []struct {
+		state    string
+		contains string
+	}{
+		{"running", "Running"},
+		{"paused", "Paused"},
+		{"completed", "Complete"},
+		{"failed", "Failed"},
+		{"idle", "Idle"},
+	}
+
+	for _, tt := range tests {
+		sb.SetLoopState(tt.state)
+		view := sb.View()
+		if !strings.Contains(view, tt.contains) {
+			t.Errorf("expected '%s' for loop state '%s', got: %s", tt.contains, tt.state, view)
+		}
+	}
+}
+
+func TestStatusBar_View_WithWidth(t *testing.T) {
+	sb := NewStatusBar()
+	sb.SetWidth(100)
+	sb.SetElapsedTime(1 * time.Minute)
+	sb.SetIteration(1)
+
+	view := sb.View()
+
+	// Just verify it renders without panic
+	if view == "" {
+		t.Error("expected non-empty view")
+	}
+}
+
