@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/wexinc/ralph/internal/task"
+	"github.com/wexinc/ralph/internal/tui/components"
 )
 
 // Message types for TUI state updates.
@@ -138,4 +139,11 @@ type FormSubmitMsg struct {
 type FormCancelMsg struct {
 	FormID string
 }
+
+// AnalysisConfirmedMsg is sent when the user confirms the project analysis.
+// The Analysis field contains the (potentially modified) analysis data.
+type AnalysisConfirmedMsg = components.AnalysisConfirmedMsg
+
+// ReanalyzeRequestedMsg is sent when the user requests to re-run project analysis.
+type ReanalyzeRequestedMsg = components.ReanalyzeRequestedMsg
 
