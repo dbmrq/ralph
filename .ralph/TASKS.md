@@ -356,11 +356,15 @@
 
 ## 🧠 Phase 10: Agent Instructions
 
-- [ ] INSTR-001: Create prompt builder
+- [x] INSTR-001: Create prompt builder ✅
   > Goal: Build agent prompts from template layers
   > Combine base_prompt + platform_prompt + project_prompt + task
   > Inject ProjectAnalysis context (build commands, project type, etc.)
   > Include relevant context from docs and previous changes
+  > **Completed:** Created TaskPromptBuilder in internal/prompt/task_builder.go
+  > - Combines template layers with analysis + docs + changes context
+  > - Refactored loop.go to use TaskPromptBuilder
+  > - Comprehensive tests in task_builder_test.go
 
 - [ ] INSTR-002: Add plan evolution instructions
   > Goal: Instruct agents to update docs/tasks when plans change

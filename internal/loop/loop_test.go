@@ -12,6 +12,7 @@ import (
 	"github.com/wexinc/ralph/internal/agent"
 	"github.com/wexinc/ralph/internal/build"
 	"github.com/wexinc/ralph/internal/config"
+	"github.com/wexinc/ralph/internal/prompt"
 	"github.com/wexinc/ralph/internal/task"
 )
 
@@ -480,23 +481,21 @@ func TestLoop_Context(t *testing.T) {
 	}
 }
 
-func TestLoop_buildAnalysisContext(t *testing.T) {
-	mockAg := &mockAgent{name: "test-agent"}
-	taskMgr := newTestManager(t)
-	cfg := newTestConfig()
-
-	l := NewLoop(mockAg, taskMgr, nil, cfg, "/tmp/project")
+func TestTaskPromptBuilder_AnalysisContext_InLoop(t *testing.T) {
+	// These tests verify that the prompt package's TaskPromptBuilder properly
+	// handles analysis context. The actual logic was moved from loop to prompt.
 
 	t.Run("nil analysis", func(t *testing.T) {
-		ctx := l.buildAnalysisContext()
+		builder := prompt.NewTaskPromptBuilder(nil)
+		ctx := builder.FormatAnalysisContext()
 		if ctx != "Project analysis not available." {
-			t.Errorf("buildAnalysisContext() = %q, want 'Project analysis not available.'", ctx)
+			t.Errorf("FormatAnalysisContext() = %q, want 'Project analysis not available.'", ctx)
 		}
 	})
 
 	t.Run("with analysis", func(t *testing.T) {
-		l.SetAnalysis(newTestAnalysis())
-		ctx := l.buildAnalysisContext()
+		builder := prompt.NewTaskPromptBuilder(nil).SetAnalysis(newTestAnalysis())
+		ctx := builder.FormatAnalysisContext()
 
 		// Should contain project type
 		if !contains(ctx, "Project Type: go") {
@@ -515,26 +514,24 @@ func TestLoop_buildAnalysisContext(t *testing.T) {
 	t.Run("greenfield project", func(t *testing.T) {
 		greenfield := newTestAnalysis()
 		greenfield.IsGreenfield = true
-		l.SetAnalysis(greenfield)
+		builder := prompt.NewTaskPromptBuilder(nil).SetAnalysis(greenfield)
 
-		ctx := l.buildAnalysisContext()
+		ctx := builder.FormatAnalysisContext()
 		if !contains(ctx, "Greenfield project") {
 			t.Error("missing Greenfield indicator in context")
 		}
 	})
 }
 
-func TestLoop_buildTaskContent(t *testing.T) {
-	mockAg := &mockAgent{name: "test-agent"}
-	taskMgr := newTestManager(t)
-	cfg := newTestConfig()
-
-	l := NewLoop(mockAg, taskMgr, nil, cfg, "/tmp/project")
+func TestTaskPromptBuilder_TaskContent_InLoop(t *testing.T) {
+	// These tests verify that the prompt package's TaskPromptBuilder properly
+	// handles task content formatting. The actual logic was moved from loop to prompt.
 
 	tsk := task.NewTask("TASK-001", "Test task", "Test description for the task")
+	builder := prompt.NewTaskPromptBuilder(nil)
 
 	t.Run("first iteration", func(t *testing.T) {
-		content := l.buildTaskContent(tsk, 1)
+		content := builder.FormatTaskContent(tsk, 1)
 
 		if !contains(content, "**Task ID:** TASK-001") {
 			t.Error("missing Task ID")
@@ -552,7 +549,7 @@ func TestLoop_buildTaskContent(t *testing.T) {
 	})
 
 	t.Run("later iteration", func(t *testing.T) {
-		content := l.buildTaskContent(tsk, 3)
+		content := builder.FormatTaskContent(tsk, 3)
 
 		if !contains(content, "**Iteration:** 3") {
 			t.Error("missing Iteration indicator")

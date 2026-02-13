@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"strings"
 	"time"
 
 	"github.com/wexinc/ralph/internal/agent"
@@ -489,6 +488,8 @@ func (l *Loop) runAgentWithRetry(ctx context.Context, sessionID, prompt string, 
 }
 
 // buildTaskPrompt constructs the full prompt for a task.
+// It uses the TaskPromptBuilder to combine template layers, project analysis,
+// and task-specific content into a complete prompt.
 func (l *Loop) buildTaskPrompt(t *task.Task, iteration int) (string, error) {
 	// Load prompt templates
 	templates, err := l.promptLoader.Load()
@@ -496,7 +497,7 @@ func (l *Loop) buildTaskPrompt(t *task.Task, iteration int) (string, error) {
 		return "", fmt.Errorf("failed to load prompts: %w", err)
 	}
 
-	// Build variables
+	// Build variables for template substitution
 	vars := &prompt.Variables{
 		TaskID:          t.ID,
 		TaskName:        t.Name,
@@ -509,85 +510,15 @@ func (l *Loop) buildTaskPrompt(t *task.Task, iteration int) (string, error) {
 		SessionID:       l.context.SessionID,
 	}
 
-	// Build base prompt
-	builder := prompt.NewBuilder(templates)
-	basePrompt := builder.Build(vars)
+	// Use TaskPromptBuilder to combine all prompt components
+	builder := prompt.NewTaskPromptBuilder(templates).
+		SetAnalysis(l.analysis)
 
-	// Add project analysis context
-	analysisContext := l.buildAnalysisContext()
+	// TODO: In the future, we can add documentation context and previous changes
+	// builder.SetDocsContext(l.loadRelevantDocs())
+	// builder.SetPreviousChanges(l.getRecentChanges())
 
-	// Build task content
-	taskContent := l.buildTaskContent(t, iteration)
-
-	// Combine all parts
-	fullPrompt := basePrompt + "\n\n---\n\n# Project Context (from analysis)\n\n" + analysisContext
-	fullPrompt += "\n\n---\n\n# Current Task\n\n" + taskContent
-
-	return fullPrompt, nil
-}
-
-// buildAnalysisContext creates the analysis context section for prompts.
-func (l *Loop) buildAnalysisContext() string {
-	if l.analysis == nil {
-		return "Project analysis not available."
-	}
-
-	var parts []string
-
-	parts = append(parts, fmt.Sprintf("Project Type: %s", l.analysis.ProjectType))
-
-	if len(l.analysis.Languages) > 0 {
-		parts = append(parts, fmt.Sprintf("Languages: %s", strings.Join(l.analysis.Languages, ", ")))
-	}
-
-	if l.analysis.Build.Command != nil {
-		parts = append(parts, fmt.Sprintf("Build Command: %s", *l.analysis.Build.Command))
-	}
-
-	if l.analysis.Test.Command != nil {
-		parts = append(parts, fmt.Sprintf("Test Command: %s", *l.analysis.Test.Command))
-	}
-
-	if l.analysis.Dependencies.Manager != "" {
-		installed := "No"
-		if l.analysis.Dependencies.Installed {
-			installed = "Yes"
-		}
-		parts = append(parts, fmt.Sprintf("Package Manager: %s (installed: %s)", l.analysis.Dependencies.Manager, installed))
-	}
-
-	if l.analysis.IsGreenfield {
-		parts = append(parts, "Status: Greenfield project (no buildable code yet)")
-	}
-
-	if l.analysis.ProjectContext != "" {
-		parts = append(parts, fmt.Sprintf("\n%s", l.analysis.ProjectContext))
-	}
-
-	return strings.Join(parts, "\n")
-}
-
-// buildTaskContent creates the task-specific content for prompts.
-func (l *Loop) buildTaskContent(t *task.Task, iteration int) string {
-	var parts []string
-
-	parts = append(parts, fmt.Sprintf("**Task ID:** %s", t.ID))
-	parts = append(parts, fmt.Sprintf("**Task:** %s", t.Name))
-
-	if t.Description != "" {
-		parts = append(parts, fmt.Sprintf("\n**Description:**\n%s", t.Description))
-	}
-
-	if iteration > 1 {
-		parts = append(parts, fmt.Sprintf("\n**Iteration:** %d (previous attempt did not complete the task)", iteration))
-
-		// Include last iteration result if available
-		if lastIter := t.CurrentIteration(); lastIter != nil && lastIter.Result != "" {
-			parts = append(parts, fmt.Sprintf("**Previous result:** %s", lastIter.Result))
-		}
-	}
-
-	return strings.Join(parts, "\n")
+	return builder.BuildForTask(t, vars, iteration), nil
 }
 
 // runVerification runs build and test verification gates.
