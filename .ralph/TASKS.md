@@ -48,7 +48,7 @@
   > Support environment variable overrides
   > Validate configuration and provide clear error messages
 
-- [ ] CONFIG-003: Add prompt template loading
+- [x] CONFIG-003: Add prompt template loading
   > Goal: Load base_prompt.txt, platform_prompt.txt, project_prompt.txt
   > Implement 3-level prompt system from ARCHITECTURE.md
   > Support template variables substitution
