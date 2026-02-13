@@ -7,21 +7,24 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/wexinc/ralph/internal/loop"
 	"github.com/wexinc/ralph/internal/task"
 	"github.com/wexinc/ralph/internal/tui/components"
 	"github.com/wexinc/ralph/internal/tui/styles"
 )
 
-// LoopState represents the current state of the Ralph loop.
-type LoopState string
+// LoopState is an alias for loop.State for convenience within the TUI package.
+// The authoritative state machine is defined in internal/loop/state.go.
+type LoopState = loop.State
 
+// Loop state constants - aliases for loop package constants.
 const (
-	LoopStateIdle        LoopState = "idle"
-	LoopStateRunning     LoopState = "running"
-	LoopStatePaused      LoopState = "paused"
-	LoopStateAwaitingFix LoopState = "awaiting_fix"
-	LoopStateCompleted   LoopState = "completed"
-	LoopStateFailed      LoopState = "failed"
+	LoopStateIdle        = loop.StateIdle
+	LoopStateRunning     = loop.StateRunning
+	LoopStatePaused      = loop.StatePaused
+	LoopStateAwaitingFix = loop.StateAwaitingFix
+	LoopStateCompleted   = loop.StateCompleted
+	LoopStateFailed      = loop.StateFailed
 )
 
 // Model is the Bubble Tea model for the Ralph TUI.

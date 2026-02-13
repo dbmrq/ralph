@@ -282,7 +282,7 @@
 
 ## 🔄 Phase 8: Main Loop & Session Management
 
-- [ ] LOOP-001: Create loop state machine
+- [x] LOOP-001: Create loop state machine
   > Goal: Define LoopState enum and transitions
   > States: Idle, Running, Paused, AwaitingFix, Completed, Failed
   > Handle state persistence for resume
