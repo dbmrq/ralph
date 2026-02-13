@@ -287,7 +287,7 @@
   > States: Idle, Running, Paused, AwaitingFix, Completed, Failed
   > Handle state persistence for resume
 
-- [ ] LOOP-002: Implement core loop execution
+- [x] LOOP-002: Implement core loop execution
   > Goal: Create loop.go with main execution logic
   > Run Project Analysis Agent FIRST (before any tasks)
   > Inject ProjectAnalysis context into agent prompts
