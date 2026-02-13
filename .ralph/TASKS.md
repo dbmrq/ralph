@@ -219,7 +219,7 @@
   > In headless mode: Skip confirmation, use AI results directly (log them)
   > Reference: FEATURES.md Section 4 "Interactive Confirmation"
 
-- [ ] BUILD-001b: Add task list detection and initialization
+- [x] BUILD-001b: Add task list detection and initialization
   > Goal: Detect or create task list as part of initial setup flow
   > **Part 1 - Detection** (in Project Analysis Agent):
   >   - Extend analysis prompt to detect existing task lists in repo

@@ -147,3 +147,15 @@ type AnalysisConfirmedMsg = components.AnalysisConfirmedMsg
 // ReanalyzeRequestedMsg is sent when the user requests to re-run project analysis.
 type ReanalyzeRequestedMsg = components.ReanalyzeRequestedMsg
 
+// TaskInitSelectedMsg is sent when the user selects a task init mode.
+type TaskInitSelectedMsg = components.TaskInitSelectedMsg
+
+// TaskInitCancelledMsg is sent when the user cancels task init.
+type TaskInitCancelledMsg = components.TaskInitCancelledMsg
+
+// TaskListConfirmedMsg is sent when the user confirms the task list.
+type TaskListConfirmedMsg = components.TaskListConfirmedMsg
+
+// TaskListReparseMsg is sent when the user wants to re-parse the task list.
+type TaskListReparseMsg = components.TaskListReparseMsg
+

@@ -19,6 +19,7 @@ Examples:
   ralph run                    # Start in TUI mode
   ralph run --headless         # Start in headless mode
   ralph run --headless --output json  # Headless with JSON output
+  ralph run --headless --tasks ./TASKS.md  # Use specific task file
   ralph run --continue <id>    # Resume a paused session`,
 	RunE: runRun,
 }
@@ -29,6 +30,7 @@ func init() {
 	runCmd.Flags().Bool("headless", false, "Run in headless mode without TUI")
 	runCmd.Flags().Bool("output", false, "Output in JSON format (requires --headless)")
 	runCmd.Flags().String("continue", "", "Continue a paused session by ID")
+	runCmd.Flags().String("tasks", "", "Path to task file (required for headless mode if no tasks.json exists)")
 }
 
 // runRun is the main entry point for the run command.
@@ -36,6 +38,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 	headless, _ := cmd.Flags().GetBool("headless")
 	outputJSON, _ := cmd.Flags().GetBool("output")
 	continueID, _ := cmd.Flags().GetString("continue")
+	tasksPath, _ := cmd.Flags().GetString("tasks")
 
 	if outputJSON && !headless {
 		return fmt.Errorf("--output flag requires --headless mode")
@@ -44,6 +47,9 @@ func runRun(cmd *cobra.Command, args []string) error {
 	// TODO: LOOP-001+ will implement actual loop execution
 	if headless {
 		cmd.Println("Starting Ralph in headless mode...")
+		if tasksPath != "" {
+			cmd.Printf("Using task file: %s\n", tasksPath)
+		}
 		if continueID != "" {
 			cmd.Printf("Continuing session: %s\n", continueID)
 		}
