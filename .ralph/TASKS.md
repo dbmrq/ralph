@@ -135,7 +135,7 @@
   > Run agent with custom prompt
   > Support optional model and agent specification
 
-- [ ] HOOK-004: Add hook manager
+- [x] HOOK-004: Add hook manager
   > Goal: Create HookManager for hook orchestration
   > Execute pre-task and post-task hooks in order
   > Handle failures according to configured failure modes
