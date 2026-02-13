@@ -53,7 +53,7 @@
   > Implement 3-level prompt system from ARCHITECTURE.md
   > Support template variables substitution
 
-- [ ] CONFIG-004: Add smart timeout configuration
+- [x] CONFIG-004: Add smart timeout configuration
   > Goal: Implement dual timeout system (active vs stuck)
   > Default: active=2h, stuck=30m
   > Monitor agent output to detect stuck state
