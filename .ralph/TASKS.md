@@ -426,10 +426,15 @@
   > - manager_test.go: Context cancelled before start, NewManagerFromConfigWithAgents error, PostTask error, mixed failure modes, logger for failures, nil task/result contexts
   > - hook_test.go: Empty HookContext, all HookResult methods, BaseHook all fields, mixed hook types, nil config
 
-- [ ] TEST-005: Add integration tests
+- [x] TEST-005: Add integration tests
   > Goal: Test full loop with mock agent
   > Test session persistence and resume
   > Test headless mode output
+  > **Completed:** Created comprehensive integration tests in internal/loop/integration_test.go:
+  > - Full loop tests: MultipleTasks, TaskWithMultipleIterations, TaskExceedsMaxIterations
+  > - Session tests: SaveAndResume, ContinuesFromPausedState, ResumeLatest
+  > - Headless tests: TextOutput, JSONOutput, WithHooks
+  > - Total: 9 integration tests covering full loop execution, session persistence, and headless mode
 
 - [ ] TEST-006: Add TUI tests
   > Goal: Test TUI state updates
