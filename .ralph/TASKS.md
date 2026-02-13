@@ -324,7 +324,7 @@
 > **Note**: These build on Phase 6 TUI Foundation. Phase 6 provides the app shell and form components.
 > This phase adds the main loop views: task list, log viewport, status bar, etc.
 
-- [ ] TUI-003: Implement task list and status bar components
+- [x] TUI-003: Implement task list and status bar components
   > Goal: Create components/taskList.go
   > Scrollable task list with status icons (✓ ○ → ⊘ ⏸ ✗)
   > Highlight current task, support j/k or arrow key navigation
