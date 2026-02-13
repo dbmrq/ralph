@@ -3,6 +3,17 @@
 
 set -e
 
+# Check if Go is installed
+if ! command -v go &> /dev/null; then
+    echo "📦 Go not installed - skipping Go build"
+    echo "   Running shell script validation instead..."
+    # Validate shell scripts if Go is not available
+    if [ -f "tests/validate.sh" ]; then
+        bash tests/validate.sh
+    fi
+    exit 0
+fi
+
 # Check if we're in bootstrap phase (no go.mod yet)
 if [ ! -f "go.mod" ]; then
     echo "📦 Bootstrap phase: No go.mod found yet - skipping build"

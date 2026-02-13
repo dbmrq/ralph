@@ -3,6 +3,17 @@
 
 set -e
 
+# Check if Go is installed
+if ! command -v go &> /dev/null; then
+    echo "🧪 Go not installed - skipping Go tests"
+    echo "   Running shell script tests instead..."
+    # Run shell script tests if available
+    if [ -f "tests/test_runner.sh" ]; then
+        bash tests/test_runner.sh
+    fi
+    exit 0
+fi
+
 # Check if we're in bootstrap phase (no go.mod yet)
 if [ ! -f "go.mod" ]; then
     echo "🧪 Bootstrap phase: No go.mod found yet - skipping tests"

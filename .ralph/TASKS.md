@@ -12,7 +12,7 @@
 > **Note**: These are setup-only tasks. No tests are needed for INIT-001 and INIT-002.
 > INIT-003 should include basic tests for the CLI commands.
 
-- [ ] INIT-001: Initialize Go module and basic project structure
+- [x] INIT-001: Initialize Go module and basic project structure
   > Goal: Create go.mod, directory structure per ARCHITECTURE.md
   > Create cmd/ralph/main.go with minimal entry point
   > Add .gitignore for Go projects

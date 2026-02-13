@@ -17,3 +17,32 @@ Thumbs.db
 # But keep templates
 !templates/
 
+# Go binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+/ralph
+
+# Go test binary, built with `go test -c`
+*.test
+
+# Go coverage tool output
+*.out
+coverage.html
+
+# Go dependency directories
+vendor/
+
+# Go workspace file
+go.work
+go.work.sum
+
+# Build output directory
+/dist/
+/build/
+
+# Debug binaries
+__debug_bin*
+
