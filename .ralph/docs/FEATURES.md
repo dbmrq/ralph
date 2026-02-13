@@ -88,38 +88,348 @@ hooks:
 - `ITERATION`: Current iteration number
 - `PROJECT_DIR`: Project root directory
 
-## 4. Bootstrap/Greenfield Detection
+## 4. Project Analysis Agent (AI-Driven Detection)
 
 ### Problem
-Greenfield projects start with no buildable code or tests. Traditional build/test gates would fail immediately because there's nothing to build or test yet.
+Greenfield projects start with no buildable code or tests. Traditional build/test gates would fail immediately because there's nothing to build or test yet. Additionally, hardcoded language-specific patterns are brittle, require maintenance, and can't handle new languages or custom build systems.
 
-### Solution
-Ralph Go automatically detects bootstrap state and gracefully skips verification:
+### Solution: AI-Driven Project Analysis
+Ralph Go uses the AI agent itself to analyze and understand the project. Before starting the task loop, a **Project Analysis Agent** runs with a structured prompt to detect project characteristics dynamically.
+
+This approach has several advantages:
+- **Language-agnostic**: Works with any language, including future ones
+- **Context-aware**: AI understands project context, not just file patterns
+- **Zero configuration**: No user setup required
+- **Adaptable**: Handles complex scenarios (monorepos, polyglot projects, custom build systems)
+- **Self-improving**: As AI models improve, detection improves automatically
+
+### Project Analysis Agent
+Before the first task, Ralph runs an implicit "analysis" phase:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  RALPH LOOP START                                                │
+│                                                                  │
+│  1. Project Analysis Agent runs (once per session)               │
+│     → Analyzes codebase structure                                │
+│     → Returns structured ProjectAnalysis JSON                    │
+│                                                                  │
+│  2. Loop begins with detected configuration                      │
+│     → Build/test commands from analysis                          │
+│     → Bootstrap state from analysis                              │
+│     → Language-specific context injected into prompts            │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Project Analysis Prompt
+The agent receives a prompt like:
+
+```
+Analyze this project and return a JSON object with the following structure:
+
+{
+  "project_type": "go|node|python|rust|java|mixed|unknown",
+  "languages": ["go", "typescript"],  // All languages detected
+  "is_greenfield": true,              // No buildable code yet
+  "is_monorepo": false,               // Multiple packages/projects
+
+  "build": {
+    "ready": false,                   // Can we build?
+    "command": "go build ./...",      // Detected or null
+    "reason": "No source files yet"   // Human-readable explanation
+  },
+
+  "test": {
+    "ready": false,                   // Are there tests to run?
+    "command": "go test ./...",       // Detected or null
+    "has_test_files": false,
+    "reason": "No test files found"
+  },
+
+  "lint": {
+    "command": "golangci-lint run ./...",  // Detected or null
+    "available": true
+  },
+
+  "dependencies": {
+    "manager": "go mod",              // Package manager detected
+    "installed": true                 // Dependencies installed?
+  },
+
+  "project_context": "This is a Go CLI application using Cobra and Bubble Tea for TUI..."
+}
+
+Instructions:
+1. Examine the project structure (files, directories, config files)
+2. Look for build system markers (go.mod, package.json, Cargo.toml, etc.)
+3. Detect what commands would build/test this project
+4. Determine if the project is in a "greenfield" state (nothing to build yet)
+5. Return ONLY the JSON object, no other text
+```
+
+### ProjectAnalysis Go Type
+```go
+type ProjectAnalysis struct {
+    ProjectType   string   `json:"project_type"`
+    Languages     []string `json:"languages"`
+    IsGreenfield  bool     `json:"is_greenfield"`
+    IsMonorepo    bool     `json:"is_monorepo"`
+
+    Build         BuildAnalysis       `json:"build"`
+    Test          TestAnalysis        `json:"test"`
+    Lint          LintAnalysis        `json:"lint"`
+    Dependencies  DependencyAnalysis  `json:"dependencies"`
+
+    ProjectContext string `json:"project_context"`
+}
+
+type BuildAnalysis struct {
+    Ready   bool    `json:"ready"`
+    Command *string `json:"command"`  // nil if not detected
+    Reason  string  `json:"reason"`
+}
+
+type TestAnalysis struct {
+    Ready        bool    `json:"ready"`
+    Command      *string `json:"command"`
+    HasTestFiles bool    `json:"has_test_files"`
+    Reason       string  `json:"reason"`
+}
+```
+
+### Fallback: Manual Override
+Users can still override with explicit configuration if needed:
 
 ```yaml
 build:
-  bootstrap_detection: auto  # auto | manual | disabled
-  # auto: Detect based on project type (no go.mod, no package.json, etc.)
-  # manual: Use bootstrap_check command
-  # disabled: Always run build/test commands
-  bootstrap_check: ""        # Custom command (exit 0 = bootstrap, non-zero = ready)
+  command: "./custom-build.sh"  # Explicit override, skip AI detection
+
+test:
+  command: "./custom-test.sh"   # Explicit override
 ```
 
-### Bootstrap Detection Logic
-1. **Auto-detection** (default): Check for project markers
-   - Go: `go.mod` exists AND `*.go` files exist
-   - Node: `package.json` exists AND `node_modules/` exists
-   - Python: `setup.py` or `pyproject.toml` exists
-   - Generic: At least one source file matching configured patterns
+When explicit commands are provided, the analysis agent still runs but those fields are overridden.
 
-2. **Custom check**: Run user-provided command
-   - Exit 0 = still in bootstrap phase (skip verification)
-   - Non-zero = project ready for verification
+### Interactive Confirmation (TUI)
 
-3. **Test file detection**: Separate check for test readiness
-   - Go: `*_test.go` files exist
-   - Node: `*.test.js` or `*.spec.js` files exist
-   - Python: `test_*.py` or `*_test.py` files exist
+After the AI analysis completes, results are presented in an **editable form** for user confirmation. This ensures transparency and allows users to tweak settings before the task loop begins.
+
+#### Analysis Progress Feedback
+During analysis, the TUI shows real-time progress:
+```
+┌─────────────────────────────────────────────────────────────┐
+│  🔍 Analyzing Project...                                    │
+│                                                             │
+│  ⠼ Running AI analysis...                          00:03   │
+│                                                             │
+│  ✓ Detected project structure                               │
+│  ✓ Found go.mod, package.json                               │
+│  ⠼ Determining build commands...                            │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### Confirmation Form
+Once analysis completes, an editable form is displayed:
+```
+┌─────────────────────────────────────────────────────────────┐
+│  📋 Project Analysis Results                    [Re-analyze]│
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Project Type    [ Go CLI                    ▼]             │
+│  Languages       [ go                          ]            │
+│                                                             │
+│  Build Command   [ go build ./cmd/ralph        ]            │
+│  Build Ready     [✓]                                        │
+│                                                             │
+│  Test Command    [ go test -race ./...         ]            │
+│  Tests Ready     [✓]                                        │
+│                                                             │
+│  Greenfield      [ ]  (no buildable code yet)               │
+│                                                             │
+│  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄ │
+│  ▶ AI Reasoning (click to expand)                           │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│           [ Confirm & Start ]    [ Re-analyze ]             │
+└─────────────────────────────────────────────────────────────┘
+
+Tab: next field | Enter: confirm | Esc: cancel | r: re-analyze
+```
+
+#### Form Behavior
+- **Tab/Shift+Tab**: Navigate between fields
+- **Enter on field**: Edit text fields, toggle checkboxes
+- **Enter on "Confirm & Start"**: Accept settings and begin task loop
+- **r or "Re-analyze" button**: Run AI analysis again
+- **Esc**: Cancel and exit (with confirmation prompt)
+
+#### Headless Mode
+In headless mode (`--headless`), the confirmation form is skipped:
+- AI analysis results are logged to stdout
+- Settings are used directly without user confirmation
+- Use `--yes` flag to suppress any prompts
+
+```bash
+ralph run --headless
+# Output:
+# [INFO] Project Analysis:
+# [INFO]   Type: Go CLI
+# [INFO]   Build: go build ./cmd/ralph (ready)
+# [INFO]   Test: go test -race ./... (ready)
+# [INFO] Starting task loop...
+```
+
+#### Persisted Settings
+User modifications are saved to `.ralph/project_analysis.json`. On subsequent runs:
+- If cached analysis exists and is recent, show form pre-filled with cached values
+- User can still modify and re-analyze if needed
+- "Re-analyze" always runs fresh AI analysis
+
+### Task List Initialization
+
+The Project Analysis Agent also detects existing task lists in the repository. If found, they are automatically parsed; if not, the user is offered several ways to create one.
+
+#### Auto-Detection
+The analysis agent looks for existing task lists:
+- `.ralph/tasks.json` (our native format)
+- `TASKS.md`, `TODO.md`, `ROADMAP.md` (markdown task lists)
+- `.github/ISSUES.md` or linked GitHub issues
+- `docs/tasks.md`, `docs/TODO.md`
+
+If found, the `ProjectAnalysis` includes:
+```json
+{
+  "task_list": {
+    "detected": true,
+    "path": "TASKS.md",
+    "format": "markdown",
+    "task_count": 15
+  }
+}
+```
+
+#### Auto-Import Flow
+When a task list is detected:
+1. Agent parses the file into our JSON format
+2. Parsed tasks shown in confirmation form for review
+3. User can edit, reorder, add, or remove tasks
+4. "Confirm" saves to `.ralph/tasks.json`
+
+#### Manual Initialization (No Task List Found)
+If no task list is detected, the TUI offers options:
+```
+┌─────────────────────────────────────────────────────────────┐
+│  📋 No Task List Found                                      │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  How would you like to create your task list?               │
+│                                                             │
+│  [ 1 ] Point to a file                                      │
+│        Browse or enter path to existing task file           │
+│                                                             │
+│  [ 2 ] Paste a list                                         │
+│        Paste tasks from clipboard or type them              │
+│                                                             │
+│  [ 3 ] Describe your goal                                   │
+│        Describe what you want to build, AI generates tasks  │
+│                                                             │
+│  [ 4 ] Start empty                                          │
+│        Begin with no tasks, add them manually               │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Option 1: Point to a file**
+- File picker or path input
+- Agent parses any format (markdown, plain text, JSON, YAML)
+- Shows parsed tasks for confirmation
+
+**Option 2: Paste a list**
+- Text area for pasting
+- Agent parses pasted content (any format)
+- Shows parsed tasks for confirmation
+
+**Option 3: Describe your goal**
+- Text area for natural language description
+- Example: "Build a REST API with user authentication, database integration, and admin dashboard"
+- Agent generates a structured task list
+- Shows generated tasks for confirmation and editing
+
+**Option 4: Start empty**
+- Creates empty `.ralph/tasks.json`
+- User can add tasks via TUI task editor
+
+#### Task List Confirmation Form
+After parsing/generating, tasks are shown in an editable list:
+```
+┌─────────────────────────────────────────────────────────────┐
+│  📋 Task List (12 tasks)                        [Re-parse]  │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ○ TASK-001: Set up project structure                       │
+│    > Initialize Go module, create directories               │
+│                                                             │
+│  ○ TASK-002: Add core dependencies                          │
+│    > Add Cobra, Viper, Bubble Tea                           │
+│                                                             │
+│  ○ TASK-003: Create CLI skeleton                            │
+│    > Implement root command with subcommands                │
+│                                                             │
+│  ... (scroll for more)                                      │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│  [a]dd  [e]dit  [d]elete  [↑↓]move  [Enter]confirm          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### Headless Mode
+In headless mode, task list must be provided:
+```bash
+# Use existing tasks.json
+ralph run --headless
+
+# Point to a file (agent parses it)
+ralph run --headless --tasks ./TASKS.md
+
+# Pipe tasks via stdin
+cat tasks.txt | ralph run --headless --tasks -
+```
+
+### Context Injection into Task Prompts
+
+The `ProjectAnalysis.ProjectContext` field provides rich context that is injected into every task agent prompt. This enables:
+
+- **Language-aware instructions**: Agent knows "this is a Go project using Cobra for CLI"
+- **Build/test commands**: Agent knows exactly how to verify their work
+- **Dependency context**: Agent knows what tools are available
+
+Example injection into prompt:
+```
+# Project Context (from analysis)
+
+Project Type: Go CLI application
+Languages: Go
+Build Command: go build ./cmd/ralph
+Test Command: go test -race -cover ./...
+Package Manager: go mod
+Dependencies Installed: Yes
+
+This is a Go CLI application using Cobra for command handling and Bubble Tea
+for TUI. The project follows standard Go project layout with cmd/ and internal/
+directories.
+
+---
+
+# Your Task
+...
+```
+
+### Re-Analysis Triggers
+
+The Project Analysis Agent runs once per session by default, but re-runs when:
+- User explicitly requests it (TUI command or CLI flag)
+- Session detects major file structure changes (new package.json, go.mod, etc.)
+- Previous analysis is older than configurable threshold (default: 24 hours)
 
 ### Bootstrap State Behavior
 - **Build gate**: Skip with info message, exit 0

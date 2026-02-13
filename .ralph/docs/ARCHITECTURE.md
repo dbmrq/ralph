@@ -233,15 +233,9 @@ const (
 
 type TestConfig struct {
     Mode          TestMode `yaml:"mode"`
-    Command       string   `yaml:"command"`        // Test command (auto-detected if empty)
+    Command       string   `yaml:"command"`        // Test command (AI-detected if empty)
     BaselineFile  string   `yaml:"baseline_file"`  // Default: .ralph/test_baseline.json
     BaselineScope string   `yaml:"baseline_scope"` // global (default), session, task
-}
-
-type BootstrapState struct {
-    BuildReady bool   // Project has buildable code
-    TestReady  bool   // Project has test files
-    Reason     string // Human-readable explanation
 }
 ```
 
@@ -249,12 +243,14 @@ Test results are captured via exit codes (works for most languages). Custom pars
 
 ### Bootstrap-Aware Verification
 
-The verification system gracefully handles greenfield projects:
+The verification system gracefully handles greenfield projects using AI-driven analysis:
 
-1. **Bootstrap Detection**: Check if project has buildable code/tests
+1. **Project Analysis**: AI agent detects if project has buildable code/tests
 2. **Graceful Skip**: If not ready, skip verification with info message (exit 0)
 3. **Transition Handling**: When first code/tests appear, capture baseline automatically
 4. **Clear Logging**: Always explain why verification was skipped or what was checked
+
+The `ProjectAnalysis.Build.Ready` and `ProjectAnalysis.Test.Ready` fields from the analysis agent determine bootstrap state.
 
 ## Feedback System
 
@@ -294,12 +290,10 @@ git:
   commit_prefix: "[ralph]"
 
 build:
-  command: ""              # Build command (auto-detected if empty)
-  bootstrap_detection: auto  # auto | manual | disabled
-  bootstrap_check: ""      # Custom command for manual mode
+  command: ""              # Build command (AI-detected if empty)
 
 test:
-  command: ""              # Test command (auto-detected if empty)
+  command: ""              # Test command (AI-detected if empty)
   mode: gate               # gate | tdd | report
   baseline_file: .ralph/test_baseline.json
   baseline_scope: global   # global | session | task
@@ -309,16 +303,21 @@ hooks:
   post_task: []
 ```
 
-### Bootstrap Detection Modes
+### AI-Driven Project Analysis
 
-- **auto** (default): Detect based on project type markers
-  - Go: `go.mod` + `*.go` files
-  - Node: `package.json` + `node_modules/`
-  - Python: `setup.py` or `pyproject.toml`
+Instead of hardcoded language-specific patterns, Ralph uses the AI agent itself to analyze the project. Before starting the task loop, a **Project Analysis Agent** runs once per session to detect:
 
-- **manual**: Use custom `bootstrap_check` command
-  - Exit 0 = still bootstrapping (skip verification)
-  - Non-zero = ready for verification
+- Project type and languages
+- Build and test commands
+- Greenfield/bootstrap state
+- Dependency manager and status
+- Project context for enhanced prompts
 
-- **disabled**: Always run build/test commands
+This approach is:
+- **Language-agnostic**: Works with any language, including future ones
+- **Zero configuration**: No user setup required
+- **Context-aware**: AI understands project context, not just file patterns
+- **Self-improving**: As AI models improve, detection improves automatically
+
+See `FEATURES.md` Section 4 for full specification.
 

@@ -142,36 +142,125 @@
 
 ---
 
-## 🔨 Phase 6: Build & Test System
+## 🖥️ Phase 6: TUI Foundation
 
-- [ ] BUILD-001: Implement bootstrap/greenfield detection
-  > Goal: Create bootstrap.go with project state detection
-  > Auto-detect based on project type (Go: go.mod + *.go, Node: package.json, etc.)
-  > Support manual mode with custom bootstrap_check command
-  > Separate detection for build-ready vs test-ready states
-  > Return BootstrapState: { BuildReady, TestReady, Reason }
-  > Reference: FEATURES.md Section 4 "Bootstrap/Greenfield Detection"
+> **Note**: TUI foundation must be built before Project Analysis TUI components.
+> The basic Bubble Tea app structure is needed for confirmation forms and progress displays.
+
+- [x] TUI-001: Create basic Bubble Tea app with header and progress
+  > Goal: Create tui/app.go with Model, Init, Update, View
+  > Define messages for state updates
+  > Basic key handling (q to quit)
+  > Create components/header.go - display project name, agent, model, session ID
+  > Create components/progress.go - show completed/remaining task counts
+  > Style with Lip Gloss
+  > Create reusable form components (text input, checkbox, dropdown) for later use
+
+- [ ] TUI-002: Implement form components
+  > Goal: Create reusable form building blocks for confirmation screens
+  > Create components/form.go - form container with field navigation
+  > Create components/textinput.go - editable text field
+  > Create components/checkbox.go - toggle checkbox
+  > Create components/button.go - clickable button with focus state
+  > Tab/Shift+Tab navigation between fields
+  > Enter to activate/edit, Esc to cancel
+  > These will be used by analysis confirmation (BUILD-001a) and task list editor (BUILD-001b)
+
+---
+
+## 🔨 Phase 7: Project Analysis & Build System
+
+- [ ] BUILD-000: Refactor existing bootstrap detection to prepare for AI-driven analysis
+  > Goal: Remove hardcoded language patterns from internal/build/bootstrap.go
+  > This file currently has ~390 lines of pattern-based detection (Go, Node, Python, Rust)
+  > Changes needed:
+  >   - Remove detectGoProject(), detectNodeProject(), detectPythonProject(), detectRustProject() methods
+  >   - Remove DetectProjectType() method and ProjectType enum (will come from AI)
+  >   - Remove detectAuto() method that switches on project type
+  >   - Keep BootstrapState struct - it will be populated from ProjectAnalysis
+  >   - Keep detectManual() for users who want explicit control
+  >   - Simplify BootstrapDetector to accept ProjectAnalysis instead of doing detection
+  > Update internal/config/config.go:
+  >   - Keep BootstrapDetection enum but change semantics:
+  >     - "auto" → use AI-driven ProjectAnalysis (new default behavior)
+  >     - "manual" → use bootstrap_check command (keep as-is)
+  >     - "disabled" → always ready (keep as-is)
+  >   - Document that "auto" now means AI-driven, not pattern-based
+  > Keep helper methods (fileExists, dirExists) - may be useful elsewhere
+  > Tests: Update bootstrap_test.go to reflect simplified interface
+
+- [ ] BUILD-001: Implement Project Analysis Agent
+  > Goal: Create analysis.go with AI-driven project detection
+  > Run an implicit "analysis" agent before the task loop starts
+  > Agent prompt asks for structured JSON with project characteristics
+  > Parse response into ProjectAnalysis struct (see FEATURES.md Section 4)
+  > Detect: project type, languages, build/test commands, greenfield state
+  > Provide progress feedback during analysis (TUI spinner with status messages)
+  > Cache confirmed analysis in .ralph/project_analysis.json for session
+  > Re-run analysis if project structure changes significantly
+  > Fallback: If AI analysis fails, use minimal defaults and warn user
+  > Reference: FEATURES.md Section 4 "Project Analysis Agent"
+
+- [ ] BUILD-001a: Create TUI analysis confirmation form
+  > Goal: Present AI analysis results in an editable form for user confirmation
+  > Uses TUI-001 app structure and TUI-002 form components from Phase 6
+  > After analysis completes, show results in a form-style view:
+  >   - Project Type: [Go         ▼]  (dropdown or text field)
+  >   - Build Command: [go build ./...]  (editable text)
+  >   - Test Command: [go test ./...]   (editable text)
+  >   - Build Ready: [✓] Yes  [ ] No
+  >   - Test Ready: [✓] Yes  [ ] No
+  >   - Greenfield: [ ] Yes  [✓] No
+  > Show AI's reasoning/context below each field (collapsed by default)
+  > Keyboard navigation: Tab between fields, Enter to confirm, Esc to re-analyze
+  > "Confirm & Start" button to proceed with (possibly modified) settings
+  > "Re-analyze" button to run analysis again
+  > Save user modifications back to ProjectAnalysis before proceeding
+  > In headless mode: Skip confirmation, use AI results directly (log them)
+  > Reference: FEATURES.md Section 4 "Interactive Confirmation"
+
+- [ ] BUILD-001b: Add task list detection and initialization
+  > Goal: Detect or create task list as part of initial setup flow
+  > **Part 1 - Detection** (in Project Analysis Agent):
+  >   - Extend analysis prompt to detect existing task lists in repo
+  >   - Look for: TASKS.md, TODO.md, .ralph/tasks.json, GitHub issues, etc.
+  >   - Add to ProjectAnalysis: task_list_detected, task_list_path, task_list_format
+  > **Part 2 - Auto-import** (if task list found):
+  >   - Use agent to parse detected file into our JSON format
+  >   - Show parsed tasks in confirmation form for review
+  > **Part 3 - Manual initialization** (if no task list found):
+  >   - TUI offers options: "Point to file", "Paste list", "Describe goal"
+  >   - "Point to file": File picker or path input, agent parses it
+  >   - "Paste list": Text area, agent parses pasted content
+  >   - "Describe goal": Text area, agent generates task list from description
+  > **Part 4 - Task list confirmation form**:
+  >   - Show generated/parsed tasks in editable list
+  >   - User can add, remove, reorder, edit tasks
+  >   - "Confirm" saves to .ralph/tasks.json
+  > In headless mode: Require --tasks flag pointing to file, or existing tasks.json
+  > Reference: FEATURES.md Section 4 "Task List Initialization"
 
 - [ ] BUILD-002: Implement build verification
   > Goal: Create build.go with build execution logic
-  > Check bootstrap state first - skip gracefully if not ready
-  > Support custom build commands from config
-  > Auto-detect build command if not configured (go build, npm run build, etc.)
+  > Use ProjectAnalysis.Build.Command (from AI detection)
+  > Check ProjectAnalysis.Build.Ready - skip gracefully if not ready
+  > Support config override: if build.command is set, use that instead
   > Parse build output for errors
   > Return structured BuildResult with bootstrap awareness
 
 - [ ] BUILD-003: Implement test verification
   > Goal: Add test execution with configurable commands
-  > Check bootstrap state first - skip gracefully if no test files
+  > Use ProjectAnalysis.Test.Command (from AI detection)
+  > Check ProjectAnalysis.Test.Ready - skip gracefully if no test files
+  > Support config override: if test.command is set, use that instead
   > Primary: Use exit codes for pass/fail
   > Optional: Custom parsing for detailed test names
-  > Extract passing/failing test counts
   > Return structured TestResult with bootstrap awareness
 
 - [ ] BUILD-004: Add TDD mode support
   > Goal: Implement test baseline capture and comparison
-  > Handle bootstrap phase: no baseline until tests exist
-  > Auto-capture baseline when first test file appears
+  > Use ProjectAnalysis.Test.Ready to determine bootstrap phase
+  > Auto-capture baseline when ProjectAnalysis indicates tests exist
   > Global baseline by default (captured once at start)
   > Track newly passing vs regressing tests
   > Store baseline in .ralph/test_baseline.json
@@ -180,7 +269,8 @@
   > Reference: FEATURES.md Section 5 "TDD Mode"
 
 - [ ] BUILD-005: Create verification gate logic
-  > Goal: Orchestrate bootstrap check → build → test → gate decision
+  > Goal: Orchestrate project analysis → build → test → gate decision
+  > Use ProjectAnalysis for all bootstrap/readiness checks
   > Support gate, tdd, and report modes
   > Handle transitions: bootstrap → ready (log and capture baseline)
   > Parse task metadata for gate overrides (Tests: Not required, Build: Not required)
@@ -190,7 +280,7 @@
 
 ---
 
-## 🔄 Phase 7: Main Loop & Session Management
+## 🔄 Phase 8: Main Loop & Session Management
 
 - [ ] LOOP-001: Create loop state machine
   > Goal: Define LoopState enum and transitions
@@ -199,7 +289,9 @@
 
 - [ ] LOOP-002: Implement core loop execution
   > Goal: Create loop.go with main execution logic
-  > Integrate: task selection → hooks → agent → verify → commit
+  > Run Project Analysis Agent FIRST (before any tasks)
+  > Inject ProjectAnalysis context into agent prompts
+  > Integrate: analysis → task selection → hooks → agent → verify → commit
   > Respect iteration limits per task
 
 - [ ] LOOP-003: Add automatic commit logic
@@ -227,30 +319,25 @@
 
 ---
 
-## 🖥️ Phase 8: TUI Implementation
+## 🖥️ Phase 9: TUI Main Loop Views
 
-- [ ] TUI-001: Create basic Bubble Tea app with header and progress
-  > Goal: Create tui/app.go with Model, Init, Update, View
-  > Define messages for state updates
-  > Basic key handling (q to quit)
-  > Create components/header.go - display project name, agent, model, session ID
-  > Create components/progress.go - show completed/remaining task counts
-  > Style with Lip Gloss
+> **Note**: These build on Phase 6 TUI Foundation. Phase 6 provides the app shell and form components.
+> This phase adds the main loop views: task list, log viewport, status bar, etc.
 
-- [ ] TUI-002: Implement task list and status bar components
+- [ ] TUI-003: Implement task list and status bar components
   > Goal: Create components/taskList.go
   > Scrollable task list with status icons (✓ ○ → ⊘ ⏸ ✗)
   > Highlight current task, support j/k or arrow key navigation
   > Create components/status.go - elapsed time, iteration count, build/test status
   > Display keyboard shortcuts in status bar
 
-- [ ] TUI-003: Implement log viewport component
+- [ ] TUI-004: Implement log viewport component
   > Goal: Create components/log.go
   > Real-time agent output streaming
   > Scrollable with auto-follow
   > Option to open in $EDITOR
 
-- [ ] TUI-004: Implement task editor and model picker
+- [ ] TUI-005: Implement task editor and model picker
   > Goal: Create components/taskEditor.go
   > Add new tasks inline (e key), edit task name/description
   > Reorder tasks, save to JSON storage
@@ -258,7 +345,7 @@
   > List available models from current agent (m key)
   > Show current model indicator
 
-- [ ] TUI-005: Add keyboard controls and loop integration
+- [ ] TUI-006: Add keyboard controls and loop integration
   > Goal: Handle p (pause), s (skip), a (abort), l (logs), h (help)
   > Confirmation dialogs for destructive actions, help overlay
   > Connect loop events to TUI updates
@@ -267,11 +354,12 @@
 
 ---
 
-## 🧠 Phase 9: Agent Instructions
+## 🧠 Phase 10: Agent Instructions
 
 - [ ] INSTR-001: Create prompt builder
   > Goal: Build agent prompts from template layers
   > Combine base_prompt + platform_prompt + project_prompt + task
+  > Inject ProjectAnalysis context (build commands, project type, etc.)
   > Include relevant context from docs and previous changes
 
 - [ ] INSTR-002: Add plan evolution instructions
@@ -281,7 +369,7 @@
 
 ---
 
-## 🧪 Phase 10: Comprehensive Testing
+## 🧪 Phase 11: Comprehensive Testing
 
 > **Note**: Unit tests are written alongside each task (per base_prompt.txt Phase 4).
 > This phase adds **comprehensive integration tests** and improves coverage.
@@ -301,6 +389,7 @@
   > Test AgentRegistry plugin system
   > Test model listing, error handling
   > Test session continuation
+  > Test Project Analysis Agent response parsing and fallback behavior
 
 - [ ] TEST-004: Add unit tests for hooks
   > Goal: Test hook execution
@@ -315,19 +404,57 @@
 - [ ] TEST-006: Add TUI tests
   > Goal: Test TUI state updates
   > Test keyboard handling
+  > Test analysis confirmation form (field navigation, editing, confirm/re-analyze)
   > Use Bubble Tea testing utilities
 
 ---
 
-## 📦 Phase 11: Polish & Documentation
+## 📦 Phase 12: Installation & First-Run Experience
 
-- [ ] POLISH-001: Add init command implementation
-  > Goal: `ralph init` creates .ralph directory
-  > Generate default config.yaml
-  > Create empty tasks.json
-  > Copy prompt templates
+> **Note**: This is the first thing users experience. Make it seamless and delightful.
+> Goal: User runs `ralph` in any project → everything "just works"
 
-- [ ] POLISH-002: Add comprehensive error messages
+- [ ] INSTALL-001: Implement zero-config first run
+  > Goal: Running `ralph` or `ralph run` in a project without `.ralph/` triggers setup
+  > Detect missing `.ralph/` directory
+  > Instead of error, show friendly welcome and start setup flow:
+  >   1. Create `.ralph/` directory structure
+  >   2. Run Project Analysis Agent (BUILD-001)
+  >   3. Show analysis confirmation form (BUILD-001a)
+  >   4. Detect/create task list (BUILD-001b)
+  >   5. Show task list confirmation
+  >   6. Start the loop
+  > All in one seamless flow - no separate `ralph init` required
+  > Save config.yaml with confirmed settings
+
+- [ ] INSTALL-002: Implement explicit `ralph init` command
+  > Goal: For users who want to set up without running
+  > `ralph init` - interactive setup (same flow as INSTALL-001, but stops before loop)
+  > `ralph init --yes` - non-interactive, use AI defaults
+  > `ralph init --config config.yaml` - use provided config
+  > `ralph init --tasks TASKS.md` - point to existing task file
+  > If `.ralph/` exists: prompt to reconfigure or exit
+  > `ralph init --force` - overwrite existing config
+
+- [ ] INSTALL-003: Add installation documentation and distribution
+  > Goal: Make ralph easy to install globally
+  > Support `go install github.com/wexinc/ralph@latest`
+  > Create GitHub releases with pre-built binaries (goreleaser)
+  > Add install instructions to README:
+  >   - macOS: `brew install ralph` (if we publish to homebrew)
+  >   - Linux/macOS/Windows: Download binary from releases
+  >   - Go users: `go install`
+  > Create install script for curl-based install:
+  >   `curl -fsSL https://ralph.dev/install.sh | sh`
+
+- [ ] INSTALL-004: Add update and version management
+  > Goal: Easy updates and version checking
+  > `ralph version` - show current version
+  > `ralph update` - check for and install updates (if installed via our script)
+  > `ralph run` shows update notification if new version available (non-blocking)
+  > Store version info in `.ralph/version.json` for compatibility checks
+
+- [ ] POLISH-001: Add comprehensive error messages
   > Goal: Clear, actionable error messages
   > Suggest fixes for common issues (auth, missing config, etc.)
   > Include relevant documentation links
