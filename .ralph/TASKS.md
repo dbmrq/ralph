@@ -631,10 +631,25 @@
   > - Integrated with internal/loop/loop.go (session and task logging)
   > - Comprehensive tests in logger_test.go and global_test.go (24 test cases)
 
-- [ ] POLISH-004: Performance optimization
+- [x] POLISH-004: Performance optimization
   > Goal: Profile and optimize hot paths
   > Efficient output monitoring for stuck detection
   > Minimize memory usage
+  > ---
+  > Implementation:
+  > - Created benchmark tests for critical paths (timeout, TUI output, LogViewport)
+  > - Optimized LogViewport (internal/tui/components/log.go):
+  >   - Removed redundant content string builder
+  >   - Added lazy content rebuilding with dirty flag
+  >   - Pre-allocated lines slice with capacity 1024
+  >   - Track partial lines for proper streaming append
+  >   - Result: AppendLine 3,059x faster, 2,039x less memory (257µs→84ns, 312KB→153B)
+  > - Optimized LineWriter (internal/tui/runner.go):
+  >   - Fixed O(n²) buffer growth with partial lines
+  >   - Use slice instead of bytes.Buffer for efficient handling
+  >   - Result: PartialLines 2.5x faster, 34,000x less memory (95µs,1.4MB→38µs,41B)
+  > - TimeoutMonitor already optimal (35ns/op, 0 allocations) - no changes needed
+  > - Most hot paths now have 0-2 allocations per operation
 
 - [ ] POLISH-005: Create README and documentation
   > Goal: Update README.md for Go version

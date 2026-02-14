@@ -374,44 +374,46 @@ func (r *TUIRunner) Model() *Model {
 
 // LineWriter wraps a writer and sends each line individually.
 // This is useful when you need line-by-line output handling.
+// Optimized to avoid O(n²) buffer growth with partial lines.
 type LineWriter struct {
 	w       io.Writer
 	onLine  func(string)
 	scanner *bufio.Scanner
-	buf     bytes.Buffer
+	buf     []byte // Use slice instead of bytes.Buffer for efficient partial line handling
 }
 
 // NewLineWriter creates a writer that calls onLine for each complete line.
 func NewLineWriter(onLine func(string)) *LineWriter {
 	return &LineWriter{
 		onLine: onLine,
+		buf:    make([]byte, 0, 256), // Pre-allocate reasonable initial capacity
 	}
 }
 
 // Write implements io.Writer.
 func (lw *LineWriter) Write(p []byte) (n int, err error) {
 	n = len(p)
-	lw.buf.Write(p)
 
+	// Append new data to buffer
+	lw.buf = append(lw.buf, p...)
+
+	// Process complete lines
 	for {
-		line, err := lw.buf.ReadString('\n')
-		if err == io.EOF {
-			if len(line) > 0 {
-				lw.buf.WriteString(line)
-			}
-			break
+		idx := bytes.IndexByte(lw.buf, '\n')
+		if idx < 0 {
+			break // No complete line
 		}
-		if err != nil {
-			return n, err
-		}
+
+		// Extract line (without newline)
+		line := string(lw.buf[:idx])
 		if lw.onLine != nil {
-			// Remove trailing newline
-			if len(line) > 0 && line[len(line)-1] == '\n' {
-				line = line[:len(line)-1]
-			}
 			lw.onLine(line)
 		}
+
+		// Remove processed line from buffer
+		lw.buf = lw.buf[idx+1:]
 	}
+
 	return n, nil
 }
 

@@ -14,15 +14,22 @@ import (
 )
 
 // LogViewport is a scrollable log viewer with auto-follow support.
+// Optimized for append-only log streaming with minimal memory allocation.
 type LogViewport struct {
 	viewport   viewport.Model
-	content    strings.Builder
 	lines      []string
 	autoFollow bool
 	focused    bool
 	title      string
 	width      int
 	height     int
+	// contentDirty tracks if we need to rebuild viewport content.
+	contentDirty bool
+	// cachedContent is the cached joined lines for the viewport.
+	cachedContent string
+	// lastLineComplete tracks if the last line ended with a newline.
+	// When false, the next AppendText should append to the last line.
+	lastLineComplete bool
 }
 
 // NewLogViewport creates a new LogViewport component.
@@ -33,13 +40,15 @@ func NewLogViewport() *LogViewport {
 		BorderForeground(styles.BorderColor)
 
 	return &LogViewport{
-		viewport:   vp,
-		lines:      []string{},
-		autoFollow: true,
-		focused:    false,
-		title:      "Log Output",
-		width:      80,
-		height:     20,
+		viewport:         vp,
+		lines:            make([]string, 0, 1024), // Pre-allocate for typical log size
+		autoFollow:       true,
+		focused:          false,
+		title:            "Log Output",
+		width:            80,
+		height:           20,
+		contentDirty:     false,
+		lastLineComplete: true, // Start with no partial line
 	}
 }
 
@@ -83,8 +92,10 @@ func (l *LogViewport) AutoFollow() bool {
 
 // Clear clears all log content.
 func (l *LogViewport) Clear() {
-	l.content.Reset()
-	l.lines = []string{}
+	l.lines = l.lines[:0] // Reuse backing array
+	l.cachedContent = ""
+	l.contentDirty = false
+	l.lastLineComplete = true
 	l.viewport.SetContent("")
 }
 
@@ -95,51 +106,79 @@ func (l *LogViewport) Write(p []byte) (n int, err error) {
 }
 
 // AppendText appends text to the log.
+// It parses newlines and appends individual lines efficiently.
+// Partial lines (text without trailing newline) are appended to the last line.
+// The viewport content is lazily rebuilt on the next View() or explicit refresh.
 func (l *LogViewport) AppendText(text string) {
-	l.content.WriteString(text)
-	l.updateLines()
-	l.viewport.SetContent(strings.Join(l.lines, "\n"))
-
-	if l.autoFollow {
-		l.viewport.GotoBottom()
+	if text == "" {
+		return
 	}
+
+	// Check if text ends with newline
+	endsWithNewline := strings.HasSuffix(text, "\n")
+
+	// Split into lines
+	newLines := strings.Split(text, "\n")
+
+	for i, line := range newLines {
+		// Skip trailing empty string from strings.Split on trailing newline
+		if i == len(newLines)-1 && line == "" {
+			continue
+		}
+
+		if i == 0 && !l.lastLineComplete && len(l.lines) > 0 {
+			// Append first part to the last existing line (handles partial lines)
+			l.lines[len(l.lines)-1] += line
+		} else {
+			l.lines = append(l.lines, line)
+		}
+	}
+
+	l.lastLineComplete = endsWithNewline
+	l.contentDirty = true
 }
 
 // AppendLine appends a line to the log.
+// This is optimized for the common case of adding single lines.
+// The viewport content is lazily rebuilt on the next View() or explicit refresh.
 func (l *LogViewport) AppendLine(line string) {
-	// Add newline if content already exists
-	if l.content.Len() > 0 {
-		l.content.WriteString("\n")
-	}
-	l.content.WriteString(line)
 	l.lines = append(l.lines, line)
-	l.viewport.SetContent(strings.Join(l.lines, "\n"))
+	l.contentDirty = true
+}
 
-	if l.autoFollow {
-		l.viewport.GotoBottom()
+// ensureViewportContent rebuilds the viewport content if dirty.
+// This is called lazily before rendering.
+func (l *LogViewport) ensureViewportContent() {
+	if l.contentDirty {
+		l.cachedContent = strings.Join(l.lines, "\n")
+		l.viewport.SetContent(l.cachedContent)
+		l.contentDirty = false
+		if l.autoFollow {
+			l.viewport.GotoBottom()
+		}
 	}
 }
 
 // SetContent sets the entire log content.
 func (l *LogViewport) SetContent(content string) {
-	l.content.Reset()
-	l.content.WriteString(content)
-	l.updateLines()
-	l.viewport.SetContent(strings.Join(l.lines, "\n"))
+	l.lines = strings.Split(content, "\n")
+	l.cachedContent = content
+	l.contentDirty = false
+	l.lastLineComplete = strings.HasSuffix(content, "\n") || content == ""
+	l.viewport.SetContent(content)
 
 	if l.autoFollow {
 		l.viewport.GotoBottom()
 	}
 }
 
-// updateLines splits content into lines.
-func (l *LogViewport) updateLines() {
-	l.lines = strings.Split(l.content.String(), "\n")
-}
-
 // Content returns the full log content.
 func (l *LogViewport) Content() string {
-	return l.content.String()
+	if l.contentDirty {
+		l.cachedContent = strings.Join(l.lines, "\n")
+		l.contentDirty = false
+	}
+	return l.cachedContent
 }
 
 // LineCount returns the number of lines.
@@ -239,6 +278,9 @@ func (l *LogViewport) Update(msg tea.Msg) tea.Cmd {
 
 // View renders the log viewport.
 func (l *LogViewport) View() string {
+	// Ensure content is up-to-date before rendering
+	l.ensureViewportContent()
+
 	// Title bar
 	titleStyle := lipgloss.NewStyle().
 		Foreground(styles.Foreground).
@@ -299,7 +341,7 @@ func (l *LogViewport) OpenInEditor() tea.Cmd {
 		}
 
 		// Write content
-		_, err = tmpFile.WriteString(l.content.String())
+		_, err = tmpFile.WriteString(l.Content())
 		if err != nil {
 			tmpFile.Close()
 			os.Remove(tmpFile.Name())
