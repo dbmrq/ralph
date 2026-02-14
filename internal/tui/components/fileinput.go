@@ -237,13 +237,10 @@ func (f *FileInput) View() string {
 		b.WriteString("\n")
 	}
 
-	// Help
+	// Shortcut bar
 	b.WriteString("\n")
-	helpStyle := lipgloss.NewStyle().Foreground(styles.Muted)
-	keyStyle := lipgloss.NewStyle().Foreground(styles.Secondary)
-	b.WriteString(keyStyle.Render("Enter") + helpStyle.Render(": import") +
-		helpStyle.Render(" │ ") +
-		keyStyle.Render("Esc") + helpStyle.Render(": cancel"))
+	shortcutBar := NewShortcutBar(FileInputShortcuts...)
+	b.WriteString(shortcutBar.View())
 
 	return b.String()
 }

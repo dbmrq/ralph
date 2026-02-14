@@ -565,12 +565,11 @@ func (m *SetupModel) viewWelcome() string {
 	// Quick tips
 	sections = append(sections, m.renderQuickTips())
 
-	// Action prompt
-	actionStyle := lipgloss.NewStyle().
-		Foreground(styles.Success).
-		Bold(true).
-		Padding(1, 2)
-	sections = append(sections, actionStyle.Render("Press Enter to begin setup • q to quit"))
+	// Shortcut bar
+	shortcutBar := components.NewShortcutBar(components.WelcomeShortcuts...)
+	shortcutBar.SetWidth(m.width)
+	shortcutBar.SetCentered(true)
+	sections = append(sections, "\n"+shortcutBar.View())
 
 	return strings.Join(sections, "\n")
 }

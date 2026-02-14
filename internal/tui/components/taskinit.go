@@ -163,5 +163,10 @@ func (s *TaskInitSelector) View() string {
 		b.WriteString("\n\n")
 	}
 
+	// Shortcut bar
+	b.WriteString("  ")
+	shortcutBar := NewShortcutBar(TaskInitShortcuts...)
+	b.WriteString(shortcutBar.View())
+
 	return b.String()
 }

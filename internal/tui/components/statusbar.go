@@ -20,6 +20,7 @@ type StatusBarData struct {
 	LoopState     string // "running", "paused", "completed", "failed"
 	Message       string // Optional status message
 	ShowShortcuts bool
+	Shortcuts     []ShortcutDef // Optional custom shortcuts (overrides context defaults)
 }
 
 // StatusBar is a component that displays loop status and keyboard shortcuts.
@@ -196,27 +197,31 @@ func (s *StatusBar) renderLoopStateIcon(state string) string {
 	}
 }
 
-// renderShortcuts renders the keyboard shortcuts.
+// renderShortcuts renders the keyboard shortcuts based on context.
 func (s *StatusBar) renderShortcuts() string {
-	keyStyle := styles.KeyStyle
-	helpStyle := styles.HelpStyle
-
-	shortcuts := []struct {
-		key  string
-		desc string
-	}{
-		{"p", "pause"},
-		{"s", "skip"},
-		{"q", "quit"},
-		{"?", "help"},
+	// Use custom shortcuts if provided
+	if len(s.data.Shortcuts) > 0 {
+		bar := NewShortcutBar(s.data.Shortcuts...)
+		return bar.View()
 	}
 
-	var parts []string
-	for _, sc := range shortcuts {
-		parts = append(parts, keyStyle.Render(sc.key)+helpStyle.Render(":"+sc.desc))
+	// Use context-aware defaults based on loop state
+	var shortcuts []ShortcutDef
+	switch s.data.LoopState {
+	case "paused":
+		shortcuts = MainLoopPausedShortcuts
+	case "completed", "failed":
+		shortcuts = []ShortcutDef{
+			{"Enter", "continue"},
+			{"q", "quit"},
+			{"?", "help"},
+		}
+	default: // "running" or other
+		shortcuts = MainLoopShortcuts
 	}
 
-	return strings.Join(parts, " ")
+	bar := NewShortcutBar(shortcuts...)
+	return bar.View()
 }
 
 // formatDuration formats a duration as HH:MM:SS or MM:SS.

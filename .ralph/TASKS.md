@@ -813,7 +813,7 @@ The goal is to make `ralph` feel like a polished, intuitive tool. When a user ru
   >   - Added formatProjectType() and formatMarkers() helpers
   >   - Comprehensive tests in internal/tui/setup_test.go
 
-- [ ] UX-006: Add keyboard shortcut hints throughout TUI
+- [x] UX-006: Add keyboard shortcut hints throughout TUI
   > Goal: Clear, contextual hints for available actions
   > **Current state**: Some shortcuts shown in status bar, but not comprehensive
   > **Desired state**: Each TUI phase shows relevant shortcuts
@@ -827,6 +827,10 @@ The goal is to make `ralph` feel like a polished, intuitive tool. When a user ru
   >   - Use consistent styling from internal/tui/styles
   > Reference: internal/tui/components/statusbar.go for existing implementation
   > Reference: internal/tui/components/helpoverlay.go for help content
+  > **COMPLETED**: Created ShortcutBar component (internal/tui/components/shortcutbar.go)
+  > with predefined shortcut sets for each TUI phase. Updated all components:
+  > setup.go (Welcome), analysisform.go, tasklistform.go, taskinit.go, fileinput.go,
+  > taskpaste.go, goalinput.go, and statusbar.go (with context-aware shortcuts).
 
 - [ ] UX-007: Handle edge cases gracefully
   > Goal: Graceful handling of common issues with clear recovery paths

@@ -369,17 +369,10 @@ func (f *AnalysisForm) View() string {
 	b.WriteString(f.reanalyzeBtn.View())
 	b.WriteString("\n")
 
-	// Help text
-	b.WriteString("\n")
-	helpStyle := lipgloss.NewStyle().Foreground(styles.Muted)
-	keyStyle := lipgloss.NewStyle().Foreground(styles.Secondary)
-
-	help := keyStyle.Render("Tab") + helpStyle.Render(": next") +
-		helpStyle.Render(" │ ") +
-		keyStyle.Render("Enter") + helpStyle.Render(": confirm/toggle") +
-		helpStyle.Render(" │ ") +
-		keyStyle.Render("r") + helpStyle.Render(": re-analyze")
-	b.WriteString("  " + help)
+	// Shortcut bar
+	b.WriteString("\n  ")
+	shortcutBar := NewShortcutBar(AnalysisShortcuts...)
+	b.WriteString(shortcutBar.View())
 
 	return b.String()
 }

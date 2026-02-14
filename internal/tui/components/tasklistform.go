@@ -232,21 +232,10 @@ func (f *TaskListForm) View() string {
 	b.WriteString(f.reparseBtn.View())
 	b.WriteString("\n")
 
-	// Help
-	b.WriteString("\n")
-	helpStyle := lipgloss.NewStyle().Foreground(styles.Muted)
-	keyStyle := lipgloss.NewStyle().Foreground(styles.Secondary)
-
-	help := keyStyle.Render("↑↓") + helpStyle.Render(": select") +
-		helpStyle.Render(" │ ") +
-		keyStyle.Render("e") + helpStyle.Render(": edit") +
-		helpStyle.Render(" │ ") +
-		keyStyle.Render("d") + helpStyle.Render(": delete") +
-		helpStyle.Render(" │ ") +
-		keyStyle.Render("Tab") + helpStyle.Render(": buttons") +
-		helpStyle.Render(" │ ") +
-		keyStyle.Render("Enter") + helpStyle.Render(": confirm")
-	b.WriteString("  " + help)
+	// Shortcut bar
+	b.WriteString("\n  ")
+	shortcutBar := NewShortcutBar(TaskListShortcuts...)
+	b.WriteString(shortcutBar.View())
 
 	return b.String()
 }

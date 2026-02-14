@@ -151,13 +151,10 @@ func (g *GoalInput) View() string {
 		b.WriteString("\n")
 	}
 
-	// Help
+	// Shortcut bar
 	b.WriteString("\n")
-	helpStyle := lipgloss.NewStyle().Foreground(styles.Muted)
-	keyStyle := lipgloss.NewStyle().Foreground(styles.Secondary)
-	b.WriteString(keyStyle.Render("Ctrl+Enter") + helpStyle.Render(": generate tasks") +
-		helpStyle.Render(" │ ") +
-		keyStyle.Render("Esc") + helpStyle.Render(": cancel"))
+	shortcutBar := NewShortcutBar(TextAreaShortcuts...)
+	b.WriteString(shortcutBar.View())
 
 	return b.String()
 }
