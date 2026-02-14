@@ -43,7 +43,10 @@ completing tasks from a task list using AI agents.`,
 		Long:  "Initialize Ralph in the current project.",
 		RunE:  runInit,
 	}
-	initC.Flags().BoolP("force", "f", false, "Overwrite existing configuration")
+	initC.Flags().BoolP("force", "f", false, "Overwrite existing configuration without prompting")
+	initC.Flags().BoolP("yes", "y", false, "Non-interactive mode, use AI defaults")
+	initC.Flags().StringP("config", "c", "", "Path to config file to use")
+	initC.Flags().StringP("tasks", "t", "", "Path to task file to import")
 	root.AddCommand(initC)
 
 	// Add agent command group
@@ -219,28 +222,28 @@ func TestInitCommand(t *testing.T) {
 		wantOutput string
 	}{
 		{
-			name:       "init without flags",
-			args:       []string{"init"},
-			wantErr:    false,
-			wantOutput: "Initializing Ralph...",
-		},
-		{
-			name:       "init with force flag",
-			args:       []string{"init", "--force"},
-			wantErr:    false,
-			wantOutput: "force mode",
-		},
-		{
-			name:       "init with force short flag",
-			args:       []string{"init", "-f"},
-			wantErr:    false,
-			wantOutput: "force mode",
-		},
-		{
 			name:       "init help",
 			args:       []string{"init", "--help"},
 			wantErr:    false,
 			wantOutput: "--force",
+		},
+		{
+			name:       "init help shows yes flag",
+			args:       []string{"init", "--help"},
+			wantErr:    false,
+			wantOutput: "--yes",
+		},
+		{
+			name:       "init help shows config flag",
+			args:       []string{"init", "--help"},
+			wantErr:    false,
+			wantOutput: "--config",
+		},
+		{
+			name:       "init help shows tasks flag",
+			args:       []string{"init", "--help"},
+			wantErr:    false,
+			wantOutput: "--tasks",
 		},
 	}
 
@@ -263,6 +266,161 @@ func TestInitCommand(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestInitCommandWithConfig(t *testing.T) {
+	// Test init --config with a valid config file
+	t.Run("init with config file", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		// Create a config file
+		configPath := tmpDir + "/test-config.yaml"
+		configContent := `
+agent:
+  default: cursor
+build:
+  command: go build ./...
+test:
+  command: go test ./...
+`
+		if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+			t.Fatalf("failed to write config: %v", err)
+		}
+
+		// Change to temp directory
+		oldWd, _ := os.Getwd()
+		if err := os.Chdir(tmpDir); err != nil {
+			t.Fatalf("failed to chdir: %v", err)
+		}
+		defer os.Chdir(oldWd)
+
+		buf := new(bytes.Buffer)
+		cmd := newTestRoot()
+		cmd.SetOut(buf)
+		cmd.SetErr(buf)
+		cmd.SetArgs([]string{"init", "--config", configPath})
+
+		err := cmd.Execute()
+		if err != nil {
+			t.Fatalf("Execute() error = %v", err)
+		}
+
+		// Check that .ralph directory was created
+		if _, err := os.Stat(tmpDir + "/.ralph"); os.IsNotExist(err) {
+			t.Error(".ralph directory was not created")
+		}
+
+		// Check that config.yaml was created
+		if _, err := os.Stat(tmpDir + "/.ralph/config.yaml"); os.IsNotExist(err) {
+			t.Error(".ralph/config.yaml was not created")
+		}
+
+		// Check output
+		if !bytes.Contains(buf.Bytes(), []byte("initialized successfully")) {
+			t.Errorf("Output = %q, want to contain 'initialized successfully'", buf.String())
+		}
+	})
+
+	// Test init --config with non-existent file
+	t.Run("init with missing config file", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		oldWd, _ := os.Getwd()
+		if err := os.Chdir(tmpDir); err != nil {
+			t.Fatalf("failed to chdir: %v", err)
+		}
+		defer os.Chdir(oldWd)
+
+		buf := new(bytes.Buffer)
+		cmd := newTestRoot()
+		cmd.SetOut(buf)
+		cmd.SetErr(buf)
+		cmd.SetArgs([]string{"init", "--config", "/nonexistent/config.yaml"})
+
+		err := cmd.Execute()
+		if err == nil {
+			t.Error("Expected error for missing config file")
+		}
+	})
+}
+
+func TestInitCommandExistingRalph(t *testing.T) {
+	// Test that init with --yes and existing .ralph errors without --force
+	t.Run("init --yes with existing .ralph errors", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		// Create .ralph directory
+		if err := os.MkdirAll(tmpDir+"/.ralph", 0755); err != nil {
+			t.Fatalf("failed to create .ralph dir: %v", err)
+		}
+
+		oldWd, _ := os.Getwd()
+		if err := os.Chdir(tmpDir); err != nil {
+			t.Fatalf("failed to chdir: %v", err)
+		}
+		defer os.Chdir(oldWd)
+
+		buf := new(bytes.Buffer)
+		cmd := newTestRoot()
+		cmd.SetOut(buf)
+		cmd.SetErr(buf)
+		cmd.SetArgs([]string{"init", "--yes"})
+
+		err := cmd.Execute()
+		if err == nil {
+			t.Error("Expected error when .ralph exists without --force")
+		}
+		if err != nil && !bytes.Contains([]byte(err.Error()), []byte("already exists")) {
+			t.Errorf("Error = %q, want to contain 'already exists'", err.Error())
+		}
+	})
+
+	// Test that init with --force and existing .ralph succeeds
+	t.Run("init --force removes existing .ralph", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		// Create .ralph directory with a file
+		ralphDir := tmpDir + "/.ralph"
+		if err := os.MkdirAll(ralphDir, 0755); err != nil {
+			t.Fatalf("failed to create .ralph dir: %v", err)
+		}
+		if err := os.WriteFile(ralphDir+"/old-config.yaml", []byte("old"), 0644); err != nil {
+			t.Fatalf("failed to write old config: %v", err)
+		}
+
+		// Create a config file to use
+		configPath := tmpDir + "/test-config.yaml"
+		if err := os.WriteFile(configPath, []byte("agent:\n  default: cursor\n"), 0644); err != nil {
+			t.Fatalf("failed to write config: %v", err)
+		}
+
+		oldWd, _ := os.Getwd()
+		if err := os.Chdir(tmpDir); err != nil {
+			t.Fatalf("failed to chdir: %v", err)
+		}
+		defer os.Chdir(oldWd)
+
+		buf := new(bytes.Buffer)
+		cmd := newTestRoot()
+		cmd.SetOut(buf)
+		cmd.SetErr(buf)
+		cmd.SetArgs([]string{"init", "--force", "--config", configPath})
+
+		err := cmd.Execute()
+		if err != nil {
+			t.Fatalf("Execute() error = %v", err)
+		}
+
+		// Check that old file is gone
+		if _, err := os.Stat(ralphDir + "/old-config.yaml"); !os.IsNotExist(err) {
+			t.Error("old-config.yaml should have been removed")
+		}
+
+		// Check output mentions removal
+		if !bytes.Contains(buf.Bytes(), []byte("Removed existing")) {
+			t.Errorf("Output = %q, want to contain 'Removed existing'", buf.String())
+		}
+	})
 }
 
 func TestDefaultRegistry(t *testing.T) {

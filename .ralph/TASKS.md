@@ -471,7 +471,7 @@
   > All in one seamless flow - no separate `ralph init` required
   > Save config.yaml with confirmed settings
 
-- [ ] INSTALL-002: Implement explicit `ralph init` command
+- [x] INSTALL-002: Implement explicit `ralph init` command
   > Goal: For users who want to set up without running
   > `ralph init` - interactive setup (same flow as INSTALL-001, but stops before loop)
   > `ralph init --yes` - non-interactive, use AI defaults
@@ -479,6 +479,14 @@
   > `ralph init --tasks TASKS.md` - point to existing task file
   > If `.ralph/` exists: prompt to reconfigure or exit
   > `ralph init --force` - overwrite existing config
+  > **Completed:** Implemented full init command with all flags:
+  > - Interactive mode: Runs TUI setup flow, stops before loop
+  > - `--yes` flag: Non-interactive with AI defaults
+  > - `--config` flag: Use provided config file
+  > - `--tasks` flag: Import tasks from specified file
+  > - `--force` flag: Overwrite existing .ralph without prompting
+  > - Existing .ralph detection with reconfigure prompt
+  > - Tests in cmd_test.go: TestInitCommand, TestInitCommandWithConfig, TestInitCommandExistingRalph
 
 - [ ] INSTALL-003: Add installation documentation and distribution
   > Goal: Make ralph easy to install globally
