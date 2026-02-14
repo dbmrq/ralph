@@ -67,13 +67,14 @@ type SetupModel struct {
 	Phase SetupPhase
 
 	// Components
-	analysisForm *components.AnalysisForm
-	taskInit     *components.TaskInitSelector
-	taskListForm *components.TaskListForm
-	textInput    *components.TextInput
-	fileInput    *components.FileInput
-	taskPaste    *components.TaskPaste
-	goalInput    *components.GoalInput
+	analysisForm  *components.AnalysisForm
+	taskInit      *components.TaskInitSelector
+	taskListForm  *components.TaskListForm
+	textInput     *components.TextInput
+	fileInput     *components.FileInput
+	taskPaste     *components.TaskPaste
+	goalInput     *components.GoalInput
+	setupProgress *components.SetupProgress
 
 	// State
 	setup       *app.Setup
@@ -87,14 +88,14 @@ type SetupModel struct {
 	welcomeInfo *WelcomeInfo
 
 	// Error recovery
-	lastPhase       SetupPhase // Phase before error, for retry
+	lastPhase       SetupPhase     // Phase before error, for retry
 	retryFunc       func() tea.Cmd // Function to retry the failed operation
 	canRetry        bool           // Whether retry is available for this error
 	canSkipAnalysis bool           // Whether user can skip analysis and configure manually
 
 	// Legacy migration
-	isLegacy       bool // Whether legacy .ralph was detected
-	migrationDone  bool // Whether migration has been completed
+	isLegacy      bool // Whether legacy .ralph was detected
+	migrationDone bool // Whether migration has been completed
 
 	// Setup state for resume capability
 	setupState *app.SetupState
@@ -138,18 +139,19 @@ type tasksGeneratedMsg struct {
 // NewSetupModel creates a new SetupModel.
 func NewSetupModel(ctx context.Context, setup *app.Setup) *SetupModel {
 	m := &SetupModel{
-		Phase:        PhaseWelcome,
-		ctx:          ctx,
-		setup:        setup,
-		analysisForm: components.NewAnalysisForm(),
-		taskInit:     components.NewTaskInitSelector(),
-		taskListForm: components.NewTaskListForm(),
-		textInput:    components.NewTextInput("input", ""),
-		fileInput:    components.NewFileInput(setup.ProjectDir),
-		taskPaste:    components.NewTaskPaste(),
-		goalInput:    components.NewGoalInput(),
-		resultChan:   make(chan interface{}, 1),
-		welcomeInfo:  computeWelcomeInfo(setup),
+		Phase:         PhaseWelcome,
+		ctx:           ctx,
+		setup:         setup,
+		analysisForm:  components.NewAnalysisForm(),
+		taskInit:      components.NewTaskInitSelector(),
+		taskListForm:  components.NewTaskListForm(),
+		textInput:     components.NewTextInput("input", ""),
+		fileInput:     components.NewFileInput(setup.ProjectDir),
+		taskPaste:     components.NewTaskPaste(),
+		goalInput:     components.NewGoalInput(),
+		setupProgress: components.NewSetupProgress(nil), // Use default steps
+		resultChan:    make(chan interface{}, 1),
+		welcomeInfo:   computeWelcomeInfo(setup),
 	}
 	return m
 }
@@ -190,7 +192,8 @@ func computeWelcomeInfo(setup *app.Setup) *WelcomeInfo {
 
 // Init initializes the setup model.
 func (m *SetupModel) Init() tea.Cmd {
-	return nil
+	// Start the spinner animation for progress displays
+	return m.setupProgress.Init()
 }
 
 // Update handles messages.
@@ -266,6 +269,12 @@ func (m *SetupModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // updateCurrentPhase delegates to the component for the current phase.
 func (m *SetupModel) updateCurrentPhase(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch m.Phase {
+	case PhaseAnalyzing, PhaseTaskDetection, PhaseTaskGenerating:
+		// Update spinner animation during progress phases
+		var cmd tea.Cmd
+		m.setupProgress, cmd = m.setupProgress.Update(msg)
+		return m, cmd
+
 	case PhaseAnalysisConfirm:
 		var cmd tea.Cmd
 		m.analysisForm, cmd = m.analysisForm.Update(msg)
@@ -455,10 +464,20 @@ func (m *SetupModel) startAnalysis() (tea.Model, tea.Cmd) {
 	m.Phase = PhaseAnalyzing
 	m.statusMsg = "Running AI analysis..."
 
-	return m, func() tea.Msg {
-		analysis, err := m.setup.RunAnalysis(m.ctx)
-		return analysisCompleteMsg{analysis: analysis, err: err}
-	}
+	// Configure and start progress tracking
+	m.setupProgress.SetCurrentStep(0) // Step 1: Analyze
+	m.setupProgress.Start()
+	m.setupProgress.SetStatusText("Scanning project structure...")
+	m.setupProgress.SetWidth(m.width - 4)
+
+	// Return both the spinner tick and the analysis command
+	return m, tea.Batch(
+		m.setupProgress.Init(),
+		func() tea.Msg {
+			analysis, err := m.setup.RunAnalysis(m.ctx)
+			return analysisCompleteMsg{analysis: analysis, err: err}
+		},
+	)
 }
 
 // handleAnalysisComplete handles analysis completion.
@@ -565,10 +584,18 @@ func (m *SetupModel) importDetectedTasks() (tea.Model, tea.Cmd) {
 	m.Phase = PhaseTaskDetection
 	m.statusMsg = fmt.Sprintf("Importing tasks from %s...", m.detection.Path)
 
-	return m, func() tea.Msg {
-		tasks, err := m.setup.ImportTasks(m.ctx, m.detection)
-		return tasksImportedMsg{tasks: tasks, err: err}
-	}
+	// Configure progress for task import step
+	m.setupProgress.SetCurrentStep(2) // Step 3: Tasks
+	m.setupProgress.SetStatusText(fmt.Sprintf("Importing from %s...", m.detection.Path))
+	m.setupProgress.SetWidth(m.width - 4)
+
+	return m, tea.Batch(
+		m.setupProgress.Init(),
+		func() tea.Msg {
+			tasks, err := m.setup.ImportTasks(m.ctx, m.detection)
+			return tasksImportedMsg{tasks: tasks, err: err}
+		},
+	)
 }
 
 // handleTasksImported handles when tasks are imported.
@@ -596,10 +623,18 @@ func (m *SetupModel) handleFileInputSubmitted(msg components.FileInputSubmittedM
 	m.Phase = PhaseTaskDetection
 	m.statusMsg = fmt.Sprintf("Importing tasks from %s...", msg.Path)
 
-	return m, func() tea.Msg {
-		tasks, err := m.setup.ImportTasksFromFile(msg.Path)
-		return tasksImportedMsg{tasks: tasks, err: err}
-	}
+	// Configure progress for task import step
+	m.setupProgress.SetCurrentStep(2) // Step 3: Tasks
+	m.setupProgress.SetStatusText(fmt.Sprintf("Importing from %s...", msg.Path))
+	m.setupProgress.SetWidth(m.width - 4)
+
+	return m, tea.Batch(
+		m.setupProgress.Init(),
+		func() tea.Msg {
+			tasks, err := m.setup.ImportTasksFromFile(msg.Path)
+			return tasksImportedMsg{tasks: tasks, err: err}
+		},
+	)
 }
 
 // handleTaskPasteSubmitted handles when user submits pasted task content.
@@ -616,10 +651,18 @@ func (m *SetupModel) handleGoalSubmitted(msg components.GoalSubmittedMsg) (tea.M
 	m.Phase = PhaseTaskGenerating
 	m.statusMsg = "Generating tasks from goal..."
 
-	return m, func() tea.Msg {
-		tasks, err := m.setup.GenerateTasks(m.ctx, msg.Goal)
-		return tasksGeneratedMsg{tasks: tasks, err: err}
-	}
+	// Configure progress for task generation step
+	m.setupProgress.SetCurrentStep(2) // Step 3: Tasks
+	m.setupProgress.SetStatusText("Generating task list from goal description...")
+	m.setupProgress.SetWidth(m.width - 4)
+
+	return m, tea.Batch(
+		m.setupProgress.Init(),
+		func() tea.Msg {
+			tasks, err := m.setup.GenerateTasks(m.ctx, msg.Goal)
+			return tasksGeneratedMsg{tasks: tasks, err: err}
+		},
+	)
 }
 
 // handleTasksGenerated handles when AI task generation completes.
@@ -1017,9 +1060,9 @@ func (m *SetupModel) viewLegacyMigration() string {
 	return sectionStyle.Render(strings.Join(sections, "\n"))
 }
 
-// viewAnalyzing renders the analyzing screen.
+// viewAnalyzing renders the analyzing screen with animated progress.
 func (m *SetupModel) viewAnalyzing() string {
-	return fmt.Sprintf("🔍 %s", m.statusMsg)
+	return m.setupProgress.View()
 }
 
 // viewAnalysisConfirm renders the analysis confirmation form.
@@ -1047,14 +1090,14 @@ func (m *SetupModel) viewTaskGenerate() string {
 	return m.goalInput.View()
 }
 
-// viewTaskGenerating renders the task generation progress.
+// viewTaskGenerating renders the task generation progress with animated spinner.
 func (m *SetupModel) viewTaskGenerating() string {
-	return fmt.Sprintf("🤖 %s", m.statusMsg)
+	return m.setupProgress.View()
 }
 
-// viewTaskDetection renders the task detection progress.
+// viewTaskDetection renders the task detection progress with animated spinner.
 func (m *SetupModel) viewTaskDetection() string {
-	return fmt.Sprintf("📋 %s", m.statusMsg)
+	return m.setupProgress.View()
 }
 
 // viewTaskConfirm renders the task list confirmation form.

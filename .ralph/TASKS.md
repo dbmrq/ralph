@@ -862,7 +862,7 @@ The goal is to make `ralph` feel like a polished, intuitive tool. When a user ru
   > - Edge case 4: SetupState struct persisted to .ralph/setup_state.json with Save/Load/Clear functions
   > Added comprehensive tests in internal/app/migration_test.go for setup state functions.
 
-- [ ] UX-008: Add progress indicators and animations
+- [x] UX-008: Add progress indicators and animations
   > Goal: Visual feedback during long operations
   > **Current state**: Static "Analyzing..." message
   > **Desired state**: Animated progress with stage indicators
@@ -876,6 +876,13 @@ The goal is to make `ralph` feel like a polished, intuitive tool. When a user ru
   >   - Add estimated time based on project size
   > Reference: github.com/charmbracelet/bubbles/spinner
   > Reference: github.com/charmbracelet/bubbles/progress
+  > **Completed**: Implemented animated progress components for setup flow:
+  >   - Created `internal/tui/components/spinner.go` - Spinner component with elapsed time tracking
+  >   - Created `internal/tui/components/setupprogress.go` - Multi-step progress indicator with:
+  >     - Step indicator showing "Step X/Y" with progress dots (● ● ○ ○)
+  >     - Animated spinner during operations
+  >     - Elapsed time display and estimated remaining time
+  >   - Integrated into setup.go for PhaseAnalyzing, PhaseTaskDetection, PhaseTaskGenerating phases
 
 ### Testing
 
