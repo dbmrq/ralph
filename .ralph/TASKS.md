@@ -786,7 +786,7 @@ The goal is to make `ralph` feel like a polished, intuitive tool. When a user ru
   >   - Added `--init-only` flag to `ralph run` for explicit "setup and exit" behavior
   >   - `ralph init` behavior unchanged (exits after setup)
 
-- [ ] UX-005: Improve TUI welcome and onboarding
+- [x] UX-005: Improve TUI welcome and onboarding
   > Goal: Beautiful, informative welcome screen
   > **Current state**: Simple "Press Enter to begin setup" message
   > **Desired state**: Rich welcome with:
@@ -802,6 +802,16 @@ The goal is to make `ralph` feel like a polished, intuitive tool. When a user ru
   >   - Use lipgloss for nice formatting
   > Reference: internal/tui/styles package for consistent styling
   > Reference: internal/agent/registry.go for agent availability checks
+  > **COMPLETED**: Implemented rich welcome screen with:
+  >   - ASCII art logo (╦═╗┌─┐┬  ┌─┐┬ ┬)
+  >   - Project info section (name, type, git status, markers)
+  >   - Agent status with auth state indicator
+  >   - Setup steps explanation (4 numbered steps)
+  >   - Quick tips section (--headless, --yes, config path)
+  >   - Added WelcomeInfo and AgentStatus structs
+  >   - Added computeWelcomeInfo() for pre-scanning project/agent info
+  >   - Added formatProjectType() and formatMarkers() helpers
+  >   - Comprehensive tests in internal/tui/setup_test.go
 
 - [ ] UX-006: Add keyboard shortcut hints throughout TUI
   > Goal: Clear, contextual hints for available actions

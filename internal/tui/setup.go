@@ -5,6 +5,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -12,6 +13,7 @@ import (
 	"github.com/wexinc/ralph/internal/agent"
 	"github.com/wexinc/ralph/internal/app"
 	"github.com/wexinc/ralph/internal/build"
+	"github.com/wexinc/ralph/internal/project"
 	"github.com/wexinc/ralph/internal/task"
 	"github.com/wexinc/ralph/internal/tui/components"
 	"github.com/wexinc/ralph/internal/tui/styles"
@@ -35,6 +37,28 @@ const (
 	PhaseError
 )
 
+// AgentStatus represents the availability status of an AI agent.
+type AgentStatus struct {
+	Name        string
+	Description string
+	Available   bool
+	AuthError   error // nil if auth is ok or not checked
+}
+
+// WelcomeInfo contains pre-scanned information for the welcome screen.
+type WelcomeInfo struct {
+	// Project info
+	ProjectName string
+	ProjectType string
+	ProjectPath string
+	IsGitRepo   bool
+	Markers     []string
+
+	// Agent info
+	SelectedAgent string
+	Agents        []AgentStatus
+}
+
 // SetupModel is the Bubble Tea model for the setup flow.
 type SetupModel struct {
 	// Phase is the current setup phase.
@@ -50,14 +74,15 @@ type SetupModel struct {
 	goalInput    *components.GoalInput
 
 	// State
-	setup     *app.Setup
-	ctx       context.Context
-	analysis  *build.ProjectAnalysis
-	detection *task.TaskListDetection
-	tasks     []*task.Task
-	errorMsg  string
-	statusMsg string
-	initMode  components.TaskInitMode
+	setup       *app.Setup
+	ctx         context.Context
+	analysis    *build.ProjectAnalysis
+	detection   *task.TaskListDetection
+	tasks       []*task.Task
+	errorMsg    string
+	statusMsg   string
+	initMode    components.TaskInitMode
+	welcomeInfo *WelcomeInfo
 
 	// Window
 	width  int
@@ -109,8 +134,43 @@ func NewSetupModel(ctx context.Context, setup *app.Setup) *SetupModel {
 		taskPaste:    components.NewTaskPaste(),
 		goalInput:    components.NewGoalInput(),
 		resultChan:   make(chan interface{}, 1),
+		welcomeInfo:  computeWelcomeInfo(setup),
 	}
 	return m
+}
+
+// computeWelcomeInfo gathers project and agent info for the welcome screen.
+func computeWelcomeInfo(setup *app.Setup) *WelcomeInfo {
+	info := &WelcomeInfo{
+		ProjectPath: setup.ProjectDir,
+	}
+
+	// Detect project info
+	detector := project.NewDetector()
+	if projectInfo, err := detector.DetectProject(setup.ProjectDir); err == nil && projectInfo != nil {
+		info.ProjectName = projectInfo.Name
+		info.ProjectType = projectInfo.ProjectType
+		info.IsGitRepo = projectInfo.IsGitRepo
+		info.Markers = projectInfo.Markers
+	} else {
+		// Fallback to directory name
+		info.ProjectName = setup.ProjectDir
+	}
+
+	// Get selected agent info
+	if setup.Agent != nil {
+		info.SelectedAgent = setup.Agent.Name()
+		// Add the selected agent to the list
+		authErr := setup.Agent.CheckAuth()
+		info.Agents = append(info.Agents, AgentStatus{
+			Name:        setup.Agent.Name(),
+			Description: setup.Agent.Description(),
+			Available:   true,
+			AuthError:   authErr,
+		})
+	}
+
+	return info
 }
 
 // Init initializes the setup model.
@@ -481,26 +541,246 @@ func (m *SetupModel) View() string {
 
 // viewWelcome renders the welcome screen.
 func (m *SetupModel) viewWelcome() string {
-	titleStyle := lipgloss.NewStyle().
+	var sections []string
+
+	// ASCII art logo
+	sections = append(sections, m.renderLogo())
+
+	// Tagline
+	taglineStyle := lipgloss.NewStyle().
+		Foreground(styles.MutedLight).
+		Italic(true).
+		Padding(0, 2)
+	sections = append(sections, taglineStyle.Render("Automated task execution with AI agents"))
+
+	// Project info section
+	sections = append(sections, m.renderProjectInfo())
+
+	// Agent status section
+	sections = append(sections, m.renderAgentStatus())
+
+	// What will happen section
+	sections = append(sections, m.renderWhatHappens())
+
+	// Quick tips
+	sections = append(sections, m.renderQuickTips())
+
+	// Action prompt
+	actionStyle := lipgloss.NewStyle().
+		Foreground(styles.Success).
+		Bold(true).
+		Padding(1, 2)
+	sections = append(sections, actionStyle.Render("Press Enter to begin setup • q to quit"))
+
+	return strings.Join(sections, "\n")
+}
+
+// renderLogo renders the Ralph ASCII art logo.
+func (m *SetupModel) renderLogo() string {
+	logoStyle := lipgloss.NewStyle().
 		Foreground(styles.Primary).
 		Bold(true).
 		Padding(1, 2)
 
-	subtitleStyle := lipgloss.NewStyle().
-		Foreground(styles.Foreground).
+	// Simple but distinctive ASCII art
+	logo := `
+ ╦═╗┌─┐┬  ┌─┐┬ ┬
+ ╠╦╝├─┤│  ├─┘├─┤
+ ╩╚═┴ ┴┴─┘┴  ┴ ┴`
+
+	return logoStyle.Render(logo)
+}
+
+// renderProjectInfo renders detected project information.
+func (m *SetupModel) renderProjectInfo() string {
+	sectionStyle := lipgloss.NewStyle().
 		Padding(0, 2)
 
-	actionStyle := lipgloss.NewStyle().
-		Foreground(styles.Success).
-		Padding(1, 2)
+	labelStyle := lipgloss.NewStyle().
+		Foreground(styles.Muted)
 
-	return fmt.Sprintf(
-		"%s\n%s\n%s\n\n%s",
-		titleStyle.Render("🐺 Welcome to Ralph!"),
-		subtitleStyle.Render("Ralph helps you automate task execution with AI agents."),
-		subtitleStyle.Render("Let's set up your project..."),
-		actionStyle.Render("Press Enter to continue, or q to quit"),
-	)
+	valueStyle := lipgloss.NewStyle().
+		Foreground(styles.Foreground).
+		Bold(true)
+
+	dimStyle := lipgloss.NewStyle().
+		Foreground(styles.MutedLight)
+
+	var lines []string
+	lines = append(lines, labelStyle.Render("📁 Project"))
+
+	if m.welcomeInfo != nil {
+		// Project name
+		lines = append(lines, fmt.Sprintf("   %s %s",
+			labelStyle.Render("Name:"),
+			valueStyle.Render(m.welcomeInfo.ProjectName)))
+
+		// Project type (if detected)
+		if m.welcomeInfo.ProjectType != "" {
+			lines = append(lines, fmt.Sprintf("   %s %s",
+				labelStyle.Render("Type:"),
+				valueStyle.Render(formatProjectType(m.welcomeInfo.ProjectType))))
+		}
+
+		// Git status
+		if m.welcomeInfo.IsGitRepo {
+			lines = append(lines, fmt.Sprintf("   %s %s",
+				labelStyle.Render("Git:"),
+				valueStyle.Render("✓ Repository")))
+		}
+
+		// Markers (condensed)
+		if len(m.welcomeInfo.Markers) > 0 {
+			markers := formatMarkers(m.welcomeInfo.Markers)
+			if markers != "" {
+				lines = append(lines, fmt.Sprintf("   %s %s",
+					labelStyle.Render("Found:"),
+					dimStyle.Render(markers)))
+			}
+		}
+	}
+
+	return sectionStyle.Render(strings.Join(lines, "\n"))
+}
+
+// renderAgentStatus renders available agent information.
+func (m *SetupModel) renderAgentStatus() string {
+	sectionStyle := lipgloss.NewStyle().
+		Padding(0, 2)
+
+	labelStyle := lipgloss.NewStyle().
+		Foreground(styles.Muted)
+
+	var lines []string
+	lines = append(lines, labelStyle.Render("🤖 AI Agent"))
+
+	if m.welcomeInfo != nil && len(m.welcomeInfo.Agents) > 0 {
+		for _, ag := range m.welcomeInfo.Agents {
+			statusIcon := "✓"
+			statusColor := styles.Success
+			statusText := "ready"
+
+			if ag.AuthError != nil {
+				statusIcon = "!"
+				statusColor = styles.Warning
+				statusText = "auth needed"
+			}
+
+			statusStyle := lipgloss.NewStyle().Foreground(statusColor)
+			nameStyle := lipgloss.NewStyle().Foreground(styles.Foreground).Bold(true)
+
+			lines = append(lines, fmt.Sprintf("   %s %s %s",
+				statusStyle.Render(statusIcon),
+				nameStyle.Render(ag.Name),
+				lipgloss.NewStyle().Foreground(styles.MutedLight).Render("("+statusText+")")))
+		}
+	} else {
+		warnStyle := lipgloss.NewStyle().Foreground(styles.Warning)
+		lines = append(lines, warnStyle.Render("   ⚠ No agents available"))
+	}
+
+	return sectionStyle.Render(strings.Join(lines, "\n"))
+}
+
+// renderWhatHappens explains the setup process.
+func (m *SetupModel) renderWhatHappens() string {
+	sectionStyle := lipgloss.NewStyle().
+		Padding(0, 2)
+
+	labelStyle := lipgloss.NewStyle().
+		Foreground(styles.Muted)
+
+	stepStyle := lipgloss.NewStyle().
+		Foreground(styles.Secondary)
+
+	descStyle := lipgloss.NewStyle().
+		Foreground(styles.MutedLight)
+
+	var lines []string
+	lines = append(lines, labelStyle.Render("📋 Setup Steps"))
+	lines = append(lines, fmt.Sprintf("   %s %s", stepStyle.Render("1."), descStyle.Render("Analyze project structure with AI")))
+	lines = append(lines, fmt.Sprintf("   %s %s", stepStyle.Render("2."), descStyle.Render("Confirm build & test commands")))
+	lines = append(lines, fmt.Sprintf("   %s %s", stepStyle.Render("3."), descStyle.Render("Import or create task list")))
+	lines = append(lines, fmt.Sprintf("   %s %s", stepStyle.Render("4."), descStyle.Render("Start automated task loop")))
+
+	return sectionStyle.Render(strings.Join(lines, "\n"))
+}
+
+// renderQuickTips shows helpful tips.
+func (m *SetupModel) renderQuickTips() string {
+	sectionStyle := lipgloss.NewStyle().
+		Padding(0, 2)
+
+	labelStyle := lipgloss.NewStyle().
+		Foreground(styles.Muted)
+
+	tipStyle := lipgloss.NewStyle().
+		Foreground(styles.MutedLight)
+
+	keyStyle := lipgloss.NewStyle().
+		Foreground(styles.Secondary).
+		Bold(true)
+
+	var lines []string
+	lines = append(lines, labelStyle.Render("💡 Tips"))
+	lines = append(lines, fmt.Sprintf("   • Use %s for headless/CI mode", keyStyle.Render("--headless")))
+	lines = append(lines, fmt.Sprintf("   • %s skips analysis and uses detected defaults", tipStyle.Render("--yes")))
+	lines = append(lines, fmt.Sprintf("   • Config is saved to %s", tipStyle.Render(".ralph/config.yaml")))
+
+	return sectionStyle.Render(strings.Join(lines, "\n"))
+}
+
+// formatProjectType formats a project type for display.
+func formatProjectType(pt string) string {
+	switch pt {
+	case "go":
+		return "Go"
+	case "node":
+		return "Node.js"
+	case "python":
+		return "Python"
+	case "rust":
+		return "Rust"
+	case "ruby":
+		return "Ruby"
+	case "php":
+		return "PHP"
+	case "swift":
+		return "Swift"
+	case "xcode":
+		return "Xcode/iOS"
+	case "gradle":
+		return "Gradle (Java/Kotlin)"
+	case "maven":
+		return "Maven (Java)"
+	case "dotnet":
+		return ".NET"
+	case "make":
+		return "Make"
+	case "cmake":
+		return "CMake"
+	default:
+		return pt
+	}
+}
+
+// formatMarkers formats project markers for display, excluding common ones.
+func formatMarkers(markers []string) string {
+	// Filter out .git and .ralph since we display those separately
+	var filtered []string
+	for _, m := range markers {
+		if m != ".git" && m != ".ralph" {
+			filtered = append(filtered, m)
+		}
+	}
+	if len(filtered) == 0 {
+		return ""
+	}
+	// Limit to first 4 markers to keep it clean
+	if len(filtered) > 4 {
+		return strings.Join(filtered[:4], ", ") + ", ..."
+	}
+	return strings.Join(filtered, ", ")
 }
 
 // viewAnalyzing renders the analyzing screen.
