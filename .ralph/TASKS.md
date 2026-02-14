@@ -384,18 +384,18 @@
   > Implement tui.LoopController interface:
   >   - Pause() → call Loop.Pause()
   >   - Resume() → call Loop.Resume()
-  >   - Skip(taskID) → call Loop.Skip() (needs to be added to Loop)
-  >   - Abort() → call Loop.Abort() (needs to be added to Loop)
+  >   - Skip(taskID) → call Loop.Skip()
+  >   - Abort() → call Loop.Abort()
   > Pass adapter to tui.Model via SetLoopController()
   > Reference: internal/tui/app.go lines 78-84 define the interface
   > **Completed:** LoopControllerAdapter in cmd/ralph/cmd/run.go
   > - Pause() calls loop.Pause()
   > - Resume() transitions context from StatePaused to StateRunning
-  > - Skip() returns "not yet implemented" (LOOP-007 will add Loop.Skip())
-  > - Abort() calls cancelFunc (LOOP-007 will add proper Loop.Abort())
+  > - Skip() calls loop.Skip() (implemented in LOOP-007)
+  > - Abort() calls loop.Abort() (implemented in LOOP-007)
   > - Tests added in cmd_test.go
 
-- [ ] LOOP-007: Add Skip and Abort methods to Loop
+- [x] LOOP-007: Add Skip and Abort methods to Loop ✅
   > Goal: Implement missing control methods in internal/loop/loop.go
   > Add `Skip(taskID string) error` method:
   >   - Mark current/specified task as skipped via taskManager.Skip()
@@ -408,6 +408,14 @@
   >   - Return from Run() cleanly
   > Reference: internal/loop/loop.go has Pause() as example (lines 627-643)
   > Reference: internal/tui/app.go LoopController interface defines expected signatures
+  > **Completed:** Implemented Skip and Abort in internal/loop/loop.go
+  > - Added control signal fields: controlMu, skipRequests, abortRequest, abortReason
+  > - Skip(taskID) registers skip request, loop checks before running task
+  > - Abort(reason) sets abort flag, loop checks at start of each iteration
+  > - Both Run() and continueLoop() check for abort/skip at each iteration
+  > - LoopControllerAdapter.Skip() and Abort() now call Loop methods
+  > - Added nil-safety checks in LoopControllerAdapter
+  > - Updated tests in cmd_test.go
 
 ---
 

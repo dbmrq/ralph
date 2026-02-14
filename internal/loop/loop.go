@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sync"
 	"time"
 
 	"github.com/wexinc/ralph/internal/agent"
@@ -110,6 +111,13 @@ type Loop struct {
 
 	// Options
 	opts *Options
+
+	// Control signals for Skip and Abort (LOOP-007)
+	// Protected by controlMu for thread-safe access from TUI
+	controlMu    sync.Mutex
+	skipRequests map[string]bool // taskID -> true if skip requested
+	abortRequest bool            // true if abort was requested
+	abortReason  string          // reason for abort
 }
 
 // NewLoop creates a new Loop with the given dependencies.
@@ -130,6 +138,7 @@ func NewLoop(
 		persistence:  NewStatePersistence(projectDir),
 		gitOps:       NewGitOperations(projectDir, cfg.Git),
 		opts:         DefaultOptions(),
+		skipRequests: make(map[string]bool),
 	}
 	// Initialize error recovery with default config
 	l.recovery = NewErrorRecovery(l, nil)
@@ -211,6 +220,19 @@ func (l *Loop) Run(ctx context.Context, sessionID string) error {
 
 	// Step 2: Main task loop
 	for {
+		// Check for abort request (LOOP-007)
+		if aborted, reason := l.checkAbort(); aborted {
+			l.context.SetError(reason)
+			if err := l.persistence.Save(l.context); err != nil {
+				l.emit(EventError, "", "", 0, "Failed to save state on abort", err)
+			}
+			if transErr := l.context.Transition(StateFailed); transErr != nil {
+				l.emit(EventError, "", "", 0, "Failed to transition on abort", transErr)
+			}
+			l.emit(EventLoopFailed, "", "", 0, reason, fmt.Errorf("%s", reason))
+			return fmt.Errorf("%s", reason)
+		}
+
 		// Check for cancellation
 		if ctx.Err() != nil {
 			l.context.SetError("cancelled")
@@ -229,9 +251,23 @@ func (l *Loop) Run(ctx context.Context, sessionID string) error {
 			return nil
 		}
 
+		// Check for skip request before running the task (LOOP-007)
+		if l.checkSkip(nextTask.ID) {
+			if err := l.taskManager.Skip(nextTask.ID); err != nil {
+				l.emit(EventError, nextTask.ID, nextTask.Name, 0, "Failed to skip task", err)
+			} else {
+				l.context.RecordTaskCompletion(task.StatusSkipped)
+				l.emit(EventTaskSkipped, nextTask.ID, nextTask.Name, 0, "Skipped by user request", nil)
+			}
+			continue
+		}
+
 		// Run the task
 		result, err := l.runTask(ctx, nextTask)
 		if err != nil {
+			// Clear any pending skip request for this task
+			l.clearSkipRequest(nextTask.ID)
+
 			// Handle task-level errors
 			if ctx.Err() != nil {
 				return ctx.Err() // Cancelled
@@ -257,6 +293,9 @@ func (l *Loop) Run(ctx context.Context, sessionID string) error {
 			l.emit(EventTaskFailed, nextTask.ID, nextTask.Name, 0, err.Error(), err)
 			continue
 		}
+
+		// Clear any pending skip request for this task
+		l.clearSkipRequest(nextTask.ID)
 
 		// Handle task result
 		if err := l.handleTaskResult(ctx, nextTask, result); err != nil {
@@ -642,6 +681,83 @@ func (l *Loop) Pause() error {
 	return nil
 }
 
+// Skip requests that a task be skipped.
+// If taskID matches the current task, the skip will be processed at the next check point.
+// If taskID is empty, the current task will be skipped.
+// The actual skip happens asynchronously when the loop checks for skip requests.
+func (l *Loop) Skip(taskID string) error {
+	l.controlMu.Lock()
+	defer l.controlMu.Unlock()
+
+	if l.context == nil {
+		return fmt.Errorf("loop has no context")
+	}
+
+	// If no taskID specified, use current task
+	if taskID == "" {
+		taskID = l.context.CurrentTaskID
+		if taskID == "" {
+			return fmt.Errorf("no task is currently running")
+		}
+	}
+
+	// Verify the task exists
+	if _, ok := l.taskManager.GetByID(taskID); !ok {
+		return fmt.Errorf("task %q not found", taskID)
+	}
+
+	// Request the skip - the loop will process this
+	l.skipRequests[taskID] = true
+	return nil
+}
+
+// Abort requests that the loop stop immediately.
+// The loop will save state and exit cleanly at the next check point.
+// If reason is empty, a default reason will be used.
+func (l *Loop) Abort(reason string) error {
+	l.controlMu.Lock()
+	defer l.controlMu.Unlock()
+
+	if l.context == nil {
+		return fmt.Errorf("loop has no context")
+	}
+
+	if reason == "" {
+		reason = "aborted by user"
+	}
+
+	l.abortRequest = true
+	l.abortReason = reason
+	return nil
+}
+
+// checkAbort checks if an abort has been requested.
+// Returns true and the reason if abort was requested.
+func (l *Loop) checkAbort() (bool, string) {
+	l.controlMu.Lock()
+	defer l.controlMu.Unlock()
+	return l.abortRequest, l.abortReason
+}
+
+// checkSkip checks if a skip has been requested for the given task.
+// Returns true if skip was requested and clears the request.
+func (l *Loop) checkSkip(taskID string) bool {
+	l.controlMu.Lock()
+	defer l.controlMu.Unlock()
+	if l.skipRequests[taskID] {
+		delete(l.skipRequests, taskID)
+		return true
+	}
+	return false
+}
+
+// clearSkipRequest removes a skip request for a task (called when task ends for any reason).
+func (l *Loop) clearSkipRequest(taskID string) {
+	l.controlMu.Lock()
+	defer l.controlMu.Unlock()
+	delete(l.skipRequests, taskID)
+}
+
 // Resume resumes a paused session.
 // If sessionID is empty, resumes the most recent resumable session.
 func (l *Loop) Resume(ctx context.Context, sessionID string) error {
@@ -718,6 +834,19 @@ func (l *Loop) continueLoop(ctx context.Context) error {
 
 	// Step 2: Main task loop (same as Run)
 	for {
+		// Check for abort request (LOOP-007)
+		if aborted, reason := l.checkAbort(); aborted {
+			l.context.SetError(reason)
+			if err := l.persistence.Save(l.context); err != nil {
+				l.emit(EventError, "", "", 0, "Failed to save state on abort", err)
+			}
+			if transErr := l.context.Transition(StateFailed); transErr != nil {
+				l.emit(EventError, "", "", 0, "Failed to transition on abort", transErr)
+			}
+			l.emit(EventLoopFailed, "", "", 0, reason, fmt.Errorf("%s", reason))
+			return fmt.Errorf("%s", reason)
+		}
+
 		// Check for cancellation
 		if ctx.Err() != nil {
 			l.context.SetError("cancelled")
@@ -736,9 +865,23 @@ func (l *Loop) continueLoop(ctx context.Context) error {
 			return nil
 		}
 
+		// Check for skip request before running the task (LOOP-007)
+		if l.checkSkip(nextTask.ID) {
+			if err := l.taskManager.Skip(nextTask.ID); err != nil {
+				l.emit(EventError, nextTask.ID, nextTask.Name, 0, "Failed to skip task", err)
+			} else {
+				l.context.RecordTaskCompletion(task.StatusSkipped)
+				l.emit(EventTaskSkipped, nextTask.ID, nextTask.Name, 0, "Skipped by user request", nil)
+			}
+			continue
+		}
+
 		// Run the task
 		result, err := l.runTask(ctx, nextTask)
 		if err != nil {
+			// Clear any pending skip request for this task
+			l.clearSkipRequest(nextTask.ID)
+
 			// Handle task-level errors
 			if ctx.Err() != nil {
 				return ctx.Err() // Cancelled
@@ -764,6 +907,9 @@ func (l *Loop) continueLoop(ctx context.Context) error {
 			l.emit(EventTaskFailed, nextTask.ID, nextTask.Name, 0, err.Error(), err)
 			continue
 		}
+
+		// Clear any pending skip request for this task
+		l.clearSkipRequest(nextTask.ID)
 
 		// Handle task result
 		if err := l.handleTaskResult(ctx, nextTask, result); err != nil {

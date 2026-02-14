@@ -2,13 +2,39 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"testing"
 
 	"github.com/spf13/cobra"
 	"github.com/wexinc/ralph/internal/agent"
 	"github.com/wexinc/ralph/internal/config"
+	"github.com/wexinc/ralph/internal/loop"
+	"github.com/wexinc/ralph/internal/task"
 )
+
+// mockAgent implements agent.Agent for testing.
+type mockAgent struct {
+	name string
+}
+
+func (m *mockAgent) Name() string        { return m.name }
+func (m *mockAgent) Description() string { return "Mock agent for testing" }
+func (m *mockAgent) IsAvailable() bool   { return true }
+func (m *mockAgent) CheckAuth() error    { return nil }
+func (m *mockAgent) ListModels() ([]agent.Model, error) {
+	return []agent.Model{{Name: "test-model", ID: "test-model"}}, nil
+}
+func (m *mockAgent) GetDefaultModel() agent.Model {
+	return agent.Model{Name: "test-model", ID: "test-model"}
+}
+func (m *mockAgent) Run(ctx context.Context, prompt string, opts agent.RunOptions) (agent.Result, error) {
+	return agent.Result{Status: agent.TaskStatusDone}, nil
+}
+func (m *mockAgent) Continue(ctx context.Context, sessionID, prompt string, opts agent.RunOptions) (agent.Result, error) {
+	return agent.Result{Status: agent.TaskStatusDone}, nil
+}
+func (m *mockAgent) GetSessionID() string { return "" }
 
 // newTestRoot creates a fresh command hierarchy for testing.
 // This is necessary because Cobra commands maintain state between runs.
@@ -673,35 +699,79 @@ func TestLoopControllerAdapter(t *testing.T) {
 		}
 	})
 
-	t.Run("Skip returns not implemented", func(t *testing.T) {
+	t.Run("Skip with nil loop returns error", func(t *testing.T) {
 		adapter := NewLoopControllerAdapter(nil, nil)
 		err := adapter.Skip("task-1")
+		// Skip with nil loop should panic or error
+		// The actual error depends on the implementation
 		if err == nil {
-			t.Error("Skip() should return error (not yet implemented)")
-		}
-		if err.Error() != "skip not yet implemented" {
-			t.Errorf("Skip() error = %q, want %q", err.Error(), "skip not yet implemented")
+			t.Error("Skip() with nil loop should return error")
 		}
 	})
 
-	t.Run("Abort with nil cancelFunc", func(t *testing.T) {
-		adapter := NewLoopControllerAdapter(nil, nil)
-		err := adapter.Abort()
-		if err != nil {
-			t.Errorf("Abort() error = %v, want nil", err)
+	t.Run("Skip with unstarted loop returns error", func(t *testing.T) {
+		// Create a minimal loop with task manager (but don't start it)
+		tmpDir := t.TempDir()
+		store := task.NewStore(tmpDir + "/tasks.json")
+		testTask := task.NewTask("task-1", "Test Task", "Description")
+		if err := store.Add(testTask); err != nil {
+			t.Fatal(err)
+		}
+		mgr := task.NewManager(store)
+		cfg := &config.Config{}
+		mockAgent := &mockAgent{name: "test"}
+		l := loop.NewLoop(mockAgent, mgr, nil, cfg, tmpDir)
+
+		adapter := NewLoopControllerAdapter(l, nil)
+		err := adapter.Skip("task-1")
+		// Skip on an unstarted loop should return error (no context)
+		if err == nil {
+			t.Error("Skip() on unstarted loop should return error")
 		}
 	})
 
-	t.Run("Abort calls cancelFunc", func(t *testing.T) {
+	t.Run("Skip with non-existent task returns error", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		store := task.NewStore(tmpDir + "/tasks.json")
+		mgr := task.NewManager(store)
+		cfg := &config.Config{}
+		mockAgent := &mockAgent{name: "test"}
+		l := loop.NewLoop(mockAgent, mgr, nil, cfg, tmpDir)
+
+		adapter := NewLoopControllerAdapter(l, nil)
+		err := adapter.Skip("non-existent-task")
+		if err == nil {
+			t.Error("Skip() with non-existent task should return error")
+		}
+	})
+
+	t.Run("Abort with nil loop returns error and calls cancelFunc", func(t *testing.T) {
 		cancelled := false
 		cancelFunc := func() { cancelled = true }
 		adapter := NewLoopControllerAdapter(nil, cancelFunc)
 		err := adapter.Abort()
-		if err != nil {
-			t.Errorf("Abort() error = %v, want nil", err)
+		// Abort with nil loop should return error and fall back to cancelFunc
+		if err == nil {
+			t.Error("Abort() with nil loop should return error")
 		}
 		if !cancelled {
-			t.Error("Abort() did not call cancelFunc")
+			t.Error("Abort() should call cancelFunc as fallback")
+		}
+	})
+
+	t.Run("Abort with unstarted loop returns error", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		store := task.NewStore(tmpDir + "/tasks.json")
+		mgr := task.NewManager(store)
+		cfg := &config.Config{}
+		mockAgent := &mockAgent{name: "test"}
+		l := loop.NewLoop(mockAgent, mgr, nil, cfg, tmpDir)
+
+		adapter := NewLoopControllerAdapter(l, nil)
+		err := adapter.Abort()
+		// Abort on an unstarted loop should return error (no context)
+		if err == nil {
+			t.Error("Abort() on unstarted loop should return error")
 		}
 	})
 }

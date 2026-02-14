@@ -661,21 +661,32 @@ func (a *LoopControllerAdapter) Resume() error {
 	return ctx.Transition(loop.StateRunning)
 }
 
-// Skip skips the current task.
-// Note: This is implemented as part of LOOP-007 in a future task.
+// Skip skips the current or specified task.
+// The loop will process this request at its next check point.
 func (a *LoopControllerAdapter) Skip(taskID string) error {
-	// TODO: Implement Skip() in Loop (LOOP-007)
-	// For now, return an error indicating not implemented
-	return fmt.Errorf("skip not yet implemented")
+	if a.loop == nil {
+		return fmt.Errorf("loop not initialized")
+	}
+	return a.loop.Skip(taskID)
 }
 
-// Abort aborts the loop.
-// Note: This is implemented as part of LOOP-007 in a future task.
+// Abort aborts the loop cleanly.
+// The loop will save state and exit at its next check point.
 func (a *LoopControllerAdapter) Abort() error {
-	// TODO: Implement Abort() in Loop (LOOP-007)
-	// For now, cancel the context which will stop the loop
-	if a.cancelFunc != nil {
-		a.cancelFunc()
+	if a.loop == nil {
+		// Fallback to context cancellation if loop is nil
+		if a.cancelFunc != nil {
+			a.cancelFunc()
+		}
+		return fmt.Errorf("loop not initialized")
+	}
+	// Use the loop's Abort method for clean shutdown
+	if err := a.loop.Abort(""); err != nil {
+		// Fallback to context cancellation if abort fails
+		if a.cancelFunc != nil {
+			a.cancelFunc()
+		}
+		return err
 	}
 	return nil
 }
