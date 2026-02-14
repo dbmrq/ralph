@@ -906,13 +906,21 @@ The goal is to make `ralph` feel like a polished, intuitive tool. When a user ru
   >    - CombinedModel tests (6): StartsInSetupPhase, SetupToLoopTransition, LoopReadyTransition,
   >                                ViewRendersCorrectPhase, WithSetupOptions, SetupErrorStaysInSetup
 
-- [ ] POLISH-008: Clean-Up
+- [x] POLISH-008: Clean-Up
   > Goal: Leave the codebase that is clean, efficient and ready to publish
   > Go through the whole codebase and remove any dead or stale code and files
   > Simplify and optimize anything we can
   > Make sure the code is readable and straightforward
   > Go through main logic step by step and make sure it's sound
   > Run tests and leave the codebase ready for publication
+  >
+  > DONE: Completed codebase cleanup audit:
+  > - Removed dead function `runWithSetupResult` from cmd/ralph/cmd/run.go (90 lines, never called)
+  > - Verified all imports used via go vet (no issues)
+  > - Ran go mod tidy (dependencies clean)
+  > - Reviewed TODO/FIXME comments (all legitimate)
+  > - Verified main logic flows sound (run.go → loop.go task execution)
+  > - All tests passing, build successful, ready for publication
 
 
 - [x] POLISH-009: CI
