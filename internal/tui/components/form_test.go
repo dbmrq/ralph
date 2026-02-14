@@ -326,4 +326,3 @@ func TestFormEmptyFields(t *testing.T) {
 		t.Error("FocusedField should be nil for empty form")
 	}
 }
-

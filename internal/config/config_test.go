@@ -698,4 +698,3 @@ func TestConfig_Validate_EmptyHooks(t *testing.T) {
 		t.Errorf("expected config with empty hooks to be valid, got error: %v", err)
 	}
 }
-

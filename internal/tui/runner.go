@@ -3,7 +3,6 @@
 package tui
 
 import (
-	"bufio"
 	"bytes"
 	"io"
 	"sync"
@@ -18,10 +17,10 @@ import (
 // It implements the loop.EventHandler signature and sends appropriate
 // TUI messages to the Bubble Tea program.
 type TUIEventHandler struct {
-	program  *tea.Program
-	startAt  time.Time
-	tasks    []*task.Task
-	tasksMu  sync.RWMutex
+	program *tea.Program
+	startAt time.Time
+	tasks   []*task.Task
+	tasksMu sync.RWMutex
 }
 
 // NewTUIEventHandler creates a new TUIEventHandler.
@@ -376,10 +375,8 @@ func (r *TUIRunner) Model() *Model {
 // This is useful when you need line-by-line output handling.
 // Optimized to avoid O(n²) buffer growth with partial lines.
 type LineWriter struct {
-	w       io.Writer
-	onLine  func(string)
-	scanner *bufio.Scanner
-	buf     []byte // Use slice instead of bytes.Buffer for efficient partial line handling
+	onLine func(string)
+	buf    []byte // Use slice instead of bytes.Buffer for efficient partial line handling
 }
 
 // NewLineWriter creates a writer that calls onLine for each complete line.
@@ -416,4 +413,3 @@ func (lw *LineWriter) Write(p []byte) (n int, err error) {
 
 	return n, nil
 }
-

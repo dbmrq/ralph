@@ -128,4 +128,3 @@ func (b *Builder) CountLevels() int {
 	}
 	return count
 }
-

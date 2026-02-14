@@ -298,7 +298,6 @@ func TestAgentHook_Execute_AgentRunError(t *testing.T) {
 	}
 }
 
-
 func TestAgentHook_Execute_PromptExpansion(t *testing.T) {
 	registry := agent.NewRegistry()
 	mockAg := &mockAgent{

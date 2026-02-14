@@ -296,4 +296,3 @@ func TestSessionManager_DeleteSession(t *testing.T) {
 		t.Error("Session should not exist after delete")
 	}
 }
-

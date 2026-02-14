@@ -107,4 +107,3 @@ func BenchmarkLogViewport_ScrollingWithManyLines(b *testing.B) {
 		lv.GotoBottom()
 	}
 }
-

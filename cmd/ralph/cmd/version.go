@@ -71,4 +71,3 @@ func checkForUpdate(cmd *cobra.Command) error {
 
 	return nil
 }
-

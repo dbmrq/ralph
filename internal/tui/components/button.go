@@ -143,4 +143,3 @@ func (b *Button) View() string {
 
 	return buttonStyle.Render(b.label)
 }
-

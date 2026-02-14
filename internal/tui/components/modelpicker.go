@@ -277,4 +277,3 @@ type ModelSelectedMsg struct {
 
 // ModelPickerClosedMsg is sent when the picker is closed without selection.
 type ModelPickerClosedMsg struct{}
-

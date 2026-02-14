@@ -260,4 +260,3 @@ func printInitSuccess(cmd *cobra.Command) {
 	cmd.Println("  1. Review .ralph/config.yaml to customize settings")
 	cmd.Println("  2. Run 'ralph run' to start the task loop")
 }
-

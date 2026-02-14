@@ -193,10 +193,10 @@ type HooksConfig struct {
 
 // Default values.
 const (
-	DefaultActiveTimeout   = 2 * time.Hour
-	DefaultStuckTimeout    = 30 * time.Minute
-	DefaultCommitPrefix    = "[ralph]"
-	DefaultBaselineFile    = ".ralph/test_baseline.json"
+	DefaultActiveTimeout = 2 * time.Hour
+	DefaultStuckTimeout  = 30 * time.Minute
+	DefaultCommitPrefix  = "[ralph]"
+	DefaultBaselineFile  = ".ralph/test_baseline.json"
 )
 
 // NewConfig returns a new Config with default values applied.

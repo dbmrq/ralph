@@ -117,10 +117,10 @@ func TestTaskList_Update(t *testing.T) {
 	tl.SetItems(items)
 
 	tests := []struct {
-		name         string
-		key          string
-		expectedSel  int
-		initialSel   int
+		name        string
+		key         string
+		expectedSel int
+		initialSel  int
 	}{
 		{"j moves down", "j", 1, 0},
 		{"k moves up", "k", 1, 2},
@@ -331,4 +331,3 @@ func TestTaskList_StatusIcons(t *testing.T) {
 		t.Error("expected 'Pending' task in view")
 	}
 }
-

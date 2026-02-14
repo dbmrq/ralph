@@ -264,4 +264,3 @@ type TaskEditorSubmitMsg struct {
 
 // TaskEditorCancelMsg is sent when the user cancels the editor.
 type TaskEditorCancelMsg struct{}
-

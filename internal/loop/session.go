@@ -152,4 +152,3 @@ func (m *SessionManager) GetResumableSessions() ([]*LoopContext, error) {
 func (m *SessionManager) DeleteSession(sessionID string) error {
 	return m.persistence.Delete(sessionID)
 }
-

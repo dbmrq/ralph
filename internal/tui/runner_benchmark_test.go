@@ -109,4 +109,3 @@ func BenchmarkManualLineScan(b *testing.B) {
 		}
 	}
 }
-

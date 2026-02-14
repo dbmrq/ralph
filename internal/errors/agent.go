@@ -171,4 +171,3 @@ func AgentExecutionFailed(agentName string, exitCode int, stderr string) *RalphE
 
 	return err
 }
-

@@ -548,4 +548,3 @@ func TestStore_ConcurrentAccess(t *testing.T) {
 		<-done
 	}
 }
-

@@ -184,4 +184,3 @@ Or disable auto-commit in .ralph/config.yaml:
     auto_commit: false`
 	return err
 }
-

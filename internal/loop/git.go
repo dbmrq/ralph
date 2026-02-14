@@ -160,4 +160,3 @@ func (g *GitOperations) CommitTask(ctx context.Context, t *task.Task) CommitResu
 
 	return result
 }
-

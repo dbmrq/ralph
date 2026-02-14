@@ -93,4 +93,3 @@ func CloseGlobal() error {
 	}
 	return nil
 }
-

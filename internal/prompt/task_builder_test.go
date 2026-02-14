@@ -326,4 +326,3 @@ func TestTaskPromptBuilder_FormatTaskContent(t *testing.T) {
 		t.Error("missing description")
 	}
 }
-

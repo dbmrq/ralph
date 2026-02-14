@@ -332,4 +332,3 @@ func (m *Manager) ReorderTasks(orderedIDs []string) error {
 
 	return nil
 }
-

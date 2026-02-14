@@ -13,90 +13,90 @@ import (
 // TestParseTaskGateOverride tests the parsing of gate overrides from task metadata.
 func TestParseTaskGateOverride(t *testing.T) {
 	tests := []struct {
-		name             string
-		description      string
-		metadata         map[string]string
-		wantTestSkip     bool
-		wantBuildSkip    bool
+		name          string
+		description   string
+		metadata      map[string]string
+		wantTestSkip  bool
+		wantBuildSkip bool
 	}{
 		{
-			name:             "no overrides",
-			description:      "Implement feature X",
-			wantTestSkip:     false,
-			wantBuildSkip:    false,
+			name:          "no overrides",
+			description:   "Implement feature X",
+			wantTestSkip:  false,
+			wantBuildSkip: false,
 		},
 		{
-			name:             "tests not required",
-			description:      "Setup task\nTests: Not required",
-			wantTestSkip:     true,
-			wantBuildSkip:    false,
+			name:          "tests not required",
+			description:   "Setup task\nTests: Not required",
+			wantTestSkip:  true,
+			wantBuildSkip: false,
 		},
 		{
-			name:             "build not required",
-			description:      "Config only task\nBuild: Not required",
-			wantTestSkip:     false,
-			wantBuildSkip:    true,
+			name:          "build not required",
+			description:   "Config only task\nBuild: Not required",
+			wantTestSkip:  false,
+			wantBuildSkip: true,
 		},
 		{
-			name:             "both not required",
-			description:      "Init task\nTests: Not required\nBuild: Not required",
-			wantTestSkip:     true,
-			wantBuildSkip:    true,
+			name:          "both not required",
+			description:   "Init task\nTests: Not required\nBuild: Not required",
+			wantTestSkip:  true,
+			wantBuildSkip: true,
 		},
 		{
-			name:             "tests none",
-			description:      "Setup only (Tests: None)",
-			wantTestSkip:     true,
-			wantBuildSkip:    false,
+			name:          "tests none",
+			description:   "Setup only (Tests: None)",
+			wantTestSkip:  true,
+			wantBuildSkip: false,
 		},
 		{
-			name:             "tests n/a",
-			description:      "Documentation task (Tests: N/A)",
-			wantTestSkip:     true,
-			wantBuildSkip:    false,
+			name:          "tests n/a",
+			description:   "Documentation task (Tests: N/A)",
+			wantTestSkip:  true,
+			wantBuildSkip: false,
 		},
 		{
-			name:             "tests skip",
-			description:      "Tests: Skip - no test infrastructure yet",
-			wantTestSkip:     true,
-			wantBuildSkip:    false,
+			name:          "tests skip",
+			description:   "Tests: Skip - no test infrastructure yet",
+			wantTestSkip:  true,
+			wantBuildSkip: false,
 		},
 		{
-			name:             "no tests needed phrase",
-			description:      "Config change - no tests needed for this",
-			wantTestSkip:     true,
-			wantBuildSkip:    false,
+			name:          "no tests needed phrase",
+			description:   "Config change - no tests needed for this",
+			wantTestSkip:  true,
+			wantBuildSkip: false,
 		},
 		{
-			name:             "no tests required phrase",
-			description:      "Documentation update - no tests required",
-			wantTestSkip:     true,
-			wantBuildSkip:    false,
+			name:          "no tests required phrase",
+			description:   "Documentation update - no tests required",
+			wantTestSkip:  true,
+			wantBuildSkip: false,
 		},
 		{
-			name:             "no build needed phrase",
-			description:      "Metadata change - no build needed",
-			wantTestSkip:     false,
-			wantBuildSkip:    true,
+			name:          "no build needed phrase",
+			description:   "Metadata change - no build needed",
+			wantTestSkip:  false,
+			wantBuildSkip: true,
 		},
 		{
-			name:             "case insensitive",
-			description:      "TESTS: NOT REQUIRED\nBUILD: NOT REQUIRED",
-			wantTestSkip:     true,
-			wantBuildSkip:    true,
+			name:          "case insensitive",
+			description:   "TESTS: NOT REQUIRED\nBUILD: NOT REQUIRED",
+			wantTestSkip:  true,
+			wantBuildSkip: true,
 		},
 		{
-			name:             "metadata override for tests",
-			description:      "Regular task",
-			metadata:        map[string]string{"test_gate": "Tests: skip"},
-			wantTestSkip:     true,
-			wantBuildSkip:    false,
+			name:          "metadata override for tests",
+			description:   "Regular task",
+			metadata:      map[string]string{"test_gate": "Tests: skip"},
+			wantTestSkip:  true,
+			wantBuildSkip: false,
 		},
 		{
-			name:             "test singular form",
-			description:      "Setup task (Test: Not required)",
-			wantTestSkip:     true,
-			wantBuildSkip:    false,
+			name:          "test singular form",
+			description:   "Setup task (Test: Not required)",
+			wantTestSkip:  true,
+			wantBuildSkip: false,
 		},
 	}
 
@@ -446,4 +446,3 @@ func TestVerificationGate_TDDMode(t *testing.T) {
 func stringPtr(s string) *string {
 	return &s
 }
-

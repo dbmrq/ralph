@@ -404,4 +404,3 @@ func TestAnalysisFormBlur(t *testing.T) {
 		t.Error("Field should not be focused after form Blur")
 	}
 }
-

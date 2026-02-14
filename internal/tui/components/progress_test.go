@@ -149,4 +149,3 @@ func TestProgressBarCharacters(t *testing.T) {
 		t.Error("View should contain empty bar character '░'")
 	}
 }
-

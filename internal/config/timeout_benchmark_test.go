@@ -98,4 +98,3 @@ func BenchmarkMonitoredWriter_LargeWrites(b *testing.B) {
 		_, _ = writer.Write(data)
 	}
 }
-

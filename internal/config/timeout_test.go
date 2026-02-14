@@ -522,4 +522,3 @@ func TestMonitoredWriter_KeepsMonitorActive(t *testing.T) {
 		t.Error("monitor should not be expired when writes are happening")
 	}
 }
-

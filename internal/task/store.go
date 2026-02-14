@@ -284,4 +284,3 @@ func (s *Store) Metadata() StoreMetadata {
 	defer s.mu.RUnlock()
 	return s.store.Metadata
 }
-

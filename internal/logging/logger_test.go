@@ -517,4 +517,3 @@ func TestConsoleOutput(t *testing.T) {
 	// Just verify it doesn't panic with console enabled
 	logger.Info("console test")
 }
-

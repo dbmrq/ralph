@@ -438,4 +438,3 @@ func (l *Logger) Rotate() error {
 
 	return nil
 }
-

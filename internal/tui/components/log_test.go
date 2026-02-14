@@ -192,8 +192,8 @@ func TestLogViewport_Update(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		key            string
+		name             string
+		key              string
 		expectAutoFollow bool
 	}{
 		{"up disables auto-follow", "up", false},
@@ -377,4 +377,3 @@ func TestLogViewport_Update_PageNavigation(t *testing.T) {
 		t.Error("expected auto-follow to be true after end (G)")
 	}
 }
-

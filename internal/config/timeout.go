@@ -274,4 +274,3 @@ func (mw *MonitoredWriter) Write(p []byte) (n int, err error) {
 func (mw *MonitoredWriter) Monitor() *TimeoutMonitor {
 	return mw.monitor
 }
-

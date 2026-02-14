@@ -289,4 +289,3 @@ func TestTaskEditorModeConstants(t *testing.T) {
 		t.Errorf("expected TaskEditorModeEdit = 2, got %d", TaskEditorModeEdit)
 	}
 }
-

@@ -215,4 +215,3 @@ func (m *Manager) GetFailedHookInfo(result *ManagerResult) string {
 		result.FailedResult.Output,
 	)
 }
-

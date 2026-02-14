@@ -62,7 +62,7 @@ var ValidTransitions = map[State][]State{
 	StateRunning:     {StatePaused, StateAwaitingFix, StateCompleted, StateFailed},
 	StatePaused:      {StateRunning, StateFailed},
 	StateAwaitingFix: {StateRunning, StateFailed},
-	StateCompleted:   {}, // Terminal state
+	StateCompleted:   {},          // Terminal state
 	StateFailed:      {StateIdle}, // Can restart from failed
 }
 
@@ -408,4 +408,3 @@ func (p *StatePersistence) Delete(sessionID string) error {
 	}
 	return nil
 }
-

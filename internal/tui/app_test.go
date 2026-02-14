@@ -553,7 +553,7 @@ func TestRepeatChar(t *testing.T) {
 
 func TestFormatDurationFunc(t *testing.T) {
 	tests := []struct {
-		duration     string
+		duration         string
 		expectedContains string
 	}{
 		{"0s", "00:00"},
@@ -601,4 +601,3 @@ func (m *mockLoopController) Skip(taskID string) error {
 	m.skipTaskID = taskID
 	return nil
 }
-

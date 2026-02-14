@@ -375,4 +375,3 @@ type EditorErrorMsg struct {
 
 // EditorClosedMsg is sent when the editor is closed.
 type EditorClosedMsg struct{}
-

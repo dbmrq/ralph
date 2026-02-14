@@ -314,7 +314,6 @@ func TestLoop_Run_Cancellation(t *testing.T) {
 	}
 }
 
-
 func TestLoop_Run_EventEmission(t *testing.T) {
 	mockAg := &mockAgent{
 		name: "test-agent",

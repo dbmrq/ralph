@@ -261,7 +261,6 @@ func (m *TDDManager) captureAndPass(testResult *TestResult) (*TDDResult, error) 
 	}, nil
 }
 
-
 // compareAgainstBaseline compares current test results against the baseline.
 func (m *TDDManager) compareAgainstBaseline(testResult *TestResult, baseline *TestBaseline) (*TDDResult, error) {
 	currentPassing := extractPassingTestNames(testResult)
@@ -404,4 +403,3 @@ func extractFailingTestNames(result *TestResult) []string {
 
 	return []string{}
 }
-

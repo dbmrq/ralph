@@ -150,4 +150,3 @@ func (h *ShellHook) expandEnvVars(command string, hookCtx *HookContext) string {
 
 	return result
 }
-

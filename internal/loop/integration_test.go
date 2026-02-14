@@ -36,9 +36,9 @@ type scenarioAgent struct {
 }
 
 type agentCall struct {
-	TaskID    string
-	Prompt    string
-	Iteration int
+	TaskID     string
+	Prompt     string
+	Iteration  int
 	IsContinue bool
 }
 

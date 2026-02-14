@@ -204,4 +204,3 @@ func TestLoadFromDir(t *testing.T) {
 		t.Error("LoadFromDir() Base is nil")
 	}
 }
-

@@ -238,4 +238,3 @@ func (d *Discovery) DiscoverAndSelect(configuredAgent string, headless bool) (Ag
 	agent, err := d.promptSelection(result.Available)
 	return agent, result, err
 }
-

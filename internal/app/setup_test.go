@@ -17,13 +17,13 @@ type mockAgent struct {
 	runErr    error
 }
 
-func (m *mockAgent) Name() string                        { return m.name }
-func (m *mockAgent) Description() string                 { return "Mock agent for testing" }
-func (m *mockAgent) IsAvailable() bool                   { return true }
-func (m *mockAgent) CheckAuth() error                    { return nil }
-func (m *mockAgent) ListModels() ([]agent.Model, error)  { return nil, nil }
-func (m *mockAgent) GetDefaultModel() agent.Model        { return agent.Model{ID: "mock-model"} }
-func (m *mockAgent) GetSessionID() string                { return "test-session" }
+func (m *mockAgent) Name() string                       { return m.name }
+func (m *mockAgent) Description() string                { return "Mock agent for testing" }
+func (m *mockAgent) IsAvailable() bool                  { return true }
+func (m *mockAgent) CheckAuth() error                   { return nil }
+func (m *mockAgent) ListModels() ([]agent.Model, error) { return nil, nil }
+func (m *mockAgent) GetDefaultModel() agent.Model       { return agent.Model{ID: "mock-model"} }
+func (m *mockAgent) GetSessionID() string               { return "test-session" }
 
 func (m *mockAgent) Run(ctx context.Context, prompt string, opts agent.RunOptions) (agent.Result, error) {
 	return m.runResult, m.runErr
@@ -169,4 +169,3 @@ func TestSetup_SaveConfig(t *testing.T) {
 		t.Error("config.yaml was not created")
 	}
 }
-

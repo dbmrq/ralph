@@ -68,7 +68,7 @@ func TestCompareVersions(t *testing.T) {
 		{"1.2.3", "1.2.3", 0},
 		{"10.0.0", "2.0.0", 1},
 		{"1.10.0", "1.2.0", 1},
-		{"v1.0.0", "1.0.0", 0}, // handles v prefix
+		{"v1.0.0", "1.0.0", 0},    // handles v prefix
 		{"1.0.0-rc1", "1.0.0", 0}, // ignores pre-release suffix
 	}
 
@@ -238,4 +238,3 @@ func TestParseVersion(t *testing.T) {
 		})
 	}
 }
-

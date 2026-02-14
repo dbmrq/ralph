@@ -220,4 +220,3 @@ func TestConfirmDialogViewWhenVisible(t *testing.T) {
 		t.Error("View should contain No button")
 	}
 }
-

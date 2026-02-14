@@ -161,7 +161,7 @@ func parseVersion(v string) [3]int {
 
 // ProjectVersion stores version info for a project.
 type ProjectVersion struct {
-	RalphVersion string    `json:"ralph_version"`
+	RalphVersion  string    `json:"ralph_version"`
 	InitializedAt time.Time `json:"initialized_at"`
 	LastRunAt     time.Time `json:"last_run_at,omitempty"`
 }
@@ -210,4 +210,3 @@ func UpdateLastRun(projectDir, version string) error {
 	pv.RalphVersion = version
 	return SaveProjectVersion(projectDir, pv)
 }
-

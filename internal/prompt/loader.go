@@ -136,4 +136,3 @@ func LoadWithFallback(primaryDir, fallbackDir string) (*Prompt, error) {
 
 	return prompt, nil
 }
-

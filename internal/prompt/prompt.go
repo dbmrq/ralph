@@ -150,4 +150,3 @@ func SubstituteVariables(content string, vars *Variables) string {
 	}
 	return Substitute(content, vars.ToMap())
 }
-

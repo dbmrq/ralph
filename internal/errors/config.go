@@ -152,4 +152,3 @@ func SessionNotFound(sessionID string) *RalphError {
     ralph run`,
 	}
 }
-

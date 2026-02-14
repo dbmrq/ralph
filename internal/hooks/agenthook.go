@@ -148,4 +148,3 @@ func (h *AgentHook) expandPromptVariables(prompt string, hookCtx *HookContext) s
 
 	return result
 }
-

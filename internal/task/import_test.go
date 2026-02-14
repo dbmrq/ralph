@@ -34,12 +34,12 @@ func TestImporter_SetIDStart(t *testing.T) {
 
 func TestImporter_GenerateID(t *testing.T) {
 	imp := NewImporter()
-	
+
 	id1 := imp.generateID()
 	if id1 != "TASK-001" {
 		t.Errorf("expected 'TASK-001', got %q", id1)
 	}
-	
+
 	id2 := imp.generateID()
 	if id2 != "TASK-002" {
 		t.Errorf("expected 'TASK-002', got %q", id2)
@@ -58,11 +58,11 @@ func TestImporter_ImportFromMarkdown_BasicTasks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	
+
 	if len(result.Tasks) != 3 {
 		t.Fatalf("expected 3 tasks, got %d", len(result.Tasks))
 	}
-	
+
 	// Check first task
 	if result.Tasks[0].ID != "TASK-001" {
 		t.Errorf("expected ID 'TASK-001', got %q", result.Tasks[0].ID)
@@ -76,7 +76,7 @@ func TestImporter_ImportFromMarkdown_BasicTasks(t *testing.T) {
 	if result.Tasks[0].Order != 1 {
 		t.Errorf("expected order 1, got %d", result.Tasks[0].Order)
 	}
-	
+
 	// Check completed task
 	if result.Tasks[2].Status != StatusCompleted {
 		t.Errorf("expected status completed, got %v", result.Tasks[2].Status)
@@ -94,11 +94,11 @@ func TestImporter_ImportFromMarkdown_WithContext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	
+
 	if len(result.Tasks) != 1 {
 		t.Fatalf("expected 1 task, got %d", len(result.Tasks))
 	}
-	
+
 	task := result.Tasks[0]
 	if !strings.Contains(task.Description, "Goal: Complete the first task") {
 		t.Errorf("expected description to contain goal, got %q", task.Description)
@@ -117,18 +117,18 @@ func TestImporter_ImportFromMarkdown_AutoGenerateID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	
+
 	if len(result.Tasks) != 2 {
 		t.Fatalf("expected 2 tasks, got %d", len(result.Tasks))
 	}
-	
+
 	if result.Tasks[0].ID != "TASK-001" {
 		t.Errorf("expected ID 'TASK-001', got %q", result.Tasks[0].ID)
 	}
 	if result.Tasks[1].ID != "TASK-002" {
 		t.Errorf("expected ID 'TASK-002', got %q", result.Tasks[1].ID)
 	}
-	
+
 	// Should have warnings about generated IDs
 	if len(result.Warnings) != 2 {
 		t.Errorf("expected 2 warnings, got %d", len(result.Warnings))

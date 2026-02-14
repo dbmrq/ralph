@@ -168,4 +168,3 @@ func TestWithDoc(t *testing.T) {
 		t.Error("WithDoc should set DocLink")
 	}
 }
-

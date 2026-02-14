@@ -168,4 +168,3 @@ var errTest = &testError{"test error"}
 type testError struct{ msg string }
 
 func (e *testError) Error() string { return e.msg }
-

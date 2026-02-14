@@ -165,4 +165,3 @@ func TestCheckboxSetLabel(t *testing.T) {
 		t.Error("View should contain the new label")
 	}
 }
-

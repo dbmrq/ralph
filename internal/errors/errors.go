@@ -154,4 +154,3 @@ func WithDoc(kind error, message, docLink string) *RalphError {
 		DocLink: docLink,
 	}
 }
-

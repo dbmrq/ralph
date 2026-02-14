@@ -147,4 +147,3 @@ func IsUserError(err error) bool {
 	}
 	return false
 }
-

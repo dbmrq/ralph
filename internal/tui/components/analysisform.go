@@ -21,24 +21,24 @@ type ReanalyzeRequestedMsg struct{}
 // AnalysisForm displays project analysis results for user confirmation.
 type AnalysisForm struct {
 	// Fields
-	projectType  *TextInput
-	languages    *TextInput
-	buildCmd     *TextInput
-	buildReady   *Checkbox
-	testCmd      *TextInput
-	testReady    *Checkbox
-	greenfield   *Checkbox
+	projectType *TextInput
+	languages   *TextInput
+	buildCmd    *TextInput
+	buildReady  *Checkbox
+	testCmd     *TextInput
+	testReady   *Checkbox
+	greenfield  *Checkbox
 
 	// Buttons
 	confirmBtn   *Button
 	reanalyzeBtn *Button
 
 	// State
-	fields       []FormField
-	focusIndex   int
-	width        int
+	fields        []FormField
+	focusIndex    int
+	width         int
 	showReasoning bool
-	reasoning    string
+	reasoning     string
 
 	// Original analysis for reference
 	original *build.ProjectAnalysis
@@ -382,4 +382,3 @@ func (f *AnalysisForm) View() string {
 
 	return b.String()
 }
-

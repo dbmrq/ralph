@@ -279,4 +279,3 @@ func TestModelPicker_SetSize(t *testing.T) {
 		t.Errorf("expected height 20, got %d", p.height)
 	}
 }
-

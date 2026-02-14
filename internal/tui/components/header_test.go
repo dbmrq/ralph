@@ -114,4 +114,3 @@ func TestHeaderContainsTitle(t *testing.T) {
 		t.Error("Header should contain title 'RALPH LOOP'")
 	}
 }
-

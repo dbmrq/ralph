@@ -213,4 +213,3 @@ func TestTaskInitModeConstants(t *testing.T) {
 		t.Errorf("expected TaskInitModeEmpty = 'empty', got %s", TaskInitModeEmpty)
 	}
 }
-

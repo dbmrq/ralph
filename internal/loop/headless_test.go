@@ -299,4 +299,3 @@ func TestHeadlessRunner_VerboseMode(t *testing.T) {
 		}
 	})
 }
-

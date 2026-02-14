@@ -115,4 +115,3 @@ func (h *Header) View() string {
 
 	return headerStyle.Render(content)
 }
-

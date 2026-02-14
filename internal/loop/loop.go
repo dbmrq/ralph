@@ -998,4 +998,3 @@ func (l *Loop) runAutoFix(ctx context.Context, t *task.Task, gateResult *build.G
 
 	return &result, nil
 }
-

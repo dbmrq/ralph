@@ -667,4 +667,3 @@ func TestManager_ReorderTasks_PartialList(t *testing.T) {
 		t.Errorf("all[1].ID = %q, want TASK-002", all[1].ID)
 	}
 }
-

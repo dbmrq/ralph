@@ -284,4 +284,3 @@ func extractSessionID(output string) string {
 	}
 	return ""
 }
-

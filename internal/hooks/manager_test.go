@@ -20,10 +20,10 @@ type mockHook struct {
 	executeFunc func(ctx context.Context, hookCtx *HookContext) (*HookResult, error)
 }
 
-func (m *mockHook) Name() string                       { return m.name }
-func (m *mockHook) Phase() HookPhase                   { return m.phase }
-func (m *mockHook) Type() config.HookType              { return m.hookType }
-func (m *mockHook) Definition() config.HookDefinition  { return m.definition }
+func (m *mockHook) Name() string                      { return m.name }
+func (m *mockHook) Phase() HookPhase                  { return m.phase }
+func (m *mockHook) Type() config.HookType             { return m.hookType }
+func (m *mockHook) Definition() config.HookDefinition { return m.definition }
 func (m *mockHook) Execute(ctx context.Context, hookCtx *HookContext) (*HookResult, error) {
 	if m.executeFunc != nil {
 		return m.executeFunc(ctx, hookCtx)
@@ -44,9 +44,9 @@ func newSuccessHook(name string, phase HookPhase) *mockHook {
 
 func newFailureHook(name string, phase HookPhase, failureMode config.FailureMode) *mockHook {
 	return &mockHook{
-		name:     name,
-		phase:    phase,
-		hookType: config.HookTypeShell,
+		name:       name,
+		phase:      phase,
+		hookType:   config.HookTypeShell,
 		definition: config.HookDefinition{OnFailure: failureMode},
 		executeFunc: func(ctx context.Context, hookCtx *HookContext) (*HookResult, error) {
 			return &HookResult{
@@ -86,11 +86,11 @@ func TestNewManager(t *testing.T) {
 
 func TestManager_HasHooks(t *testing.T) {
 	tests := []struct {
-		name     string
-		pre      []Hook
-		post     []Hook
-		hasPre   bool
-		hasPost  bool
+		name    string
+		pre     []Hook
+		post    []Hook
+		hasPre  bool
+		hasPost bool
 	}{
 		{"empty", nil, nil, false, false},
 		{"pre only", []Hook{newSuccessHook("h", HookPhasePre)}, nil, true, false},
@@ -266,7 +266,6 @@ func TestManager_ExecuteHooks_FailureWarnContinue(t *testing.T) {
 		t.Errorf("len(Results) = %d, want 3", len(result.Results))
 	}
 }
-
 
 func TestManager_ExecuteHooks_ExecutionError(t *testing.T) {
 	hooks := []Hook{
@@ -762,4 +761,3 @@ func TestManager_GetFailedHookInfo_NilFailedResult(t *testing.T) {
 		t.Errorf("GetFailedHookInfo() = %q, want empty string when FailedResult is nil", info)
 	}
 }
-

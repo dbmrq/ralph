@@ -434,4 +434,3 @@ func TestExtractSessionID_Variants(t *testing.T) {
 		})
 	}
 }
-

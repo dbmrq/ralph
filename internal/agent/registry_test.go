@@ -381,4 +381,3 @@ func TestRegistry_PromptUserSelection(t *testing.T) {
 		}
 	})
 }
-

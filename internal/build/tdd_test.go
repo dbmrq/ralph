@@ -404,7 +404,6 @@ func TestTDDManager_Evaluate_NoRegressions(t *testing.T) {
 	}
 }
 
-
 func TestFindRegressions(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -456,34 +455,34 @@ func TestFindRegressions(t *testing.T) {
 
 func TestFindNewlyPassing(t *testing.T) {
 	tests := []struct {
-		name           string
+		name            string
 		baselineFailing []string
-		currentPassing []string
-		wantCount      int
+		currentPassing  []string
+		wantCount       int
 	}{
 		{
-			name:           "one newly passing",
+			name:            "one newly passing",
 			baselineFailing: []string{"TestA", "TestB"},
-			currentPassing: []string{"TestA"},
-			wantCount:      1,
+			currentPassing:  []string{"TestA"},
+			wantCount:       1,
 		},
 		{
-			name:           "all newly passing",
+			name:            "all newly passing",
 			baselineFailing: []string{"TestA", "TestB"},
-			currentPassing: []string{"TestA", "TestB"},
-			wantCount:      2,
+			currentPassing:  []string{"TestA", "TestB"},
+			wantCount:       2,
 		},
 		{
-			name:           "none newly passing",
+			name:            "none newly passing",
 			baselineFailing: []string{"TestA", "TestB"},
-			currentPassing: []string{},
-			wantCount:      0,
+			currentPassing:  []string{},
+			wantCount:       0,
 		},
 		{
-			name:           "empty baseline failing",
+			name:            "empty baseline failing",
 			baselineFailing: []string{},
-			currentPassing: []string{"TestA"},
-			wantCount:      0,
+			currentPassing:  []string{"TestA"},
+			wantCount:       0,
 		},
 	}
 

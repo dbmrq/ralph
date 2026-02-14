@@ -231,4 +231,3 @@ func (d *BootstrapDetector) detectAuto() (*BootstrapState, error) {
 
 	return d.Analysis.ToBootstrapState(), nil
 }
-

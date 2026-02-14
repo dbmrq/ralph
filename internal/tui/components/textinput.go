@@ -129,4 +129,3 @@ func (t *TextInput) View() string {
 func (t *TextInput) Reset() {
 	t.model.Reset()
 }
-

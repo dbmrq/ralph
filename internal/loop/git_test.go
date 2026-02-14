@@ -319,4 +319,3 @@ func TestGitOperations_CommitTask(t *testing.T) {
 		}
 	})
 }
-

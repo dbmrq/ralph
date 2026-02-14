@@ -128,4 +128,3 @@ type Agent interface {
 	// GetSessionID returns the session ID from the most recent run, if any.
 	GetSessionID() string
 }
-

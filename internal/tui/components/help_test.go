@@ -154,4 +154,3 @@ func TestHelpOverlayViewWhenVisible(t *testing.T) {
 		t.Error("View should contain close instruction")
 	}
 }
-

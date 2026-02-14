@@ -67,7 +67,7 @@ func NeedsSetup(projectDir string) bool {
 // CreateRalphDir creates the .ralph directory structure.
 func (s *Setup) CreateRalphDir() error {
 	ralphDir := filepath.Join(s.ProjectDir, ".ralph")
-	
+
 	// Create main directory
 	if err := os.MkdirAll(ralphDir, 0755); err != nil {
 		return fmt.Errorf("failed to create .ralph directory: %w", err)
@@ -92,19 +92,19 @@ func (s *Setup) CreateRalphDir() error {
 // RunAnalysis runs the Project Analysis Agent.
 func (s *Setup) RunAnalysis(ctx context.Context) (*build.ProjectAnalysis, error) {
 	s.report("Analyzing project...")
-	
+
 	analyzer := build.NewProjectAnalyzer(s.ProjectDir, s.Agent)
 	analyzer.Model = s.Model
 	analyzer.LogWriter = s.LogWriter
 	analyzer.OnProgress = func(status string) {
 		s.report(status)
 	}
-	
+
 	analysis, err := analyzer.AnalyzeWithFallback(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("analysis failed: %w", err)
 	}
-	
+
 	return analysis, nil
 }
 
@@ -129,7 +129,7 @@ func (s *Setup) ImportTasks(ctx context.Context, detection *task.TaskListDetecti
 	initializer.OnProgress = func(status string) {
 		s.report(status)
 	}
-	
+
 	result, err := initializer.ImportFromDetection(detection)
 	if err != nil {
 		return nil, err
@@ -143,7 +143,7 @@ func (s *Setup) ImportTasksFromFile(path string) ([]*task.Task, error) {
 	initializer.OnProgress = func(status string) {
 		s.report(status)
 	}
-	
+
 	result, err := initializer.ImportFromFile(path)
 	if err != nil {
 		return nil, err
@@ -311,4 +311,3 @@ func (s *Setup) report(status string) {
 		s.OnProgress(status)
 	}
 }
-

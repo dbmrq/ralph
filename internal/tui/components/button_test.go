@@ -145,4 +145,3 @@ func TestButtonStyleConstants(t *testing.T) {
 		t.Error("ButtonStyleDanger should be 2")
 	}
 }
-

@@ -245,4 +245,3 @@ func createTestZip(path string) error {
 
 	return nil
 }
-

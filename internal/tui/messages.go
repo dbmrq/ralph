@@ -114,11 +114,11 @@ type ConfirmMsg struct {
 
 // HookStatusMsg reports hook execution status.
 type HookStatusMsg struct {
-	HookName   string
-	HookType   string // pre_task or post_task
-	Running    bool
-	Succeeded  bool
-	Error      string
+	HookName  string
+	HookType  string // pre_task or post_task
+	Running   bool
+	Succeeded bool
+	Error     string
 }
 
 // AnalysisStatusMsg reports project analysis status.
@@ -158,4 +158,3 @@ type TaskListConfirmedMsg = components.TaskListConfirmedMsg
 
 // TaskListReparseMsg is sent when the user wants to re-parse the task list.
 type TaskListReparseMsg = components.TaskListReparseMsg
-

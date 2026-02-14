@@ -501,4 +501,3 @@ func TestLineWriter_OnlyNewlines(t *testing.T) {
 		}
 	}
 }
-

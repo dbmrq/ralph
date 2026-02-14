@@ -153,4 +153,3 @@ func TestCommitFailed_EmptyStderr(t *testing.T) {
 		t.Error("Should not include empty details")
 	}
 }
-

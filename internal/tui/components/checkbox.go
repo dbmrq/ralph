@@ -117,4 +117,3 @@ func (c *Checkbox) View() string {
 func (c *Checkbox) SetLabel(label string) {
 	c.label = label
 }
-

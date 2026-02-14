@@ -127,4 +127,3 @@ func TestTextInputReset(t *testing.T) {
 		t.Errorf("Value should be empty after Reset, got '%s'", ti.Value())
 	}
 }
-

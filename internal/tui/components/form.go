@@ -30,14 +30,14 @@ type FormCancelledMsg struct {
 
 // Form is a container for form fields with navigation support.
 type Form struct {
-	id          string
-	title       string
-	fields      []FormField
-	focusIndex  int
-	width       int
-	submitted   bool
-	cancelled   bool
-	showHelp    bool
+	id         string
+	title      string
+	fields     []FormField
+	focusIndex int
+	width      int
+	submitted  bool
+	cancelled  bool
+	showHelp   bool
 }
 
 // NewForm creates a new Form container.
@@ -285,4 +285,3 @@ func (f *Form) View() string {
 
 	return b.String()
 }
-

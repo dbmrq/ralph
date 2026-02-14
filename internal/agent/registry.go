@@ -197,4 +197,3 @@ func (r *Registry) PromptUserSelection(selector AgentSelector) (Agent, error) {
 		return selector(available)
 	}
 }
-

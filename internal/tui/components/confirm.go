@@ -178,4 +178,3 @@ type ConfirmYesMsg struct {
 
 // ConfirmNoMsg is sent when the user cancels.
 type ConfirmNoMsg struct{}
-

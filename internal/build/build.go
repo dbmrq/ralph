@@ -313,4 +313,3 @@ func containsErrorKeyword(lineLower string) bool {
 	}
 	return false
 }
-

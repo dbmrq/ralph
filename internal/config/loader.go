@@ -191,19 +191,23 @@ func stringToCustomTypeHookFunc() mapstructure.DecodeHookFunc {
 		}
 
 		// Handle our custom string types
+		str, ok := data.(string)
+		if !ok {
+			return data, nil
+		}
 		switch to {
 		case reflect.TypeOf(BootstrapDetection("")):
-			return BootstrapDetection(data.(string)), nil
+			return BootstrapDetection(str), nil
 		case reflect.TypeOf(TestMode("")):
-			return TestMode(data.(string)), nil
+			return TestMode(str), nil
 		case reflect.TypeOf(BaselineScope("")):
-			return BaselineScope(data.(string)), nil
+			return BaselineScope(str), nil
 		case reflect.TypeOf(FailureMode("")):
-			return FailureMode(data.(string)), nil
+			return FailureMode(str), nil
 		case reflect.TypeOf(HookType("")):
-			return HookType(data.(string)), nil
+			return HookType(str), nil
 		case reflect.TypeOf(DetectionMethod("")):
-			return DetectionMethod(data.(string)), nil
+			return DetectionMethod(str), nil
 		}
 
 		return data, nil

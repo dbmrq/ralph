@@ -34,10 +34,10 @@ type TaskInitCancelledMsg struct{}
 
 // TaskInitSelector shows options for initializing the task list.
 type TaskInitSelector struct {
-	options      []taskInitOption
-	selectedIdx  int
-	width        int
-	detection    *task.TaskListDetection
+	options     []taskInitOption
+	selectedIdx int
+	width       int
+	detection   *task.TaskListDetection
 }
 
 type taskInitOption struct {
@@ -164,4 +164,3 @@ func (s *TaskInitSelector) View() string {
 
 	return b.String()
 }
-

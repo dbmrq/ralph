@@ -301,4 +301,3 @@ func TestTaskListForm_EnsureVisible(t *testing.T) {
 		t.Errorf("expected scrollOffset 1, got %d", f.scrollOffset)
 	}
 }
-

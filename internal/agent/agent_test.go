@@ -170,4 +170,3 @@ func (m *mockAgent) Run(_ context.Context, _ string, _ RunOptions) (Result, erro
 func (m *mockAgent) Continue(_ context.Context, _ string, _ string, _ RunOptions) (Result, error) {
 	return m.runResult, m.runError
 }
-

@@ -12,21 +12,21 @@ import (
 
 // mockAgent is a test double for agent.Agent.
 type mockAgent struct {
-	name          string
-	runResult     agent.Result
-	runError      error
-	runCallCount  int
-	lastPrompt    string
-	lastOpts      agent.RunOptions
+	name         string
+	runResult    agent.Result
+	runError     error
+	runCallCount int
+	lastPrompt   string
+	lastOpts     agent.RunOptions
 }
 
-func (m *mockAgent) Name() string                                  { return m.name }
-func (m *mockAgent) Description() string                           { return "Mock agent for testing" }
-func (m *mockAgent) IsAvailable() bool                             { return true }
-func (m *mockAgent) CheckAuth() error                              { return nil }
-func (m *mockAgent) ListModels() ([]agent.Model, error)            { return nil, nil }
-func (m *mockAgent) GetDefaultModel() agent.Model                  { return agent.Model{ID: "mock-model"} }
-func (m *mockAgent) GetSessionID() string                          { return "" }
+func (m *mockAgent) Name() string                       { return m.name }
+func (m *mockAgent) Description() string                { return "Mock agent for testing" }
+func (m *mockAgent) IsAvailable() bool                  { return true }
+func (m *mockAgent) CheckAuth() error                   { return nil }
+func (m *mockAgent) ListModels() ([]agent.Model, error) { return nil, nil }
+func (m *mockAgent) GetDefaultModel() agent.Model       { return agent.Model{ID: "mock-model"} }
+func (m *mockAgent) GetSessionID() string               { return "" }
 func (m *mockAgent) Continue(ctx context.Context, sessionID string, prompt string, opts agent.RunOptions) (agent.Result, error) {
 	return m.Run(ctx, prompt, opts)
 }
@@ -367,4 +367,3 @@ func TestProjectAnalyzer_AnalysisPrompt(t *testing.T) {
 func containsString(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > 0 && (s[:len(substr)] == substr || containsString(s[1:], substr)))
 }
-

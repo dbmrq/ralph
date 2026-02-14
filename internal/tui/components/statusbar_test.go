@@ -244,4 +244,3 @@ func TestStatusBar_View_WithWidth(t *testing.T) {
 		t.Error("expected non-empty view")
 	}
 }
-

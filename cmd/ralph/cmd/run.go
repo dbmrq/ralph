@@ -89,7 +89,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		// Non-fatal: warn but continue without file logging
 		fmt.Fprintf(cmd.ErrOrStderr(), "Warning: failed to initialize logging: %v\n", err)
 	} else {
-		defer logging.CloseGlobal()
+		defer func() { _ = logging.CloseGlobal() }()
 		logging.Info("Ralph starting", "version", Version, "verbose", verbose)
 	}
 

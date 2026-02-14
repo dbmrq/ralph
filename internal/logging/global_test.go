@@ -237,4 +237,3 @@ func TestGlobalWith(t *testing.T) {
 		t.Error("Log should contain 'component' attribute")
 	}
 }
-

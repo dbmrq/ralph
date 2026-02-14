@@ -228,4 +228,3 @@ var (
 					BorderForeground(Error).
 					Padding(0, 1)
 )
-

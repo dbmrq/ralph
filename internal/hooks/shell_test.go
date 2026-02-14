@@ -313,12 +313,12 @@ func TestShellHook_Execute_Stderr(t *testing.T) {
 
 func TestShellHook_Execute_FailureModes(t *testing.T) {
 	tests := []struct {
-		name           string
-		failureMode    config.FailureMode
-		shouldAbort    bool
-		shouldSkip     bool
-		shouldAsk      bool
-		shouldWarn     bool
+		name        string
+		failureMode config.FailureMode
+		shouldAbort bool
+		shouldSkip  bool
+		shouldAsk   bool
+		shouldWarn  bool
 	}{
 		{"abort_loop", config.FailureModeAbortLoop, true, false, false, false},
 		{"skip_task", config.FailureModeSkipTask, false, true, false, false},

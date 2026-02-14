@@ -139,4 +139,3 @@ func (p *Progress) PercentComplete() float64 {
 func (p *Progress) IsComplete() bool {
 	return p.data.Total > 0 && p.data.Completed >= p.data.Total
 }
-

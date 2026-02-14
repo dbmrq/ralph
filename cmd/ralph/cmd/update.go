@@ -67,7 +67,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	if !skipPrompt {
 		cmd.Print("\nDo you want to update? [y/N]: ")
 		var response string
-		fmt.Scanln(&response)
+		_, _ = fmt.Scanln(&response)
 		if response != "y" && response != "Y" {
 			cmd.Println("Update cancelled.")
 			return nil
@@ -125,4 +125,3 @@ func performUpdate(cmd *cobra.Command, tagVersion string) error {
 	cmd.Printf("\n✓ Successfully updated to %s!\n", tagVersion)
 	return nil
 }
-

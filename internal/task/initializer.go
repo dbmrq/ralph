@@ -383,4 +383,3 @@ func (i *Initializer) SaveToStore(tasks []*Task, path string) error {
 	store.SetTasks(tasks)
 	return store.Save()
 }
-

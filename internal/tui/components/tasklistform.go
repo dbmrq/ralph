@@ -306,4 +306,3 @@ func (f *TaskListForm) renderTaskList() string {
 
 	return strings.Join(lines, "\n")
 }
-

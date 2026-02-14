@@ -42,19 +42,19 @@ type SetupModel struct {
 	textInput    *components.TextInput
 
 	// State
-	setup       *app.Setup
-	ctx         context.Context
-	analysis    *build.ProjectAnalysis
-	detection   *task.TaskListDetection
-	tasks       []*task.Task
-	errorMsg    string
-	statusMsg   string
-	initMode    components.TaskInitMode
-	
+	setup     *app.Setup
+	ctx       context.Context
+	analysis  *build.ProjectAnalysis
+	detection *task.TaskListDetection
+	tasks     []*task.Task
+	errorMsg  string
+	statusMsg string
+	initMode  components.TaskInitMode
+
 	// Window
 	width  int
 	height int
-	
+
 	// Result channel for async operations
 	resultChan chan interface{}
 }
@@ -474,4 +474,3 @@ func RunSetupTUI(ctx context.Context, ag agent.Agent, projectDir string) (*app.S
 
 	return nil, fmt.Errorf("setup cancelled")
 }
-

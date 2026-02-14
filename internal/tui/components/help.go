@@ -196,4 +196,3 @@ func (h *HelpOverlay) renderGroup(group ShortcutGroup) string {
 
 // HelpClosedMsg is sent when the help overlay is closed.
 type HelpClosedMsg struct{}
-

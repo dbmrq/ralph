@@ -282,4 +282,3 @@ func formatElapsed(d time.Duration) string {
 	}
 	return fmt.Sprintf("%02d:%02d", m, s)
 }
-

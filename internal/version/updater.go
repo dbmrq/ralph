@@ -230,4 +230,3 @@ func GetCurrentExecutable() (string, error) {
 	}
 	return filepath.EvalSymlinks(exe)
 }
-

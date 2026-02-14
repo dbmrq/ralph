@@ -260,10 +260,10 @@ func TestLoopContext_IncrementIteration(t *testing.T) {
 
 func TestLoopContext_RecordTaskCompletion(t *testing.T) {
 	tests := []struct {
-		status              task.TaskStatus
-		wantCompleted       int
-		wantFailed          int
-		wantSkipped         int
+		status        task.TaskStatus
+		wantCompleted int
+		wantFailed    int
+		wantSkipped   int
 	}{
 		{task.StatusCompleted, 1, 0, 0},
 		{task.StatusFailed, 0, 1, 0},
@@ -530,4 +530,3 @@ func TestTransitionError_Error(t *testing.T) {
 		t.Errorf("Error() = %q, want %q", err.Error(), expected)
 	}
 }
-

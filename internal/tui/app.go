@@ -30,15 +30,15 @@ const (
 // Model is the Bubble Tea model for the Ralph TUI.
 type Model struct {
 	// Components
-	header     *components.Header
-	progress   *components.Progress
-	taskList   *components.TaskList
-	statusBar  *components.StatusBar
-	logView    *components.LogViewport
-	taskEditor *components.TaskEditor
+	header      *components.Header
+	progress    *components.Progress
+	taskList    *components.TaskList
+	statusBar   *components.StatusBar
+	logView     *components.LogViewport
+	taskEditor  *components.TaskEditor
 	modelPicker *components.ModelPicker
 	helpOverlay *components.HelpOverlay
-	confirmDlg *components.ConfirmDialog
+	confirmDlg  *components.ConfirmDialog
 
 	// State
 	loopState   LoopState
@@ -525,8 +525,6 @@ func (m *Model) renderOverlay(base, overlay string) string {
 	return base + "\n" + overlayStyle.Render(overlay)
 }
 
-
-
 // repeatChar repeats a character n times.
 func repeatChar(char string, n int) string {
 	if n <= 0 {
@@ -589,4 +587,3 @@ func Run() error {
 	_, err := p.Run()
 	return err
 }
-

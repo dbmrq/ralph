@@ -120,4 +120,3 @@ func TestSessionNotFound(t *testing.T) {
 		t.Error("Suggestion should mention how to start a new session")
 	}
 }
-

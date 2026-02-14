@@ -221,4 +221,3 @@ func getDetectionHint(method config.DetectionMethod) string {
 		return ""
 	}
 }
-
