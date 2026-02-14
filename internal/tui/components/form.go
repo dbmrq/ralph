@@ -36,7 +36,7 @@ type Form struct {
 	focusIndex int
 	width      int
 	submitted  bool
-	cancelled  bool
+	canceled   bool
 	showHelp   bool
 }
 
@@ -178,13 +178,13 @@ func (f *Form) Submitted() bool {
 
 // Canceled returns whether the form was canceled.
 func (f *Form) Canceled() bool {
-	return f.cancelled
+	return f.canceled
 }
 
 // Reset resets the form state.
 func (f *Form) Reset() {
 	f.submitted = false
-	f.cancelled = false
+	f.canceled = false
 	f.focusIndex = 0
 }
 
@@ -205,7 +205,7 @@ func (f *Form) Update(msg tea.Msg) (*Form, tea.Cmd) {
 			return f, tea.Batch(cmds...)
 
 		case "esc":
-			f.cancelled = true
+			f.canceled = true
 			return f, func() tea.Msg {
 				return FormCanceledMsg{FormID: f.id}
 			}

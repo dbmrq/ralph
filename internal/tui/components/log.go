@@ -241,18 +241,18 @@ func (l *LogViewport) Update(msg tea.Msg) tea.Cmd {
 		switch msg.String() {
 		case "up", "k":
 			l.autoFollow = false
-			l.viewport.LineUp(1)
+			l.viewport.ScrollUp(1)
 		case "down", "j":
-			l.viewport.LineDown(1)
+			l.viewport.ScrollDown(1)
 			// Re-enable auto-follow if at bottom
 			if l.viewport.AtBottom() {
 				l.autoFollow = true
 			}
 		case "pgup", "ctrl+u":
 			l.autoFollow = false
-			l.viewport.HalfViewUp()
+			l.viewport.HalfPageUp()
 		case "pgdown", "ctrl+d":
-			l.viewport.HalfViewDown()
+			l.viewport.HalfPageDown()
 			if l.viewport.AtBottom() {
 				l.autoFollow = true
 			}

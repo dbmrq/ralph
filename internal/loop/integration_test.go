@@ -117,7 +117,7 @@ func extractTaskIDFromPrompt(prompt string) string {
 			taskLine := prompt[idx : idx+end]
 			parts := strings.Fields(taskLine)
 			if len(parts) >= 3 {
-				return strings.TrimRight(parts[2], "**")
+				return strings.TrimRight(parts[2], "*")
 			}
 		}
 	}

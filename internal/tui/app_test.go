@@ -389,9 +389,8 @@ func TestModelHandleKeyPress_Pause_NoController(t *testing.T) {
 	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}}
 	_, cmd := m.Update(msg)
 
-	if cmd != nil {
-		// No command should be returned when no controller
-	}
+	// No command should be returned when no controller
+	_ = cmd
 }
 
 func TestModelHandleKeyPress_Skip_ShowsConfirm(t *testing.T) {
