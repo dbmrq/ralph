@@ -215,13 +215,13 @@ func (l *LogViewport) GoToBottom() {
 
 // ScrollUp scrolls up one line.
 func (l *LogViewport) ScrollUp() {
-	l.viewport.LineUp(1)
+	l.viewport.ScrollUp(1)
 	l.autoFollow = false
 }
 
 // ScrollDown scrolls down one line.
 func (l *LogViewport) ScrollDown() {
-	l.viewport.LineDown(1)
+	l.viewport.ScrollDown(1)
 }
 
 // ToggleAutoFollow toggles auto-follow mode.

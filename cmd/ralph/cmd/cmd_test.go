@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
+
 	"github.com/wexinc/ralph/internal/agent"
 	"github.com/wexinc/ralph/internal/config"
 	"github.com/wexinc/ralph/internal/loop"

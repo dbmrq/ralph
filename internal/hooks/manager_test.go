@@ -293,7 +293,7 @@ func TestManager_ExecuteHooks_ExecutionError(t *testing.T) {
 }
 
 func TestManager_ExecuteHooks_ContextCancellation(t *testing.T) {
-	// Create a slow hook that will be cancelled
+	// Create a slow hook that will be canceled
 	slowHook := &mockHook{
 		name:     "slow",
 		phase:    HookPhasePre,
@@ -301,7 +301,7 @@ func TestManager_ExecuteHooks_ContextCancellation(t *testing.T) {
 		executeFunc: func(ctx context.Context, hookCtx *HookContext) (*HookResult, error) {
 			select {
 			case <-ctx.Done():
-				return &HookResult{Success: false, Error: "cancelled"}, nil
+				return &HookResult{Success: false, Error: "canceled"}, nil
 			case <-time.After(10 * time.Second):
 				return &HookResult{Success: true}, nil
 			}
@@ -322,7 +322,7 @@ func TestManager_ExecuteHooks_ContextCancellation(t *testing.T) {
 	result := m.ExecutePreTaskHooks(ctx, hookCtx)
 
 	if result.AllSuccess {
-		t.Error("AllSuccess = true, want false (cancelled)")
+		t.Error("AllSuccess = true, want false (canceled)")
 	}
 }
 
@@ -543,7 +543,7 @@ func containsAll(s string, substrings ...string) bool {
 	return true
 }
 
-func TestManager_ExecuteHooks_ContextCancelledBeforeStart(t *testing.T) {
+func TestManager_ExecuteHooks_ContextCanceledBeforeStart(t *testing.T) {
 	hooks := []Hook{
 		newSuccessHook("pre1", HookPhasePre),
 	}
@@ -562,14 +562,14 @@ func TestManager_ExecuteHooks_ContextCancelledBeforeStart(t *testing.T) {
 	result := m.ExecutePreTaskHooks(ctx, hookCtx)
 
 	if result.AllSuccess {
-		t.Error("AllSuccess = true, want false (context cancelled)")
+		t.Error("AllSuccess = true, want false (context canceled)")
 	}
 	if result.Action != ManagerActionAbortLoop {
 		t.Errorf("Action = %v, want %v", result.Action, ManagerActionAbortLoop)
 	}
 	// No hooks should have been executed
 	if len(result.Results) != 0 {
-		t.Errorf("len(Results) = %d, want 0 (context cancelled before any execution)", len(result.Results))
+		t.Errorf("len(Results) = %d, want 0 (context canceled before any execution)", len(result.Results))
 	}
 }
 

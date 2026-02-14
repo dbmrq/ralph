@@ -202,15 +202,15 @@ func TestFormUpdateEscCancel(t *testing.T) {
 	form.AddField(ti)
 	form.Focus()
 
-	if form.Cancelled() {
-		t.Fatal("Form should not be cancelled initially")
+	if form.Canceled() {
+		t.Fatal("Form should not be canceled initially")
 	}
 
 	msg := tea.KeyMsg{Type: tea.KeyEscape}
 	form.Update(msg)
 
-	if !form.Cancelled() {
-		t.Error("Form should be cancelled after Esc")
+	if !form.Canceled() {
+		t.Error("Form should be canceled after Esc")
 	}
 }
 
@@ -252,8 +252,8 @@ func TestFormReset(t *testing.T) {
 	if form.Submitted() {
 		t.Error("Form should not be submitted after Reset")
 	}
-	if form.Cancelled() {
-		t.Error("Form should not be cancelled after Reset")
+	if form.Canceled() {
+		t.Error("Form should not be canceled after Reset")
 	}
 	if form.FocusIndex() != 0 {
 		t.Error("Focus index should be 0 after Reset")

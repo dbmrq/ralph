@@ -91,13 +91,13 @@ func TestOperationTimeout(t *testing.T) {
 	}
 }
 
-func TestContextCancelled(t *testing.T) {
-	err := ContextCancelled("task execution")
+func TestContextCanceled(t *testing.T) {
+	err := ContextCanceled("task execution")
 
 	if !errors.Is(err, ErrTimeout) {
-		t.Error("ContextCancelled should return ErrTimeout")
+		t.Error("ContextCanceled should return ErrTimeout")
 	}
-	if !strings.Contains(err.Message, "cancelled") {
+	if !strings.Contains(err.Message, "canceled") {
 		t.Error("Message should indicate cancellation")
 	}
 	if !strings.Contains(err.Suggestion, "--continue") {

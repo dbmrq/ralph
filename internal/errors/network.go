@@ -90,11 +90,11 @@ func OperationTimeout(operation string, elapsed time.Duration) *RalphError {
 	}
 }
 
-// ContextCancelled creates an error for cancelled operations.
-func ContextCancelled(operation string) *RalphError {
+// ContextCanceled creates an error for canceled operations.
+func ContextCanceled(operation string) *RalphError {
 	return &RalphError{
 		Kind:    ErrTimeout,
-		Message: fmt.Sprintf("%s was cancelled", operation),
+		Message: fmt.Sprintf("%s was canceled", operation),
 		Details: map[string]string{
 			"operation": operation,
 		},

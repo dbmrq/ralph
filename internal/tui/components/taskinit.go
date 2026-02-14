@@ -29,8 +29,8 @@ type TaskInitSelectedMsg struct {
 	Mode TaskInitMode
 }
 
-// TaskInitCancelledMsg is sent when the user cancels task init.
-type TaskInitCancelledMsg struct{}
+// TaskInitCanceledMsg is sent when the user cancels task init.
+type TaskInitCanceledMsg struct{}
 
 // TaskInitSelector shows options for initializing the task list.
 type TaskInitSelector struct {
@@ -90,7 +90,7 @@ func (s *TaskInitSelector) Update(msg tea.Msg) (*TaskInitSelector, tea.Cmd) {
 			}
 		case "esc":
 			return s, func() tea.Msg {
-				return TaskInitCancelledMsg{}
+				return TaskInitCanceledMsg{}
 			}
 		}
 	}

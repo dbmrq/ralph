@@ -240,7 +240,7 @@ func (l *Loop) Run(ctx context.Context, sessionID string) error {
 
 		// Check for cancellation
 		if ctx.Err() != nil {
-			l.context.SetError("cancelled")
+			l.context.SetError("canceled")
 			_ = l.context.Transition(StateFailed)
 			return ctx.Err()
 		}
@@ -858,7 +858,7 @@ func (l *Loop) continueLoop(ctx context.Context) error {
 
 		// Check for cancellation
 		if ctx.Err() != nil {
-			l.context.SetError("cancelled")
+			l.context.SetError("canceled")
 			_ = l.context.Transition(StateFailed)
 			return ctx.Err()
 		}

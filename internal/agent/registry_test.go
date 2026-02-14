@@ -370,7 +370,7 @@ func TestRegistry_PromptUserSelection(t *testing.T) {
 		r.Register(&mockAgent{name: "alpha", available: true})
 		r.Register(&mockAgent{name: "bravo", available: true})
 
-		expectedErr := errors.New("user cancelled")
+		expectedErr := errors.New("user canceled")
 		selector := func(_ []Agent) (Agent, error) {
 			return nil, expectedErr
 		}

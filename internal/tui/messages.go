@@ -135,7 +135,7 @@ type FormSubmitMsg struct {
 	Values map[string]interface{}
 }
 
-// FormCancelMsg is sent when a form is cancelled.
+// FormCancelMsg is sent when a form is canceled.
 type FormCancelMsg struct {
 	FormID string
 }
@@ -150,8 +150,8 @@ type ReanalyzeRequestedMsg = components.ReanalyzeRequestedMsg
 // TaskInitSelectedMsg is sent when the user selects a task init mode.
 type TaskInitSelectedMsg = components.TaskInitSelectedMsg
 
-// TaskInitCancelledMsg is sent when the user cancels task init.
-type TaskInitCancelledMsg = components.TaskInitCancelledMsg
+// TaskInitCanceledMsg is sent when the user cancels task init.
+type TaskInitCanceledMsg = components.TaskInitCanceledMsg
 
 // TaskListConfirmedMsg is sent when the user confirms the task list.
 type TaskListConfirmedMsg = components.TaskListConfirmedMsg

@@ -125,8 +125,8 @@ func TestTaskInitSelector_Update_Escape(t *testing.T) {
 	}
 
 	msg := cmd()
-	if _, ok := msg.(TaskInitCancelledMsg); !ok {
-		t.Fatalf("expected TaskInitCancelledMsg, got %T", msg)
+	if _, ok := msg.(TaskInitCanceledMsg); !ok {
+		t.Fatalf("expected TaskInitCanceledMsg, got %T", msg)
 	}
 }
 

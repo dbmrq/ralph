@@ -472,5 +472,5 @@ func RunSetupTUI(ctx context.Context, ag agent.Agent, projectDir string) (*app.S
 		}
 	}
 
-	return nil, fmt.Errorf("setup cancelled")
+	return nil, fmt.Errorf("setup canceled")
 }

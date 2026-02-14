@@ -23,8 +23,8 @@ type FormSubmittedMsg struct {
 	FormID string
 }
 
-// FormCancelledMsg is sent when a form is cancelled.
-type FormCancelledMsg struct {
+// FormCanceledMsg is sent when a form is canceled.
+type FormCanceledMsg struct {
 	FormID string
 }
 
@@ -176,8 +176,8 @@ func (f *Form) Submitted() bool {
 	return f.submitted
 }
 
-// Cancelled returns whether the form was cancelled.
-func (f *Form) Cancelled() bool {
+// Canceled returns whether the form was canceled.
+func (f *Form) Canceled() bool {
 	return f.cancelled
 }
 
@@ -207,7 +207,7 @@ func (f *Form) Update(msg tea.Msg) (*Form, tea.Cmd) {
 		case "esc":
 			f.cancelled = true
 			return f, func() tea.Msg {
-				return FormCancelledMsg{FormID: f.id}
+				return FormCanceledMsg{FormID: f.id}
 			}
 		}
 	}
