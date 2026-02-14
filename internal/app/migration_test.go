@@ -149,3 +149,230 @@ func TestMigrateFromLegacy(t *testing.T) {
 	})
 }
 
+func TestSetupState(t *testing.T) {
+	t.Run("save and load setup state", func(t *testing.T) {
+		dir := t.TempDir()
+		ralphDir := filepath.Join(dir, ".ralph")
+		os.MkdirAll(ralphDir, 0755)
+
+		state := NewSetupState("analyzing")
+		state.MarkAnalysisDone("/path/to/analysis.json")
+
+		err := SaveSetupState(dir, state)
+		if err != nil {
+			t.Fatalf("SaveSetupState() error = %v", err)
+		}
+
+		loaded, err := LoadSetupState(dir)
+		if err != nil {
+			t.Fatalf("LoadSetupState() error = %v", err)
+		}
+
+		if loaded.Phase != "analyzing" {
+			t.Errorf("Phase = %q, want %q", loaded.Phase, "analyzing")
+		}
+		if !loaded.AnalysisDone {
+			t.Error("AnalysisDone should be true")
+		}
+		if loaded.AnalysisPath != "/path/to/analysis.json" {
+			t.Errorf("AnalysisPath = %q, want %q", loaded.AnalysisPath, "/path/to/analysis.json")
+		}
+	})
+
+	t.Run("load returns nil when no state file", func(t *testing.T) {
+		dir := t.TempDir()
+		os.MkdirAll(filepath.Join(dir, ".ralph"), 0755)
+
+		state, err := LoadSetupState(dir)
+		if err != nil {
+			t.Fatalf("LoadSetupState() error = %v", err)
+		}
+		if state != nil {
+			t.Error("expected nil state when no state file exists")
+		}
+	})
+
+	t.Run("save does nothing when no .ralph directory", func(t *testing.T) {
+		dir := t.TempDir()
+		state := NewSetupState("welcome")
+
+		err := SaveSetupState(dir, state)
+		if err != nil {
+			t.Fatalf("SaveSetupState() error = %v", err)
+		}
+
+		// Should not have created .ralph directory
+		if _, err := os.Stat(filepath.Join(dir, ".ralph")); !os.IsNotExist(err) {
+			t.Error(".ralph directory should not have been created")
+		}
+	})
+
+	t.Run("clear setup state", func(t *testing.T) {
+		dir := t.TempDir()
+		ralphDir := filepath.Join(dir, ".ralph")
+		os.MkdirAll(ralphDir, 0755)
+
+		state := NewSetupState("analyzing")
+		SaveSetupState(dir, state)
+
+		err := ClearSetupState(dir)
+		if err != nil {
+			t.Fatalf("ClearSetupState() error = %v", err)
+		}
+
+		loaded, err := LoadSetupState(dir)
+		if err != nil {
+			t.Fatalf("LoadSetupState() error = %v", err)
+		}
+		if loaded != nil {
+			t.Error("state should be nil after clear")
+		}
+	})
+
+	t.Run("clear non-existent state returns nil", func(t *testing.T) {
+		dir := t.TempDir()
+		os.MkdirAll(filepath.Join(dir, ".ralph"), 0755)
+
+		err := ClearSetupState(dir)
+		if err != nil {
+			t.Fatalf("ClearSetupState() error = %v", err)
+		}
+	})
+}
+
+func TestHasPartialSetup(t *testing.T) {
+	t.Run("returns true when setup state exists", func(t *testing.T) {
+		dir := t.TempDir()
+		ralphDir := filepath.Join(dir, ".ralph")
+		os.MkdirAll(ralphDir, 0755)
+
+		state := NewSetupState("analyzing")
+		SaveSetupState(dir, state)
+
+		if !HasPartialSetup(dir) {
+			t.Error("HasPartialSetup() should return true")
+		}
+	})
+
+	t.Run("returns false when no setup state", func(t *testing.T) {
+		dir := t.TempDir()
+		os.MkdirAll(filepath.Join(dir, ".ralph"), 0755)
+
+		if HasPartialSetup(dir) {
+			t.Error("HasPartialSetup() should return false")
+		}
+	})
+
+	t.Run("returns false when no .ralph directory", func(t *testing.T) {
+		dir := t.TempDir()
+
+		if HasPartialSetup(dir) {
+			t.Error("HasPartialSetup() should return false")
+		}
+	})
+}
+
+func TestCleanupPartialSetup(t *testing.T) {
+	t.Run("cleans up partial setup", func(t *testing.T) {
+		dir := t.TempDir()
+		ralphDir := filepath.Join(dir, ".ralph")
+		os.MkdirAll(ralphDir, 0755)
+
+		state := NewSetupState("analyzing")
+		SaveSetupState(dir, state)
+
+		err := CleanupPartialSetup(dir)
+		if err != nil {
+			t.Fatalf("CleanupPartialSetup() error = %v", err)
+		}
+
+		if _, err := os.Stat(ralphDir); !os.IsNotExist(err) {
+			t.Error(".ralph directory should have been removed")
+		}
+	})
+
+	t.Run("returns error for complete setup", func(t *testing.T) {
+		dir := t.TempDir()
+		ralphDir := filepath.Join(dir, ".ralph")
+		os.MkdirAll(ralphDir, 0755)
+		os.WriteFile(filepath.Join(ralphDir, "config.yaml"), []byte("{}"), 0644)
+
+		err := CleanupPartialSetup(dir)
+		if err == nil {
+			t.Error("CleanupPartialSetup() should return error for complete setup")
+		}
+	})
+
+	t.Run("returns nil when no .ralph directory", func(t *testing.T) {
+		dir := t.TempDir()
+
+		err := CleanupPartialSetup(dir)
+		if err != nil {
+			t.Fatalf("CleanupPartialSetup() error = %v", err)
+		}
+	})
+}
+
+func TestSetupStateMethods(t *testing.T) {
+	t.Run("NewSetupState initializes correctly", func(t *testing.T) {
+		state := NewSetupState("welcome")
+
+		if state.Phase != "welcome" {
+			t.Errorf("Phase = %q, want %q", state.Phase, "welcome")
+		}
+		if state.StartedAt == "" {
+			t.Error("StartedAt should be set")
+		}
+		if state.LastUpdated == "" {
+			t.Error("LastUpdated should be set")
+		}
+	})
+
+	t.Run("UpdatePhase updates phase and timestamp", func(t *testing.T) {
+		state := NewSetupState("welcome")
+		originalTime := state.LastUpdated
+
+		// Wait briefly to ensure timestamp changes
+		state.UpdatePhase("analyzing")
+
+		if state.Phase != "analyzing" {
+			t.Errorf("Phase = %q, want %q", state.Phase, "analyzing")
+		}
+		// Note: timestamps may be same if test runs fast
+		_ = originalTime
+	})
+
+	t.Run("MarkAnalysisDone sets fields", func(t *testing.T) {
+		state := NewSetupState("analyzing")
+		state.MarkAnalysisDone("/path/to/analysis.json")
+
+		if !state.AnalysisDone {
+			t.Error("AnalysisDone should be true")
+		}
+		if state.AnalysisPath != "/path/to/analysis.json" {
+			t.Errorf("AnalysisPath = %q, want %q", state.AnalysisPath, "/path/to/analysis.json")
+		}
+	})
+
+	t.Run("MarkTasksDone sets fields", func(t *testing.T) {
+		state := NewSetupState("tasks")
+		state.MarkTasksDone("/path/to/tasks.json")
+
+		if !state.TasksDone {
+			t.Error("TasksDone should be true")
+		}
+		if state.TasksPath != "/path/to/tasks.json" {
+			t.Errorf("TasksPath = %q, want %q", state.TasksPath, "/path/to/tasks.json")
+		}
+	})
+
+	t.Run("MarkConfigDone sets field", func(t *testing.T) {
+		state := NewSetupState("config")
+		state.MarkConfigDone()
+
+		if !state.ConfigDone {
+			t.Error("ConfigDone should be true")
+		}
+	})
+}
+

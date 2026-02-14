@@ -96,6 +96,9 @@ type SetupModel struct {
 	isLegacy       bool // Whether legacy .ralph was detected
 	migrationDone  bool // Whether migration has been completed
 
+	// Setup state for resume capability
+	setupState *app.SetupState
+
 	// Window
 	width  int
 	height int
@@ -436,6 +439,13 @@ func (m *SetupModel) startSetup() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// Save initial setup state for resume capability
+	m.setupState = app.NewSetupState("analyzing")
+	if err := app.SaveSetupState(m.setup.ProjectDir, m.setupState); err != nil {
+		// Non-fatal, just log
+		m.statusMsg = fmt.Sprintf("Warning: failed to save setup state: %v", err)
+	}
+
 	// Start analysis
 	return m.startAnalysis()
 }
@@ -480,9 +490,22 @@ func (m *SetupModel) handleAnalysisConfirmed(msg components.AnalysisConfirmedMsg
 	m.analysis = msg.Analysis
 
 	// Save analysis
+	analysisPath := ""
 	if err := m.setup.SaveAnalysis(m.analysis); err != nil {
 		// Non-fatal, log and continue
 		m.statusMsg = fmt.Sprintf("Warning: failed to cache analysis: %v", err)
+	} else {
+		analysisPath = ".ralph/analysis.json"
+	}
+
+	// Update setup state to track progress
+	if m.setupState != nil {
+		m.setupState.MarkAnalysisDone(analysisPath)
+		m.setupState.UpdatePhase("tasks")
+		if err := app.SaveSetupState(m.setup.ProjectDir, m.setupState); err != nil {
+			// Non-fatal, just log
+			m.statusMsg = fmt.Sprintf("Warning: failed to save setup state: %v", err)
+		}
 	}
 
 	// Check for task list detection
@@ -627,6 +650,12 @@ func (m *SetupModel) finalizeSetup() (tea.Model, tea.Cmd) {
 	if err := m.setup.SaveConfig(cfg); err != nil {
 		// Non-fatal, continue
 		m.statusMsg = fmt.Sprintf("Warning: failed to save config: %v", err)
+	}
+
+	// Clear setup state - setup completed successfully
+	if err := app.ClearSetupState(m.setup.ProjectDir); err != nil {
+		// Non-fatal, just log
+		m.statusMsg = fmt.Sprintf("Warning: failed to clear setup state: %v", err)
 	}
 
 	m.Phase = PhaseComplete

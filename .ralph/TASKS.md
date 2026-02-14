@@ -832,7 +832,7 @@ The goal is to make `ralph` feel like a polished, intuitive tool. When a user ru
   > setup.go (Welcome), analysisform.go, tasklistform.go, taskinit.go, fileinput.go,
   > taskpaste.go, goalinput.go, and statusbar.go (with context-aware shortcuts).
 
-- [ ] UX-007: Handle edge cases gracefully
+- [x] UX-007: Handle edge cases gracefully
   > Goal: Graceful handling of common issues with clear recovery paths
   > **Edge case 1**: No AI agents available
   >   - Show friendly message explaining the issue
@@ -855,6 +855,12 @@ The goal is to make `ralph` feel like a polished, intuitive tool. When a user ru
   >   - Add "resume setup" capability using session state
   > Reference: internal/errors package for error types
   > Reference: Existing `.ralph/` directory structure in this repo (has old shell scripts)
+  > **COMPLETED**: All four edge cases implemented:
+  > - Edge case 1: PhaseNoAgents view with installation instructions and 'm' for manual mode
+  > - Edge case 2: IsLegacyRalph() detection, PhaseLegacyMigration view, MigrateFromLegacy()
+  > - Edge case 3: handleAnalysisComplete() sets canRetry/canSkipAnalysis, error view with retry/manual
+  > - Edge case 4: SetupState struct persisted to .ralph/setup_state.json with Save/Load/Clear functions
+  > Added comprehensive tests in internal/app/migration_test.go for setup state functions.
 
 - [ ] UX-008: Add progress indicators and animations
   > Goal: Visual feedback during long operations
