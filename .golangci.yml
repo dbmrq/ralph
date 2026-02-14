@@ -1,0 +1,49 @@
+# golangci-lint configuration
+# https://golangci-lint.run/usage/configuration/
+
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+
+linters:
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - gofmt
+    - goimports
+    - misspell
+    - unconvert
+  disable:
+    - depguard
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: false
+  gofmt:
+    simplify: true
+  goimports:
+    local-prefixes: github.com/wexinc/ralph
+  misspell:
+    locale: US
+
+issues:
+  exclude-rules:
+    # Test files can have unused parameters
+    - path: _test\.go
+      linters:
+        - unused
+    # Allow longer lines in test files
+    - path: _test\.go
+      linters:
+        - lll
+    # main.go can have unused version variables
+    - path: cmd/ralph/main\.go
+      linters:
+        - unused
+      text: "version|commit|date"
+
