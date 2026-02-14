@@ -153,4 +153,3 @@ func TestFileInputCanceledMsg(t *testing.T) {
 	msg := FileInputCanceledMsg{}
 	_ = msg
 }
-

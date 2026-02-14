@@ -158,4 +158,3 @@ func (p *SetupProgress) View() string {
 
 	return content
 }
-

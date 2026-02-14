@@ -151,4 +151,3 @@ func TestTaskPaste_ParseError(t *testing.T) {
 		t.Errorf("expected no parse error for empty input, got %q", err)
 	}
 }
-

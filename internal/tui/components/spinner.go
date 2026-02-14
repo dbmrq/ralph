@@ -142,4 +142,3 @@ func formatSpinnerDuration(d time.Duration) string {
 	m := int(d.Minutes()) % 60
 	return fmt.Sprintf("%dh%dm", h, m)
 }
-

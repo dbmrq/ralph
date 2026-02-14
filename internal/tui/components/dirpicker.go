@@ -398,4 +398,3 @@ func (d *DirPicker) Items() []DirPickerItem {
 func (d *DirPicker) SelectedIndex() int {
 	return d.selectedIdx
 }
-

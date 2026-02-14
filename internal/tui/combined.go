@@ -332,4 +332,3 @@ func RunCombinedTUIWithOptions(
 
 	return &CombinedResult{Canceled: true}, nil
 }
-

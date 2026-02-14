@@ -19,12 +19,12 @@ type mockSetupAgent struct {
 	authErr     error
 }
 
-func (m *mockSetupAgent) Name() string                 { return m.name }
-func (m *mockSetupAgent) Description() string          { return m.description }
-func (m *mockSetupAgent) IsAvailable() bool            { return m.available }
-func (m *mockSetupAgent) CheckAuth() error             { return m.authErr }
+func (m *mockSetupAgent) Name() string                       { return m.name }
+func (m *mockSetupAgent) Description() string                { return m.description }
+func (m *mockSetupAgent) IsAvailable() bool                  { return m.available }
+func (m *mockSetupAgent) CheckAuth() error                   { return m.authErr }
 func (m *mockSetupAgent) ListModels() ([]interface{}, error) { return nil, nil }
-func (m *mockSetupAgent) GetDefaultModel() interface{} { return nil }
+func (m *mockSetupAgent) GetDefaultModel() interface{}       { return nil }
 func (m *mockSetupAgent) Run(ctx context.Context, prompt string, opts interface{}) (interface{}, error) {
 	return nil, nil
 }
@@ -509,4 +509,3 @@ func TestHandleCancel(t *testing.T) {
 		}
 	})
 }
-

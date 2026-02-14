@@ -136,4 +136,3 @@ func TestGoalCanceledMsg(t *testing.T) {
 	// Just ensure the type exists and can be instantiated
 	_ = msg
 }
-

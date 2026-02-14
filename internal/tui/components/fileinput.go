@@ -244,4 +244,3 @@ func (f *FileInput) View() string {
 
 	return b.String()
 }
-

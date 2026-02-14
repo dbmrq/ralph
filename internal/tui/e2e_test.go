@@ -216,7 +216,6 @@ func TestE2E_NewProject_EnterStartsAnalysis(t *testing.T) {
 	}
 }
 
-
 // =============================================================================
 // Scenario 2: Existing Project - Has .ralph → loop starts immediately
 // =============================================================================
@@ -518,8 +517,6 @@ func TestE2E_SetupInterrupted_ClearStateOnComplete(t *testing.T) {
 		t.Error("expected no partial setup after clearing")
 	}
 }
-
-
 
 // =============================================================================
 // CombinedModel Tests - Seamless Setup to Loop Transition

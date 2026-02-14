@@ -23,9 +23,9 @@ import (
 type SetupPhase int
 
 const (
-	PhaseWelcome SetupPhase = iota
-	PhaseNoAgents         // No AI agents available
-	PhaseLegacyMigration  // Legacy .ralph detected, offer migration
+	PhaseWelcome         SetupPhase = iota
+	PhaseNoAgents                   // No AI agents available
+	PhaseLegacyMigration            // Legacy .ralph detected, offer migration
 	PhaseAnalyzing
 	PhaseAnalysisConfirm
 	PhaseTaskDetection

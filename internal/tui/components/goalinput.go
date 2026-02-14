@@ -21,11 +21,11 @@ type GoalCanceledMsg struct{}
 
 // GoalInput is a component for entering a project goal to generate tasks.
 type GoalInput struct {
-	textarea  textarea.Model
-	width     int
-	height    int
-	focused   bool
-	examples  []string
+	textarea textarea.Model
+	width    int
+	height   int
+	focused  bool
+	examples []string
 }
 
 // NewGoalInput creates a new GoalInput component.
@@ -158,4 +158,3 @@ func (g *GoalInput) View() string {
 
 	return b.String()
 }
-

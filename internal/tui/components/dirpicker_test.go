@@ -336,4 +336,3 @@ func TestDirPicker_TildeExpansion(t *testing.T) {
 		}
 	}
 }
-

@@ -24,12 +24,12 @@ type TaskPasteCanceledMsg struct{}
 
 // TaskPaste is a component for pasting task lists.
 type TaskPaste struct {
-	textarea    textarea.Model
-	width       int
-	height      int
-	focused     bool
+	textarea     textarea.Model
+	width        int
+	height       int
+	focused      bool
 	previewTasks []*task.Task
-	parseError  string
+	parseError   string
 }
 
 // NewTaskPaste creates a new TaskPaste component.
@@ -204,4 +204,3 @@ func (t *TaskPaste) View() string {
 
 	return b.String()
 }
-
