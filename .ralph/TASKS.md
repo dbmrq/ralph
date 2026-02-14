@@ -886,7 +886,7 @@ The goal is to make `ralph` feel like a polished, intuitive tool. When a user ru
 
 ### Testing
 
-- [ ] TEST-008: Add end-to-end TUI flow tests
+- [x] TEST-008: Add end-to-end TUI flow tests ✅
   > Goal: Test the complete user journey from `ralph` to task execution
   > Test scenarios:
   >   - New project: no .ralph → setup flow → loop starts
@@ -897,6 +897,14 @@ The goal is to make `ralph` feel like a polished, intuitive tool. When a user ru
   > Use Bubble Tea testing utilities for TUI testing
   > Reference: internal/tui/app_test.go for testing patterns
   > Reference: tea.Test() for Bubble Tea test utilities
+  > ✅ COMPLETED: Created internal/tui/e2e_test.go with 20 tests covering all 5 scenarios
+  >    - New project tests (3): SetupFlowStarts, WelcomeShowsProjectInfo, EnterStartsAnalysis
+  >    - Existing project tests (2): SkipsSetup, LoadsExistingConfig
+  >    - Legacy project tests (3): DetectsLegacyFormat, MigrationPhaseShown, MigrationCreatesNewConfig
+  >    - No agents tests (3): PhaseNoAgentsShown, ShowsInstallInstructions, ManualModeAvailable
+  >    - Setup interrupted tests (3): StateIsSaved, CanResumeSetup, ClearStateOnComplete
+  >    - CombinedModel tests (6): StartsInSetupPhase, SetupToLoopTransition, LoopReadyTransition,
+  >                                ViewRendersCorrectPhase, WithSetupOptions, SetupErrorStaysInSetup
 
 - [ ] POLISH-008: Clean-Up
   > Goal: Leave the codebase that is clean, efficient and ready to publish
