@@ -145,8 +145,8 @@ func New(config *Config) (*Logger, error) {
 
 	logger.slog = slog.New(handler)
 
-	// Run initial cleanup
-	go logger.Cleanup()
+	// Run initial cleanup (error ignored as it's non-critical)
+	go func() { _ = logger.Cleanup() }()
 
 	return logger, nil
 }

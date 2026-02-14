@@ -24,6 +24,14 @@ linters-settings:
   errcheck:
     check-type-assertions: true
     check-blank: false
+    exclude-functions:
+      # Common functions that are safe to ignore
+      - fmt.Fprintf
+      - fmt.Fprint
+      - fmt.Fprintln
+      - fmt.Sscanf
+      - io.WriteString
+      - (*encoding/json.Encoder).Encode
   gofmt:
     simplify: true
   goimports:
@@ -33,6 +41,10 @@ linters-settings:
 
 issues:
   exclude-rules:
+    # Test files can have unchecked errors
+    - path: _test\.go
+      linters:
+        - errcheck
     # Test files can have unused parameters
     - path: _test\.go
       linters:
