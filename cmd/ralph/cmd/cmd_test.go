@@ -746,15 +746,15 @@ func TestLoopControllerAdapter(t *testing.T) {
 	})
 
 	t.Run("Abort with nil loop returns error and calls cancelFunc", func(t *testing.T) {
-		cancelled := false
-		cancelFunc := func() { cancelled = true }
+		canceled := false
+		cancelFunc := func() { canceled = true }
 		adapter := NewLoopControllerAdapter(nil, cancelFunc)
 		err := adapter.Abort()
 		// Abort with nil loop should return error and fall back to cancelFunc
 		if err == nil {
 			t.Error("Abort() with nil loop should return error")
 		}
-		if !cancelled {
+		if !canceled {
 			t.Error("Abort() should call cancelFunc as fallback")
 		}
 	})

@@ -275,7 +275,7 @@ func (l *Loop) Run(ctx context.Context, sessionID string) error {
 
 			// Handle task-level errors
 			if ctx.Err() != nil {
-				return ctx.Err() // Cancelled
+				return ctx.Err() // Canceled
 			}
 
 			// Record failure
@@ -893,7 +893,7 @@ func (l *Loop) continueLoop(ctx context.Context) error {
 
 			// Handle task-level errors
 			if ctx.Err() != nil {
-				return ctx.Err() // Cancelled
+				return ctx.Err() // Canceled
 			}
 
 			// Record failure

@@ -278,7 +278,7 @@ func (s *Setup) RunHeadless(ctx context.Context) (*SetupResult, error) {
 
 // logAnalysis logs the analysis results for headless mode.
 func (s *Setup) logAnalysis(analysis *build.ProjectAnalysis) {
-	s.report(fmt.Sprintf("Project Analysis:"))
+	s.report("Project Analysis:")
 	s.report(fmt.Sprintf("  Type: %s", analysis.ProjectType))
 	if len(analysis.Languages) > 0 {
 		s.report(fmt.Sprintf("  Languages: %v", analysis.Languages))

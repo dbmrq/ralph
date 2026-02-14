@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	"github.com/spf13/cobra"
+
 	"github.com/wexinc/ralph/internal/agent"
 	"github.com/wexinc/ralph/internal/agent/auggie"
 	"github.com/wexinc/ralph/internal/agent/cursor"
@@ -78,7 +79,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 				return err
 			}
 			if !shouldContinue {
-				cmd.Println("Initialization cancelled.")
+				cmd.Println("Initialization canceled.")
 				return nil
 			}
 		}
