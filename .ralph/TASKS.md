@@ -351,6 +351,57 @@
   > Connect loop events to TUI updates
   > Real-time progress updates, error state visualization
   > Pause/resume integration with session management
+  > **Status: Keyboard handlers implemented, but actual loop integration is incomplete**
+
+- [ ] TUI-007: Implement TUI main loop runner
+  > Goal: Create the bridge that runs the TUI alongside the Loop
+  > **This is the critical missing piece - without it, TUI mode cannot run**
+  > Create `runTUI()` function in cmd/ralph/cmd/run.go that:
+  >   - Creates the Bubble Tea program with tui.Model
+  >   - Creates and configures the Loop with proper OnEvent callback
+  >   - Translates loop.Event to TUI messages (TasksUpdatedMsg, TaskStartedMsg, etc.)
+  >   - Runs the Loop in a goroutine while Bubble Tea runs in main thread
+  >   - Handles graceful shutdown when TUI quits or loop completes
+  > Update `runRun()` to call `runTUI()` instead of printing placeholder message
+  > Update `runWithSetupResult()` to run the loop with TUI after setup completes
+  > Create TUIEventHandler struct that implements loop event handling:
+  >   - Has reference to tea.Program to send messages
+  >   - Maps EventTaskStarted → tui.TaskStartedMsg
+  >   - Maps EventTaskCompleted → tui.TaskCompletedMsg
+  >   - Maps EventLoopPaused/EventLoopStarted → tui.LoopStateMsg
+  >   - Maps EventVerifyStarted/Passed/Failed → tui.BuildStatusMsg/TestStatusMsg
+  > Create TUIOutputWriter (implements io.Writer) that:
+  >   - Wraps tea.Program.Send()
+  >   - Converts each line of output to tui.AgentOutputMsg
+  >   - Can be passed as loopOpts.LogWriter
+  > Reference: See runHeadless() for how Loop is configured and run
+  > Reference: See internal/tui/messages.go for all TUI message types
+  > Reference: See internal/loop/headless.go for event handling pattern (HeadlessRunner.HandleEvent)
+
+- [ ] TUI-008: Implement LoopController adapter
+  > Goal: Bridge the TUI's LoopController interface to actual Loop methods
+  > Create adapter struct in cmd/ralph/cmd/run.go or internal/tui/controller.go
+  > Implement tui.LoopController interface:
+  >   - Pause() → call Loop.Pause()
+  >   - Resume() → call Loop.Resume()
+  >   - Skip(taskID) → call Loop.Skip() (needs to be added to Loop)
+  >   - Abort() → call Loop.Abort() (needs to be added to Loop)
+  > Pass adapter to tui.Model via SetLoopController()
+  > Reference: internal/tui/app.go lines 78-84 define the interface
+
+- [ ] LOOP-007: Add Skip and Abort methods to Loop
+  > Goal: Implement missing control methods in internal/loop/loop.go
+  > Add `Skip(taskID string) error` method:
+  >   - Mark current/specified task as skipped via taskManager.Skip()
+  >   - Emit EventTaskSkipped
+  >   - Continue to next task
+  > Add `Abort() error` method:
+  >   - Transition to StateFailed or new StateAborted
+  >   - Save session state for potential resume
+  >   - Emit EventLoopFailed with abort reason
+  >   - Return from Run() cleanly
+  > Reference: internal/loop/loop.go has Pause() as example (lines 627-643)
+  > Reference: internal/tui/app.go LoopController interface defines expected signatures
 
 ---
 
@@ -451,6 +502,16 @@
   > - internal/tui/components/tasklistform_test.go: NEW - Full test coverage for TaskListForm component (analysis confirmation form)
   > Coverage improved: internal/tui 40.8%→58.8%, internal/tui/components 69.3%→88.6%
 
+- [ ] TEST-007: Add TUI-Loop integration tests
+  > Goal: Test the new TUI-Loop integration code
+  > Test TUIEventHandler translates loop events to TUI messages correctly
+  > Test TUIOutputWriter streams agent output to TUI
+  > Test LoopController adapter calls through to Loop methods
+  > Test Loop.Skip() and Loop.Abort() new methods
+  > Test graceful shutdown when TUI quits during loop execution
+  > Test concurrent execution of TUI and Loop
+  > Can use mock tea.Program or test message types directly
+
 ---
 
 ## 📦 Phase 12: Installation & First-Run Experience
@@ -522,10 +583,20 @@
   > - Comprehensive tests in version_test.go and updater_test.go
   > - Added version and update command tests in cmd_test.go
 
-- [ ] POLISH-001: Add comprehensive error messages
+- [x] POLISH-001: Add comprehensive error messages
   > Goal: Clear, actionable error messages
   > Suggest fixes for common issues (auth, missing config, etc.)
   > Include relevant documentation links
+  > **Completed:**
+  > - Created internal/errors package with comprehensive error types
+  > - errors.go: Base RalphError struct with Kind, Message, Suggestion, DocLink, Details
+  > - agent.go: AgentNotAvailable, AgentNotFound, NoAgentsAvailable, MultipleAgentsNeedSelection, AuthNotConfigured, AuthExpired, AgentExecutionFailed
+  > - config.go: ConfigNotFound, ConfigParseError, ConfigValidationError, ProjectNotInitialized, NoTasksFound, TaskNotFound, AllTasksComplete, SessionNotFound
+  > - build.go: BuildFailed, TestFailed, TestRegression, NoTestsFound, GitNotInitialized, GitDirtyState, GitConflict, CommitFailed
+  > - network.go: NetworkUnavailable, RateLimited, AgentTimeout, OperationTimeout, ContextCancelled, IsRetryable, IsUserError
+  > - Integrated with internal/agent/registry.go to return rich error messages
+  > - Integrated with internal/loop/recovery.go to use IsRetryable for retry logic
+  > - Comprehensive tests in *_test.go files (53 test cases)
 
 - [ ] POLISH-003: Add logging system
   > Goal: Structured logging to .ralph/logs/

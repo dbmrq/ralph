@@ -1,20 +1,21 @@
 package agent
 
 import (
-	"fmt"
 	"sort"
 	"sync"
+
+	ralpherrors "github.com/wexinc/ralph/internal/errors"
 )
 
 // ErrNoAgentsAvailable is returned when no agents are available.
-var ErrNoAgentsAvailable = fmt.Errorf("no agents available")
+var ErrNoAgentsAvailable = ralpherrors.ErrAgent
 
 // ErrAgentNotFound is returned when a requested agent is not found.
-var ErrAgentNotFound = fmt.Errorf("agent not found")
+var ErrAgentNotFound = ralpherrors.ErrAgent
 
 // ErrMultipleAgentsAvailable is returned when multiple agents are available
 // but no selection was made.
-var ErrMultipleAgentsAvailable = fmt.Errorf("multiple agents available, selection required")
+var ErrMultipleAgentsAvailable = ralpherrors.ErrAgent
 
 // Registry manages registered agent plugins.
 type Registry struct {
@@ -126,10 +127,10 @@ func (r *Registry) SelectAgent(name string) (Agent, error) {
 	if name != "" {
 		agent, ok := r.Get(name)
 		if !ok {
-			return nil, fmt.Errorf("%w: %s", ErrAgentNotFound, name)
+			return nil, ralpherrors.AgentNotFound(name, r.Names())
 		}
 		if !agent.IsAvailable() {
-			return nil, fmt.Errorf("agent %q is not available", name)
+			return nil, ralpherrors.AgentNotAvailable(name)
 		}
 		return agent, nil
 	}
@@ -137,11 +138,15 @@ func (r *Registry) SelectAgent(name string) (Agent, error) {
 	available := r.Available()
 	switch len(available) {
 	case 0:
-		return nil, ErrNoAgentsAvailable
+		return nil, ralpherrors.NoAgentsAvailable()
 	case 1:
 		return available[0], nil
 	default:
-		return nil, ErrMultipleAgentsAvailable
+		names := make([]string, len(available))
+		for i, a := range available {
+			names[i] = a.Name()
+		}
+		return nil, ralpherrors.MultipleAgentsNeedSelection(names)
 	}
 }
 
@@ -152,14 +157,14 @@ func (r *Registry) GetOrDefault(name string) (Agent, error) {
 	if name != "" {
 		agent, ok := r.Get(name)
 		if !ok {
-			return nil, fmt.Errorf("%w: %s", ErrAgentNotFound, name)
+			return nil, ralpherrors.AgentNotFound(name, r.Names())
 		}
 		return agent, nil
 	}
 
 	available := r.Available()
 	if len(available) == 0 {
-		return nil, ErrNoAgentsAvailable
+		return nil, ralpherrors.NoAgentsAvailable()
 	}
 	// Return first available (sorted by name)
 	return available[0], nil
@@ -178,12 +183,16 @@ func (r *Registry) PromptUserSelection(selector AgentSelector) (Agent, error) {
 
 	switch len(available) {
 	case 0:
-		return nil, ErrNoAgentsAvailable
+		return nil, ralpherrors.NoAgentsAvailable()
 	case 1:
 		return available[0], nil
 	default:
 		if selector == nil {
-			return nil, ErrMultipleAgentsAvailable
+			names := make([]string, len(available))
+			for i, a := range available {
+				names[i] = a.Name()
+			}
+			return nil, ralpherrors.MultipleAgentsNeedSelection(names)
 		}
 		return selector(available)
 	}

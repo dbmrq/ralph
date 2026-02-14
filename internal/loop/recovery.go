@@ -14,6 +14,7 @@ import (
 
 	"github.com/wexinc/ralph/internal/agent"
 	"github.com/wexinc/ralph/internal/build"
+	ralpherrors "github.com/wexinc/ralph/internal/errors"
 	"github.com/wexinc/ralph/internal/task"
 )
 
@@ -116,9 +117,14 @@ func IsRetryableError(err error) bool {
 		return false
 	}
 
+	// Check if it's a RalphError with retryable kind
+	if ralpherrors.IsRetryable(err) {
+		return true
+	}
+
 	errStr := strings.ToLower(err.Error())
 
-	// Network/timeout errors
+	// Network/timeout errors (fallback for non-RalphError types)
 	retryablePatterns := []string{
 		"timeout",
 		"connection refused",
