@@ -651,10 +651,15 @@
   > - TimeoutMonitor already optimal (35ns/op, 0 allocations) - no changes needed
   > - Most hot paths now have 0-2 allocations per operation
 
-- [ ] POLISH-005: Create README and documentation
+- [x] POLISH-005: Create README and documentation
   > Goal: Update README.md for Go version
   > Document all CLI commands and flags
   > Add examples for TUI, headless, and CI usage
+  > **Completed:**
+  > - Added comprehensive command reference section with all flags for init, run, agent add, version, update
+  > - Added CI/GitHub Actions section with workflow example, JSON output format, environment variables
+  > - Updated usage section with all commands including version, update, and completion
+  > - Documented keyboard shortcuts, configuration, TDD mode, hooks, and project structure
 
 - [ ] POLISH-006: Clean-Up
   > Goal: Leave the codebase that is clean, efficient and ready to publish

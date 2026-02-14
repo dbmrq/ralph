@@ -72,19 +72,32 @@ That's it! Ralph will:
 ralph init                    # Interactive setup
 ralph init --yes              # Non-interactive, use AI defaults
 ralph init --tasks TASKS.md   # Import existing task file
+ralph init --config my.yaml   # Use provided config file
+ralph init --force            # Reinitialize, overwriting existing
 
 # Run the automation loop
 ralph run                     # Interactive TUI mode
 ralph run --headless          # Headless mode (for CI)
 ralph run --headless --output json  # JSON output
-ralph run --continue          # Resume previous session
+ralph run --headless --tasks TASKS.md  # Use specific task file
+ralph run --continue <id>     # Resume previous session
+ralph run --verbose           # Enable verbose logging
 
 # Agent management
 ralph agent list              # List available agents
-ralph agent add               # Add a custom agent
+ralph agent add               # Add a custom agent (interactive)
+ralph agent add --name myagent --command myagent  # Non-interactive
 
-# Version info
-ralph --version
+# Version and updates
+ralph version                 # Show detailed version info
+ralph version --check         # Check for updates
+ralph update                  # Update to latest version
+ralph update --check          # Check only, don't install
+
+# Shell completion
+ralph completion bash         # Generate bash completions
+ralph completion zsh          # Generate zsh completions
+ralph completion fish         # Generate fish completions
 ```
 
 ### Keyboard Shortcuts (TUI Mode)
@@ -99,6 +112,62 @@ ralph --version
 | `e` | Edit/add task |
 | `h` | Help overlay |
 | `q` | Quit |
+
+### Command Reference
+
+#### `ralph init`
+
+Initialize Ralph in the current project.
+
+| Flag | Short | Description |
+|------|-------|-------------|
+| `--yes` | `-y` | Non-interactive mode, use AI defaults |
+| `--config` | `-c` | Path to config file to use |
+| `--tasks` | `-t` | Path to task file to import |
+| `--force` | `-f` | Overwrite existing configuration |
+
+#### `ralph run`
+
+Start the automation loop.
+
+| Flag | Description |
+|------|-------------|
+| `--headless` | Run without TUI (for CI) |
+| `--output` | Output format: `json` (requires `--headless`) |
+| `--tasks` | Path to task file (headless mode) |
+| `--continue` | Resume session by ID |
+| `--verbose` | Enable verbose logging |
+
+#### `ralph agent add`
+
+Add a custom agent.
+
+| Flag | Short | Description |
+|------|-------|-------------|
+| `--name` | `-n` | Agent name |
+| `--command` | `-c` | Agent command |
+| `--description` | `-d` | Agent description |
+| `--detection` | | Detection method: `command`, `path`, `env`, `always` |
+| `--detection-value` | | Value for detection |
+| `--model-list-cmd` | | Command to list models |
+| `--default-model` | | Default model |
+
+#### `ralph version`
+
+Show version information.
+
+| Flag | Short | Description |
+|------|-------|-------------|
+| `--check` | `-c` | Check for available updates |
+
+#### `ralph update`
+
+Update to the latest version.
+
+| Flag | Short | Description |
+|------|-------|-------------|
+| `--check` | `-c` | Only check, don't install |
+| `--yes` | `-y` | Don't prompt for confirmation |
 
 ## ⚙️ Configuration
 
@@ -201,6 +270,80 @@ In TDD mode, Ralph:
 1. Captures a baseline of existing test failures
 2. Blocks only on test **regressions** (newly failing tests)
 3. Allows pre-existing failures to continue
+
+## 🔄 CI/GitHub Actions
+
+Ralph supports headless mode for CI/CD pipelines. Use `--headless` to disable the TUI.
+
+### Basic GitHub Actions Workflow
+
+```yaml
+name: Ralph Automation
+
+on:
+  workflow_dispatch:  # Manual trigger
+    inputs:
+      task_limit:
+        description: 'Maximum tasks to complete'
+        default: '5'
+
+jobs:
+  ralph:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Install Ralph
+        run: go install github.com/wexinc/ralph/cmd/ralph@latest
+
+      - name: Run Ralph
+        env:
+          AUGMENT_SESSION_AUTH: ${{ secrets.AUGMENT_SESSION_AUTH }}
+        run: |
+          ralph run --headless --output json 2>&1 | tee ralph-output.json
+
+      - name: Upload Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: ralph-output
+          path: ralph-output.json
+```
+
+### JSON Output Format
+
+When using `--output json`, Ralph outputs structured JSON:
+
+```json
+{
+  "session_id": "abc123",
+  "status": "completed",
+  "tasks_completed": 3,
+  "tasks_remaining": 2,
+  "tasks": [
+    {
+      "id": "TASK-001",
+      "name": "Implement feature",
+      "status": "completed",
+      "iterations": 1
+    }
+  ],
+  "errors": []
+}
+```
+
+### Headless Mode Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `AUGMENT_SESSION_AUTH` | Augment CLI authentication token |
+| `RALPH_TIMEOUT_ACTIVE` | Override active timeout (e.g., "2h") |
+| `RALPH_TIMEOUT_STUCK` | Override stuck timeout (e.g., "30m") |
+| `RALPH_GIT_AUTO_COMMIT` | Enable/disable auto-commit ("true"/"false") |
 
 ## 📂 Project Structure
 
