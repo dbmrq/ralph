@@ -26,6 +26,16 @@ completing tasks from a task list using AI agents.
 It supports multiple AI agents (Cursor, Auggie, custom), provides both
 TUI and headless modes, and includes features like automatic commits,
 hooks, and TDD support.`,
+	// When ralph is called with no subcommand, start the TUI (same as "ralph run")
+	RunE: runRoot,
+}
+
+// runRoot is called when ralph is invoked with no subcommand.
+// It starts the TUI, same as "ralph run".
+func runRoot(cmd *cobra.Command, args []string) error {
+	// Delegate to runRun, which handles the run command logic.
+	// This makes "ralph" behave the same as "ralph run".
+	return runRun(cmd, args)
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

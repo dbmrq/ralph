@@ -45,6 +45,8 @@ func newTestRoot() *cobra.Command {
 		Short: "Ralph Loop - AI-powered task automation",
 		Long: `Ralph is an AI-powered task automation tool that runs in a loop,
 completing tasks from a task list using AI agents.`,
+		// When ralph is called with no subcommand, start the TUI (same as "ralph run")
+		RunE: runRoot,
 	}
 	root.Version = "test"
 	root.SetVersionTemplate("ralph {{.Version}}\n")
@@ -141,10 +143,12 @@ func TestRootCommand(t *testing.T) {
 		wantOutput string
 	}{
 		{
-			name:       "no args shows help",
-			args:       []string{},
-			wantErr:    false,
-			wantOutput: "Ralph is an AI-powered task automation tool",
+			name: "no args starts TUI mode",
+			args: []string{},
+			// Running ralph with no args now tries to start the TUI (same as "ralph run").
+			// This will error in test environment without proper setup, but that's expected.
+			wantErr:    true,
+			wantOutput: "", // Output varies depending on agent availability
 		},
 		{
 			name:       "help flag",

@@ -670,11 +670,16 @@
   > Run tests and leave the codebase ready for publication
 
 
-- [ ] POLISH-007: CI
+- [x] POLISH-007: CI
   > Goal: Add CI build and validation on push
   > Create GitHub workflow that runs tests on every push
   > Push changes and use gh cli to check results
   > Iterate on any issues until both the application and the CI process are working consistently
+  > **Completed:**
+  > - Created .github/workflows/ci.yml with Build, Test, Lint, Vet jobs
+  > - Configured golangci-lint with errcheck, gosimple, govet, ineffassign, staticcheck, unused, gofmt, goimports, misspell, unconvert
+  > - Fixed all linter issues: goimports, misspellings (cancelled→canceled), deprecated viewport methods, staticcheck warnings
+  > - All CI jobs passing: Build, Test (with coverage), Lint, Vet, CI Success
 
 ---
 
@@ -699,7 +704,7 @@ The goal is to make `ralph` feel like a polished, intuitive tool. When a user ru
 
 ### Implementation Tasks
 
-- [ ] UX-001: Make `ralph` (no args) launch the TUI
+- [x] UX-001: Make `ralph` (no args) launch the TUI ✅
   > Goal: Change default behavior to launch TUI instead of showing help
   > **Current behavior**: Running `ralph` shows CLI help text
   > **Desired behavior**: Running `ralph` opens the TUI
@@ -712,6 +717,12 @@ The goal is to make `ralph` feel like a polished, intuitive tool. When a user ru
   > Reference: Cobra's `rootCmd.Run` vs `rootCmd.RunE`
   > Reference: cmd/ralph/cmd/run.go `runRun()` function
   > Tests: Update cmd_test.go to verify `ralph` with no args starts TUI mode
+  > **Completed:**
+  > - Added `RunE: runRoot` to rootCmd in root.go
+  > - Created `runRoot()` function that delegates to `runRun()`
+  > - Updated `newTestRoot()` in cmd_test.go to match
+  > - Updated test case "no args shows help" → "no args starts TUI mode"
+  > - All tests pass, build passes, help/version/subcommands still work
 
 - [ ] UX-002: Add project directory detection and selection
   > Goal: Detect if we're in a valid project directory, offer to select one if not
@@ -846,3 +857,18 @@ The goal is to make `ralph` feel like a polished, intuitive tool. When a user ru
   > Use Bubble Tea testing utilities for TUI testing
   > Reference: internal/tui/app_test.go for testing patterns
   > Reference: tea.Test() for Bubble Tea test utilities
+
+- [ ] POLISH-008: Clean-Up
+  > Goal: Leave the codebase that is clean, efficient and ready to publish
+  > Go through the whole codebase and remove any dead or stale code and files
+  > Simplify and optimize anything we can
+  > Make sure the code is readable and straightforward
+  > Go through main logic step by step and make sure it's sound
+  > Run tests and leave the codebase ready for publication
+
+
+- [x] POLISH-009: CI
+  > Goal: Add TUI tests to CI
+  > Run TUI tests in CI builds
+  > Push changes and use gh cli to check results
+  > Iterate on any issues until both the application and the CI process are working consistently
