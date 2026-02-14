@@ -167,15 +167,8 @@ func TestRunCommand(t *testing.T) {
 		wantOutput string
 		skipSetup  bool // if true, create .ralph dir to skip setup flow
 	}{
-		{
-			name:       "run without flags",
-			args:       []string{"run"},
-			wantErr:    false,
-			wantOutput: "Starting Ralph in TUI mode",
-			skipSetup:  true,
-		},
-		// Note: headless mode now actually tries to run the loop, which requires
-		// agents, config, tasks, etc. This is tested in integration tests.
+		// Note: TUI mode and headless mode now actually try to run the loop,
+		// which requires agents, config, tasks, etc. This is tested in integration tests.
 		// Here we only test the help and flag parsing.
 		{
 			name:       "run help",
@@ -183,13 +176,6 @@ func TestRunCommand(t *testing.T) {
 			wantErr:    false,
 			wantOutput: "--headless",
 			skipSetup:  false, // help doesn't run the command
-		},
-		{
-			name:       "run with continue flag shows TUI message",
-			args:       []string{"run", "--continue", "session-123"},
-			wantErr:    false,
-			wantOutput: "Continuing session: session-123",
-			skipSetup:  true,
 		},
 		{
 			name:      "output requires headless",

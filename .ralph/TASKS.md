@@ -353,7 +353,7 @@
   > Pause/resume integration with session management
   > **Status: Keyboard handlers implemented, but actual loop integration is incomplete**
 
-- [ ] TUI-007: Implement TUI main loop runner
+- [x] TUI-007: Implement TUI main loop runner
   > Goal: Create the bridge that runs the TUI alongside the Loop
   > **This is the critical missing piece - without it, TUI mode cannot run**
   > Create `runTUI()` function in cmd/ralph/cmd/run.go that:
@@ -613,3 +613,17 @@
   > Document all CLI commands and flags
   > Add examples for TUI, headless, and CI usage
 
+- [ ] POLISH-006: Clean-Up
+  > Goal: Leave the codebase that is clean, efficient and ready to publish
+  > Go through the whole codebase and remove any dead or stale code and files
+  > Simplify and optimize anything we can
+  > Make sure the code is readable and straightforward
+  > Go through main logic step by step and make sure it's sound
+  > Run tests and leave the codebase ready for publication
+
+
+- [ ] POLISH-007: CI
+  > Goal: Add CI build and validation on push
+  > Create GitHub workflow that runs tests on every push
+  > Push changes and use gh cli to check results
+  > Iterate on any issues until both the application and the CI process are working consistently

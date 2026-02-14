@@ -83,13 +83,96 @@ func runRun(cmd *cobra.Command, args []string) error {
 		return runHeadless(cmd, projectDir, outputFormat, continueID, tasksPath, verbose)
 	}
 
-	// TUI mode (placeholder - will be implemented in TUI-006)
-	cmd.Println("Starting Ralph in TUI mode...")
-	if continueID != "" {
-		cmd.Printf("Continuing session: %s\n", continueID)
+	// TUI mode
+	return runTUI(cmd, projectDir, continueID, tasksPath, verbose)
+}
+
+// runTUI executes ralph in TUI mode with interactive terminal interface.
+func runTUI(cmd *cobra.Command, projectDir, continueID, tasksPath string, verbose bool) error {
+	// Set up cancellation context
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Handle signals for graceful shutdown
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-sigChan
+		cancel()
+	}()
+
+	// Load configuration
+	cfg, err := loadConfig(projectDir)
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
 	}
-	cmd.Println("TUI mode not yet implemented. Use --headless for now.")
-	return nil
+
+	// Initialize agent registry and select agent
+	selectedAgent, err := selectAgent(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to select agent: %w", err)
+	}
+
+	// Load task manager
+	taskMgr, err := loadTasks(projectDir, tasksPath)
+	if err != nil {
+		return fmt.Errorf("failed to load tasks: %w", err)
+	}
+
+	// Get all tasks for the TUI
+	tasks := taskMgr.All()
+
+	// Create hook manager (optional)
+	var hookMgr *hooks.Manager
+	if len(cfg.Hooks.PreTask) > 0 || len(cfg.Hooks.PostTask) > 0 {
+		hookMgr, err = hooks.NewManagerFromConfig(&cfg.Hooks)
+		if err != nil {
+			return fmt.Errorf("failed to create hook manager: %w", err)
+		}
+	}
+
+	// Create the main loop
+	mainLoop := loop.NewLoop(selectedAgent, taskMgr, hookMgr, cfg, projectDir)
+
+	// Determine session ID
+	var sessionID string
+	if continueID != "" {
+		sessionID = continueID
+	} else {
+		sessionID = loop.GenerateSessionID()
+	}
+
+	// Create TUI runner with session info
+	sessionInfo := tui.SessionInfo{
+		ProjectName: filepath.Base(projectDir),
+		AgentName:   selectedAgent.Name(),
+		ModelName:   cfg.Agent.Model,
+		SessionID:   sessionID,
+	}
+	tuiRunner := tui.NewTUIRunner(mainLoop, tasks, sessionInfo)
+
+	// Configure loop options with TUI event handling
+	loopOpts := loop.DefaultOptions()
+	tuiRunner.ConfigureLoop(loopOpts)
+	mainLoop.SetOptions(loopOpts)
+
+	// Create loop controller adapter and set it on the model
+	controller := NewLoopControllerAdapter(mainLoop, cancel)
+	tuiRunner.Model().SetLoopController(controller)
+
+	// Run TUI and Loop concurrently
+	var loopErr error
+	if continueID != "" {
+		loopErr = tuiRunner.Run(func() error {
+			return mainLoop.Resume(ctx, continueID)
+		})
+	} else {
+		loopErr = tuiRunner.Run(func() error {
+			return mainLoop.Run(ctx, sessionID)
+		})
+	}
+
+	return loopErr
 }
 
 // runTUISetup runs the first-run setup flow in TUI mode.
@@ -179,13 +262,94 @@ func selectAgentForSetup() (agent.Agent, error) {
 
 // runWithSetupResult runs the main loop after setup completes (TUI mode).
 func runWithSetupResult(cmd *cobra.Command, projectDir string, result *app.SetupResult, continueID string, verbose bool) error {
-	// For now, fall through to TUI mode placeholder
-	// Full TUI loop will be implemented in TUI-006
-	if continueID != "" {
-		cmd.Printf("Continuing session: %s\n", continueID)
+	// Set up cancellation context
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Handle signals for graceful shutdown
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-sigChan
+		cancel()
+	}()
+
+	// Use the config from setup result
+	cfg := result.Config
+
+	// Initialize agent
+	selectedAgent, err := selectAgent(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to select agent: %w", err)
 	}
-	cmd.Println("TUI mode not yet fully implemented. Use --headless for now.")
-	return nil
+
+	// Create task manager from setup tasks
+	storePath := filepath.Join(projectDir, ".ralph", "tasks.json")
+	store := task.NewStore(storePath)
+	taskMgr := task.NewManager(store)
+	if err := taskMgr.Load(); err != nil {
+		return fmt.Errorf("failed to load tasks: %w", err)
+	}
+
+	// Get all tasks for the TUI
+	tasks := taskMgr.All()
+
+	// Create hook manager (optional)
+	var hookMgr *hooks.Manager
+	if len(cfg.Hooks.PreTask) > 0 || len(cfg.Hooks.PostTask) > 0 {
+		hookMgr, err = hooks.NewManagerFromConfig(&cfg.Hooks)
+		if err != nil {
+			return fmt.Errorf("failed to create hook manager: %w", err)
+		}
+	}
+
+	// Create the main loop
+	mainLoop := loop.NewLoop(selectedAgent, taskMgr, hookMgr, cfg, projectDir)
+
+	// Set analysis from setup result
+	if result.Analysis != nil {
+		mainLoop.SetAnalysis(result.Analysis)
+	}
+
+	// Determine session ID
+	var sessionID string
+	if continueID != "" {
+		sessionID = continueID
+	} else {
+		sessionID = loop.GenerateSessionID()
+	}
+
+	// Create TUI runner with session info
+	sessionInfo := tui.SessionInfo{
+		ProjectName: filepath.Base(projectDir),
+		AgentName:   selectedAgent.Name(),
+		ModelName:   cfg.Agent.Model,
+		SessionID:   sessionID,
+	}
+	tuiRunner := tui.NewTUIRunner(mainLoop, tasks, sessionInfo)
+
+	// Configure loop options with TUI event handling
+	loopOpts := loop.DefaultOptions()
+	tuiRunner.ConfigureLoop(loopOpts)
+	mainLoop.SetOptions(loopOpts)
+
+	// Create loop controller adapter and set it on the model
+	controller := NewLoopControllerAdapter(mainLoop, cancel)
+	tuiRunner.Model().SetLoopController(controller)
+
+	// Run TUI and Loop concurrently
+	var loopErr error
+	if continueID != "" {
+		loopErr = tuiRunner.Run(func() error {
+			return mainLoop.Resume(ctx, continueID)
+		})
+	} else {
+		loopErr = tuiRunner.Run(func() error {
+			return mainLoop.Run(ctx, sessionID)
+		})
+	}
+
+	return loopErr
 }
 
 // runHeadlessWithSetupResult runs the main loop after setup completes (headless mode).
@@ -463,4 +627,51 @@ func checkUpdateBackground(cmd *cobra.Command) {
 		fmt.Fprintf(cmd.ErrOrStderr(), "\n💡 Update available: %s → %s (run 'ralph update')\n\n",
 			Version, release.TagName)
 	}
+}
+
+// LoopControllerAdapter adapts the Loop to the TUI's LoopController interface.
+// This bridges the TUI's control interface (pause/resume/skip/abort) to the Loop methods.
+type LoopControllerAdapter struct {
+	loop       *loop.Loop
+	cancelFunc context.CancelFunc
+}
+
+// NewLoopControllerAdapter creates a new adapter.
+func NewLoopControllerAdapter(l *loop.Loop, cancelFunc context.CancelFunc) *LoopControllerAdapter {
+	return &LoopControllerAdapter{
+		loop:       l,
+		cancelFunc: cancelFunc,
+	}
+}
+
+// Pause pauses the loop after the current task.
+func (a *LoopControllerAdapter) Pause() error {
+	return a.loop.Pause()
+}
+
+// Resume resumes a paused loop.
+func (a *LoopControllerAdapter) Resume() error {
+	// Resume needs to be handled differently since it needs context
+	// For TUI mode, we typically just continue the current session
+	// The loop will handle the actual resume logic
+	return nil // Resume is handled by loop state transition
+}
+
+// Skip skips the current task.
+// Note: This is implemented as part of LOOP-007 in a future task.
+func (a *LoopControllerAdapter) Skip(taskID string) error {
+	// TODO: Implement Skip() in Loop (LOOP-007)
+	// For now, return an error indicating not implemented
+	return fmt.Errorf("skip not yet implemented")
+}
+
+// Abort aborts the loop.
+// Note: This is implemented as part of LOOP-007 in a future task.
+func (a *LoopControllerAdapter) Abort() error {
+	// TODO: Implement Abort() in Loop (LOOP-007)
+	// For now, cancel the context which will stop the loop
+	if a.cancelFunc != nil {
+		a.cancelFunc()
+	}
+	return nil
 }
