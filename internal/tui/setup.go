@@ -26,6 +26,10 @@ const (
 	PhaseAnalysisConfirm
 	PhaseTaskDetection
 	PhaseTaskInit
+	PhaseTaskFileInput  // New: file path input
+	PhaseTaskPaste      // New: paste task list
+	PhaseTaskGenerate   // New: generate from goal
+	PhaseTaskGenerating // New: generating tasks in progress
 	PhaseTaskConfirm
 	PhaseComplete
 	PhaseError
@@ -41,6 +45,9 @@ type SetupModel struct {
 	taskInit     *components.TaskInitSelector
 	taskListForm *components.TaskListForm
 	textInput    *components.TextInput
+	fileInput    *components.FileInput
+	taskPaste    *components.TaskPaste
+	goalInput    *components.GoalInput
 
 	// State
 	setup     *app.Setup
@@ -82,6 +89,12 @@ type tasksImportedMsg struct {
 	err   error
 }
 
+// tasksGeneratedMsg is sent when tasks are generated from a goal.
+type tasksGeneratedMsg struct {
+	tasks []*task.Task
+	err   error
+}
+
 // NewSetupModel creates a new SetupModel.
 func NewSetupModel(ctx context.Context, setup *app.Setup) *SetupModel {
 	m := &SetupModel{
@@ -92,6 +105,9 @@ func NewSetupModel(ctx context.Context, setup *app.Setup) *SetupModel {
 		taskInit:     components.NewTaskInitSelector(),
 		taskListForm: components.NewTaskListForm(),
 		textInput:    components.NewTextInput("input", ""),
+		fileInput:    components.NewFileInput(setup.ProjectDir),
+		taskPaste:    components.NewTaskPaste(),
+		goalInput:    components.NewGoalInput(),
 		resultChan:   make(chan interface{}, 1),
 	}
 	return m
@@ -111,6 +127,11 @@ func (m *SetupModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.analysisForm.SetWidth(msg.Width - 4)
 		m.taskInit.SetWidth(msg.Width - 4)
 		m.taskListForm.SetWidth(msg.Width - 4)
+		m.fileInput.SetWidth(msg.Width - 4)
+		m.taskPaste.SetWidth(msg.Width - 4)
+		m.taskPaste.SetHeight(msg.Height - 10)
+		m.goalInput.SetWidth(msg.Width - 4)
+		m.goalInput.SetHeight(msg.Height - 10)
 		return m, nil
 
 	case tea.KeyMsg:
@@ -121,6 +142,9 @@ func (m *SetupModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tasksImportedMsg:
 		return m.handleTasksImported(msg)
+
+	case tasksGeneratedMsg:
+		return m.handleTasksGenerated(msg)
 
 	case components.AnalysisConfirmedMsg:
 		return m.handleAnalysisConfirmed(msg)
@@ -135,6 +159,27 @@ func (m *SetupModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleTaskListConfirmed(msg)
 
 	case components.TaskListReparseMsg:
+		m.Phase = PhaseTaskInit
+		return m, nil
+
+	case components.FileInputSubmittedMsg:
+		return m.handleFileInputSubmitted(msg)
+
+	case components.FileInputCanceledMsg:
+		m.Phase = PhaseTaskInit
+		return m, nil
+
+	case components.TaskPasteSubmittedMsg:
+		return m.handleTaskPasteSubmitted(msg)
+
+	case components.TaskPasteCanceledMsg:
+		m.Phase = PhaseTaskInit
+		return m, nil
+
+	case components.GoalSubmittedMsg:
+		return m.handleGoalSubmitted(msg)
+
+	case components.GoalCanceledMsg:
 		m.Phase = PhaseTaskInit
 		return m, nil
 	}
@@ -154,6 +199,21 @@ func (m *SetupModel) updateCurrentPhase(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case PhaseTaskInit:
 		var cmd tea.Cmd
 		m.taskInit, cmd = m.taskInit.Update(msg)
+		return m, cmd
+
+	case PhaseTaskFileInput:
+		var cmd tea.Cmd
+		m.fileInput, cmd = m.fileInput.Update(msg)
+		return m, cmd
+
+	case PhaseTaskPaste:
+		var cmd tea.Cmd
+		m.taskPaste, cmd = m.taskPaste.Update(msg)
+		return m, cmd
+
+	case PhaseTaskGenerate:
+		var cmd tea.Cmd
+		m.goalInput, cmd = m.goalInput.Update(msg)
 		return m, cmd
 
 	case PhaseTaskConfirm:
@@ -252,32 +312,23 @@ func (m *SetupModel) handleTaskInitSelected(msg components.TaskInitSelectedMsg) 
 
 	switch msg.Mode {
 	case components.TaskInitModeFile:
-		// File mode: Import from detected file if available, otherwise start empty
-		// Future enhancement: Add file picker or path input
+		// File mode: If we have detection, import directly; otherwise show file input
 		if m.detection != nil && m.detection.Detected {
 			return m.importDetectedTasks()
 		}
-		// No file detected, start with empty task list
-		m.tasks = []*task.Task{}
-		return m.finalizeSetup()
+		// Show file input component
+		m.Phase = PhaseTaskFileInput
+		return m, m.fileInput.Focus()
 
 	case components.TaskInitModePaste:
-		// Paste mode: Not yet implemented, fall back to detected or empty
-		// Future enhancement: Add text input for pasting task list
-		if m.detection != nil && m.detection.Detected {
-			return m.importDetectedTasks()
-		}
-		m.tasks = []*task.Task{}
-		return m.finalizeSetup()
+		// Paste mode: Show textarea for pasting task list
+		m.Phase = PhaseTaskPaste
+		return m, m.taskPaste.Focus()
 
 	case components.TaskInitModeGenerate:
-		// Generate mode: Not yet implemented, fall back to detected or empty
-		// Future enhancement: Add goal input with AI task generation
-		if m.detection != nil && m.detection.Detected {
-			return m.importDetectedTasks()
-		}
-		m.tasks = []*task.Task{}
-		return m.finalizeSetup()
+		// Generate mode: Show goal input for AI task generation
+		m.Phase = PhaseTaskGenerate
+		return m, m.goalInput.Focus()
 
 	case components.TaskInitModeEmpty:
 		m.tasks = []*task.Task{}
@@ -323,6 +374,51 @@ func (m *SetupModel) handleTaskListConfirmed(msg components.TaskListConfirmedMsg
 	return m.finalizeSetup()
 }
 
+// handleFileInputSubmitted handles when user submits a file path.
+func (m *SetupModel) handleFileInputSubmitted(msg components.FileInputSubmittedMsg) (tea.Model, tea.Cmd) {
+	m.Phase = PhaseTaskDetection
+	m.statusMsg = fmt.Sprintf("Importing tasks from %s...", msg.Path)
+
+	return m, func() tea.Msg {
+		tasks, err := m.setup.ImportTasksFromFile(msg.Path)
+		return tasksImportedMsg{tasks: tasks, err: err}
+	}
+}
+
+// handleTaskPasteSubmitted handles when user submits pasted task content.
+func (m *SetupModel) handleTaskPasteSubmitted(msg components.TaskPasteSubmittedMsg) (tea.Model, tea.Cmd) {
+	// Use the already-parsed tasks from the component
+	m.tasks = msg.Tasks
+	m.taskListForm.SetTasks(m.tasks)
+	m.Phase = PhaseTaskConfirm
+	return m, m.taskListForm.Focus()
+}
+
+// handleGoalSubmitted handles when user submits a goal for task generation.
+func (m *SetupModel) handleGoalSubmitted(msg components.GoalSubmittedMsg) (tea.Model, tea.Cmd) {
+	m.Phase = PhaseTaskGenerating
+	m.statusMsg = "Generating tasks from goal..."
+
+	return m, func() tea.Msg {
+		tasks, err := m.setup.GenerateTasks(m.ctx, msg.Goal)
+		return tasksGeneratedMsg{tasks: tasks, err: err}
+	}
+}
+
+// handleTasksGenerated handles when AI task generation completes.
+func (m *SetupModel) handleTasksGenerated(msg tasksGeneratedMsg) (tea.Model, tea.Cmd) {
+	if msg.err != nil {
+		m.Phase = PhaseError
+		m.errorMsg = fmt.Sprintf("Failed to generate tasks: %v", msg.err)
+		return m, nil
+	}
+
+	m.tasks = msg.tasks
+	m.taskListForm.SetTasks(m.tasks)
+	m.Phase = PhaseTaskConfirm
+	return m, m.taskListForm.Focus()
+}
+
 // finalizeSetup saves everything and completes the setup.
 func (m *SetupModel) finalizeSetup() (tea.Model, tea.Cmd) {
 	// Save tasks
@@ -363,6 +459,14 @@ func (m *SetupModel) View() string {
 		return m.viewAnalysisConfirm()
 	case PhaseTaskInit:
 		return m.viewTaskInit()
+	case PhaseTaskFileInput:
+		return m.viewTaskFileInput()
+	case PhaseTaskPaste:
+		return m.viewTaskPaste()
+	case PhaseTaskGenerate:
+		return m.viewTaskGenerate()
+	case PhaseTaskGenerating:
+		return m.viewTaskGenerating()
 	case PhaseTaskDetection:
 		return m.viewTaskDetection()
 	case PhaseTaskConfirm:
@@ -412,6 +516,26 @@ func (m *SetupModel) viewAnalysisConfirm() string {
 // viewTaskInit renders the task initialization selector.
 func (m *SetupModel) viewTaskInit() string {
 	return m.taskInit.View()
+}
+
+// viewTaskFileInput renders the file path input.
+func (m *SetupModel) viewTaskFileInput() string {
+	return m.fileInput.View()
+}
+
+// viewTaskPaste renders the task paste textarea.
+func (m *SetupModel) viewTaskPaste() string {
+	return m.taskPaste.View()
+}
+
+// viewTaskGenerate renders the goal input for task generation.
+func (m *SetupModel) viewTaskGenerate() string {
+	return m.goalInput.View()
+}
+
+// viewTaskGenerating renders the task generation progress.
+func (m *SetupModel) viewTaskGenerating() string {
+	return fmt.Sprintf("🤖 %s", m.statusMsg)
 }
 
 // viewTaskDetection renders the task detection progress.

@@ -739,7 +739,7 @@ The goal is to make `ralph` feel like a polished, intuitive tool. When a user ru
   > Tests: project/detector_test.go
   > **COMPLETED**: Implemented project detection with 25+ project markers, directory picker TUI with recent projects, and integration into run command.
 
-- [ ] UX-003: Implement full task input modes in TUI
+- [x] UX-003: Implement full task input modes in TUI
   > Goal: Complete the TaskInitSelector modes that are currently stubbed
   > **Current state**: Paste and Generate modes fall back to detected/empty (see setup.go lines 264-280)
   > **Mode 1 - Point to file**: Add file path input with autocomplete
@@ -759,6 +759,12 @@ The goal is to make `ralph` feel like a polished, intuitive tool. When a user ru
   > Reference: internal/tui/components/taskinit.go
   > Reference: internal/task/initializer.go `GenerateFromGoal()`
   > Tests: Add tests for each component in internal/tui/components/
+  > **COMPLETED**: Implemented all three task input modes:
+  >   - Created `internal/tui/components/fileinput.go` for file path input with validation and task preview
+  >   - Created `internal/tui/components/taskpaste.go` for pasting task lists with live parsing preview
+  >   - Created `internal/tui/components/goalinput.go` for goal input that triggers AI task generation
+  >   - Updated `internal/tui/setup.go` with new phases and handlers for each mode
+  >   - Added comprehensive tests for all new components
 
 - [ ] UX-004: Seamless setup-to-loop transition
   > Goal: After setup completes, immediately transition to the main loop TUI
