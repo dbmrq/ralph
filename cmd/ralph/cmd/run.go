@@ -53,6 +53,7 @@ func init() {
 	runCmd.Flags().String("continue", "", "Continue a paused session by ID")
 	runCmd.Flags().String("tasks", "", "Path to task file (required for headless mode if no tasks.json exists)")
 	runCmd.Flags().BoolP("verbose", "v", false, "Enable verbose output")
+	runCmd.Flags().Bool("init-only", false, "Only run setup, do not start the task loop")
 }
 
 // runRun is the main entry point for the run command.
@@ -62,6 +63,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 	continueID, _ := cmd.Flags().GetString("continue")
 	tasksPath, _ := cmd.Flags().GetString("tasks")
 	verbose, _ := cmd.Flags().GetBool("verbose")
+	initOnly, _ := cmd.Flags().GetBool("init-only")
 
 	if outputFormat != "" && !headless {
 		return fmt.Errorf("--output flag requires --headless mode")
@@ -108,9 +110,15 @@ func runRun(cmd *cobra.Command, args []string) error {
 	// Check if setup is needed (no .ralph directory)
 	if app.NeedsSetup(projectDir) {
 		if headless {
-			return runHeadlessSetup(cmd, projectDir, outputFormat, tasksPath, verbose)
+			return runHeadlessSetup(cmd, projectDir, outputFormat, tasksPath, verbose, initOnly)
 		}
-		return runTUISetup(cmd, projectDir, continueID, tasksPath, verbose)
+		return runTUISetup(cmd, projectDir, continueID, tasksPath, verbose, initOnly)
+	}
+
+	// If --init-only was specified but setup already done, just exit
+	if initOnly {
+		cmd.Println("Project already initialized (.ralph directory exists)")
+		return nil
 	}
 
 	if headless {
@@ -209,8 +217,9 @@ func runTUI(cmd *cobra.Command, projectDir, continueID, tasksPath string, verbos
 	return loopErr
 }
 
-// runTUISetup runs the first-run setup flow in TUI mode.
-func runTUISetup(cmd *cobra.Command, projectDir, continueID, tasksPath string, verbose bool) error {
+// runTUISetup runs the first-run setup flow in TUI mode with seamless transition to loop.
+// If initOnly is true, exits after setup without starting the task loop.
+func runTUISetup(cmd *cobra.Command, projectDir, continueID, tasksPath string, verbose, initOnly bool) error {
 	// Set up cancellation context
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -229,21 +238,131 @@ func runTUISetup(cmd *cobra.Command, projectDir, continueID, tasksPath string, v
 		return fmt.Errorf("failed to select agent: %w", err)
 	}
 
-	// Run the TUI setup flow
-	result, err := tui.RunSetupTUI(ctx, selectedAgent, projectDir)
-	if err != nil {
-		return fmt.Errorf("setup failed: %w", err)
+	// If initOnly, use the standard setup TUI that exits after completion
+	if initOnly {
+		result, err := tui.RunSetupTUI(ctx, selectedAgent, projectDir)
+		if err != nil {
+			return fmt.Errorf("setup failed: %w", err)
+		}
+		cmd.Printf("\n✓ Setup complete! Found %d tasks.\n", len(result.Tasks))
+		cmd.Println("\nRun 'ralph run' to start the task loop.")
+		return nil
 	}
 
-	cmd.Printf("Setup complete! Found %d tasks.\n", len(result.Tasks))
-	cmd.Println("Starting Ralph loop...")
+	// Determine session ID
+	var sessionID string
+	if continueID != "" {
+		sessionID = continueID
+	} else {
+		sessionID = loop.GenerateSessionID()
+	}
 
-	// Continue to run the loop with the setup result
-	return runWithSetupResult(cmd, projectDir, result, continueID, verbose)
+	// Variables to hold loop components created after setup
+	var mainLoop *loop.Loop
+	var loopController *LoopControllerAdapter
+
+	// Session info will be populated after setup
+	sessionInfo := tui.SessionInfo{
+		ProjectName: filepath.Base(projectDir),
+		AgentName:   selectedAgent.Name(),
+		SessionID:   sessionID,
+	}
+
+	// Run combined setup-to-loop TUI
+	result, err := tui.RunCombinedTUI(
+		ctx,
+		selectedAgent,
+		projectDir,
+		nil, // tasks come from setup result
+		sessionInfo,
+		func(setupResult *app.SetupResult, loopModel *tui.Model, program *tea.Program) error {
+			// This function is called after setup completes, inside the TUI
+			// We need to create and run the loop here
+
+			if setupResult == nil {
+				return fmt.Errorf("setup did not complete")
+			}
+
+			// Use the config from setup result
+			cfg := setupResult.Config
+
+			// Update session info with model from config
+			loopModel.SetSessionInfo(
+				sessionInfo.ProjectName,
+				selectedAgent.Name(),
+				cfg.Agent.Model,
+				sessionID,
+			)
+
+			// Create task manager from setup tasks
+			storePath := filepath.Join(projectDir, ".ralph", "tasks.json")
+			store := task.NewStore(storePath)
+			taskMgr := task.NewManager(store)
+			if err := taskMgr.Load(); err != nil {
+				return fmt.Errorf("failed to load tasks: %w", err)
+			}
+
+			// Set tasks on the loop model
+			loopModel.SetTasks(taskMgr.All())
+
+			// Create hook manager (optional)
+			var hookMgr *hooks.Manager
+			if len(cfg.Hooks.PreTask) > 0 || len(cfg.Hooks.PostTask) > 0 {
+				hookMgr, err = hooks.NewManagerFromConfig(&cfg.Hooks)
+				if err != nil {
+					return fmt.Errorf("failed to create hook manager: %w", err)
+				}
+			}
+
+			// Create the main loop
+			mainLoop = loop.NewLoop(selectedAgent, taskMgr, hookMgr, cfg, projectDir)
+
+			// Set analysis from setup result
+			if setupResult.Analysis != nil {
+				mainLoop.SetAnalysis(setupResult.Analysis)
+			}
+
+			// Create event handler and output writer
+			eventHandler := tui.NewTUIEventHandler(program)
+			eventHandler.SetTasks(taskMgr.All())
+			outputWriter := tui.NewTUIOutputWriter(program)
+
+			// Configure loop options with TUI event handling
+			loopOpts := loop.DefaultOptions()
+			loopOpts.OnEvent = eventHandler.HandleEvent
+			loopOpts.LogWriter = outputWriter
+			mainLoop.SetOptions(loopOpts)
+
+			// Create loop controller adapter and set it on the model
+			loopController = NewLoopControllerAdapter(mainLoop, cancel)
+			loopModel.SetLoopController(loopController)
+
+			// Run the loop
+			if continueID != "" {
+				return mainLoop.Resume(ctx, continueID)
+			}
+			return mainLoop.Run(ctx, sessionID)
+		},
+	)
+
+	if err != nil {
+		return fmt.Errorf("TUI failed: %w", err)
+	}
+
+	if result.Canceled {
+		return fmt.Errorf("setup canceled")
+	}
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	return nil
 }
 
 // runHeadlessSetup runs the first-run setup flow in headless mode.
-func runHeadlessSetup(cmd *cobra.Command, projectDir, outputFormat, tasksPath string, verbose bool) error {
+// If initOnly is true, exits after setup without starting the task loop.
+func runHeadlessSetup(cmd *cobra.Command, projectDir, outputFormat, tasksPath string, verbose, initOnly bool) error {
 	// Set up cancellation context
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -280,6 +399,12 @@ func runHeadlessSetup(cmd *cobra.Command, projectDir, outputFormat, tasksPath st
 	}
 
 	cmd.Printf("Setup complete! Found %d tasks.\n", len(result.Tasks))
+
+	// If initOnly, just exit after setup
+	if initOnly {
+		cmd.Println("Run 'ralph run' to start the task loop.")
+		return nil
+	}
 
 	// Continue to run the loop with the setup result
 	return runHeadlessWithSetupResult(cmd, projectDir, result, outputFormat, verbose)

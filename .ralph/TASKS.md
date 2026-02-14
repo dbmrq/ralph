@@ -766,7 +766,7 @@ The goal is to make `ralph` feel like a polished, intuitive tool. When a user ru
   >   - Updated `internal/tui/setup.go` with new phases and handlers for each mode
   >   - Added comprehensive tests for all new components
 
-- [ ] UX-004: Seamless setup-to-loop transition
+- [x] UX-004: Seamless setup-to-loop transition
   > Goal: After setup completes, immediately transition to the main loop TUI
   > **Current behavior**: `ralph init` completes and exits, requiring separate `ralph run`
   > **Desired behavior**: Setup TUI fades into loop TUI with tasks starting
@@ -779,6 +779,12 @@ The goal is to make `ralph` feel like a polished, intuitive tool. When a user ru
   > Reference: cmd/ralph/cmd/run.go `runTUISetup()` and `runTUI()`
   > Reference: internal/tui/setup.go `SetupCompleteMsg`
   > Tests: Integration test for full flow from setup to loop execution
+  > **COMPLETED**: Created `internal/tui/combined.go` with `CombinedModel` that:
+  >   - Embeds both `SetupModel` and main loop `Model`
+  >   - Starts in setup phase, transitions to loop phase when setup sends `SetupCompleteMsg`
+  >   - The `tea.Program` never quits during transition - provides seamless UX
+  >   - Added `--init-only` flag to `ralph run` for explicit "setup and exit" behavior
+  >   - `ralph init` behavior unchanged (exits after setup)
 
 - [ ] UX-005: Improve TUI welcome and onboarding
   > Goal: Beautiful, informative welcome screen
