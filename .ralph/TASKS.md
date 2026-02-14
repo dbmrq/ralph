@@ -724,7 +724,7 @@ The goal is to make `ralph` feel like a polished, intuitive tool. When a user ru
   > - Updated test case "no args shows help" → "no args starts TUI mode"
   > - All tests pass, build passes, help/version/subcommands still work
 
-- [ ] UX-002: Add project directory detection and selection
+- [x] UX-002: Add project directory detection and selection
   > Goal: Detect if we're in a valid project directory, offer to select one if not
   > **Scenario 1**: User runs `ralph` in a git repo → use current directory
   > **Scenario 2**: User runs `ralph` in non-git directory → check for project markers (go.mod, package.json, etc.)
@@ -737,6 +737,7 @@ The goal is to make `ralph` feel like a polished, intuitive tool. When a user ru
   >   - Store recent projects in `~/.ralph/recent.json`
   > Reference: internal/build/analyzer.go for project type detection patterns
   > Tests: project/detector_test.go
+  > **COMPLETED**: Implemented project detection with 25+ project markers, directory picker TUI with recent projects, and integration into run command.
 
 - [ ] UX-003: Implement full task input modes in TUI
   > Goal: Complete the TaskInitSelector modes that are currently stubbed

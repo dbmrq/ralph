@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 
 	"github.com/wexinc/ralph/internal/agent"
@@ -19,8 +20,10 @@ import (
 	"github.com/wexinc/ralph/internal/hooks"
 	"github.com/wexinc/ralph/internal/logging"
 	"github.com/wexinc/ralph/internal/loop"
+	"github.com/wexinc/ralph/internal/project"
 	"github.com/wexinc/ralph/internal/task"
 	"github.com/wexinc/ralph/internal/tui"
+	"github.com/wexinc/ralph/internal/tui/components"
 	"github.com/wexinc/ralph/internal/version"
 )
 
@@ -71,6 +74,14 @@ func runRun(cmd *cobra.Command, args []string) error {
 	projectDir, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("failed to get working directory: %w", err)
+	}
+
+	// Check if we need to prompt for directory selection (TUI mode only)
+	if !headless {
+		projectDir, err = detectOrSelectProject(cmd, projectDir)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Initialize logging
@@ -712,4 +723,98 @@ func (a *LoopControllerAdapter) Abort() error {
 		return err
 	}
 	return nil
+}
+
+// detectOrSelectProject checks if the current directory is a valid project.
+// If not, it shows a directory picker TUI for the user to select a project.
+func detectOrSelectProject(cmd *cobra.Command, currentDir string) (string, error) {
+	detector := project.NewDetector()
+
+	// Check if we should prompt for directory selection
+	if !detector.ShouldPromptForDirectory(currentDir) {
+		// Current directory is a valid project, use it
+		return currentDir, nil
+	}
+
+	// Load recent projects
+	recent, err := project.LoadRecentProjects()
+	if err != nil {
+		// Non-fatal: continue without recent projects
+		recent = &project.RecentProjects{}
+	}
+
+	// Create and run the directory picker TUI
+	picker := components.NewDirPicker()
+	picker.Init(currentDir, recent)
+
+	model := &dirPickerModel{
+		picker: picker,
+	}
+
+	p := tea.NewProgram(model, tea.WithAltScreen())
+	finalModel, err := p.Run()
+	if err != nil {
+		return "", fmt.Errorf("directory picker error: %w", err)
+	}
+
+	result := finalModel.(*dirPickerModel)
+	if result.canceled {
+		return "", fmt.Errorf("directory selection canceled")
+	}
+
+	if result.selectedPath == "" {
+		return "", fmt.Errorf("no directory selected")
+	}
+
+	// Update recent projects with the selected project
+	if result.selectedProject != nil {
+		recent.Add(result.selectedProject)
+		if err := recent.Save(); err != nil {
+			// Non-fatal: warn but continue
+			fmt.Fprintf(cmd.ErrOrStderr(), "Warning: failed to save recent projects: %v\n", err)
+		}
+	}
+
+	return result.selectedPath, nil
+}
+
+// dirPickerModel wraps the DirPicker component for standalone TUI execution.
+type dirPickerModel struct {
+	picker          *components.DirPicker
+	selectedPath    string
+	selectedProject *project.ProjectInfo
+	canceled        bool
+}
+
+func (m *dirPickerModel) Init() tea.Cmd {
+	return nil
+}
+
+func (m *dirPickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "ctrl+c":
+			m.canceled = true
+			return m, tea.Quit
+		}
+	case tea.WindowSizeMsg:
+		m.picker.SetSize(msg.Width, msg.Height)
+		return m, nil
+	case components.DirSelectedMsg:
+		m.selectedPath = msg.Path
+		m.selectedProject = msg.Project
+		return m, tea.Quit
+	case components.DirCanceledMsg:
+		m.canceled = true
+		return m, tea.Quit
+	}
+
+	var cmd tea.Cmd
+	m.picker, cmd = m.picker.Update(msg)
+	return m, cmd
+}
+
+func (m *dirPickerModel) View() string {
+	return m.picker.View()
 }
