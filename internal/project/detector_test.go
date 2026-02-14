@@ -275,4 +275,3 @@ func TestDetectProject_WithGlobMarkers(t *testing.T) {
 		t.Errorf("ProjectType = %q, want %q", proj.ProjectType, "xcode")
 	}
 }
-

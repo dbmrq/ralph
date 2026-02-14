@@ -161,4 +161,3 @@ func TestRecentProjects_SaveAndLoad(t *testing.T) {
 		t.Errorf("expected 1 project, got %d", len(loaded.Projects))
 	}
 }
-

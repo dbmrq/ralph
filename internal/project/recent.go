@@ -153,4 +153,3 @@ func (r *RecentProjects) GetPaths() []string {
 	}
 	return paths
 }
-
