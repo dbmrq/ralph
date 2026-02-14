@@ -675,3 +675,174 @@
   > Create GitHub workflow that runs tests on every push
   > Push changes and use gh cli to check results
   > Iterate on any issues until both the application and the CI process are working consistently
+
+---
+
+## 🚀 Phase 13: "Just Works" TUI Experience
+
+> **Note**: This is the ultimate user experience goal. Running `ralph` with no arguments should open a beautiful TUI that guides the user through everything - from project detection to task execution.
+> **Vision**: `ralph` → TUI opens → guides you through setup if needed → starts executing tasks → you watch the magic happen
+
+### Overview
+
+The goal is to make `ralph` feel like a polished, intuitive tool. When a user runs `ralph` (no arguments) in any directory:
+
+1. **Project Detection**: Detect if we're in a git repo or ask where the project is
+2. **Setup Detection**: Check if `.ralph/` exists and has valid config
+3. **Guided Setup**: If not initialized, run the full TUI setup flow:
+   - Welcome screen with project info
+   - AI-powered project analysis with confirmation
+   - Task initialization (detect existing, paste, generate from goal, or start empty)
+   - Task list confirmation
+4. **Seamless Transition**: After setup, immediately transition to the main loop TUI
+5. **Running State**: Show real-time progress, agent output, controls
+
+### Implementation Tasks
+
+- [ ] UX-001: Make `ralph` (no args) launch the TUI
+  > Goal: Change default behavior to launch TUI instead of showing help
+  > **Current behavior**: Running `ralph` shows CLI help text
+  > **Desired behavior**: Running `ralph` opens the TUI
+  > Implementation:
+  >   - Modify `rootCmd` in `cmd/ralph/cmd/root.go` to have a default action
+  >   - Set `rootCmd.Run` or use Cobra's `PersistentPreRun` to check for no subcommand
+  >   - When no subcommand is given, call `runRun()` (same as `ralph run`)
+  >   - Preserve `ralph --help` to show help text
+  >   - Preserve all subcommands (`ralph init`, `ralph run`, `ralph agent`, etc.)
+  > Reference: Cobra's `rootCmd.Run` vs `rootCmd.RunE`
+  > Reference: cmd/ralph/cmd/run.go `runRun()` function
+  > Tests: Update cmd_test.go to verify `ralph` with no args starts TUI mode
+
+- [ ] UX-002: Add project directory detection and selection
+  > Goal: Detect if we're in a valid project directory, offer to select one if not
+  > **Scenario 1**: User runs `ralph` in a git repo → use current directory
+  > **Scenario 2**: User runs `ralph` in non-git directory → check for project markers (go.mod, package.json, etc.)
+  > **Scenario 3**: User runs `ralph` in home directory or random location → show directory picker TUI
+  > Implementation:
+  >   - Create `internal/project/detector.go` with `DetectProject(dir string) (*ProjectInfo, error)`
+  >   - Check for: .git, go.mod, package.json, Cargo.toml, pyproject.toml, etc.
+  >   - Create `internal/tui/components/dirpicker.go` for directory selection
+  >   - Simple list with common project locations, recent projects, and manual path input
+  >   - Store recent projects in `~/.ralph/recent.json`
+  > Reference: internal/build/analyzer.go for project type detection patterns
+  > Tests: project/detector_test.go
+
+- [ ] UX-003: Implement full task input modes in TUI
+  > Goal: Complete the TaskInitSelector modes that are currently stubbed
+  > **Current state**: Paste and Generate modes fall back to detected/empty (see setup.go lines 264-280)
+  > **Mode 1 - Point to file**: Add file path input with autocomplete
+  >   - Create TextInput with path autocomplete
+  >   - Show preview of detected tasks from file
+  >   - Validate file exists and can be parsed
+  > **Mode 2 - Paste a list**: Add multiline text input for pasting tasks
+  >   - Create `internal/tui/components/taskpaste.go` with textarea component
+  >   - Parse pasted markdown/text into tasks (using internal/task/parser.go)
+  >   - Show live preview of parsed tasks
+  > **Mode 3 - Generate from goal**: Add natural language goal input with AI generation
+  >   - Create `internal/tui/components/goalinput.go` with text input and generate button
+  >   - Call AI agent to generate task list from goal description
+  >   - Use existing `internal/task/initializer.go GenerateFromGoal()`
+  >   - Show generated tasks for confirmation, allow editing
+  > Reference: internal/tui/setup.go `handleTaskInitSelected()`
+  > Reference: internal/tui/components/taskinit.go
+  > Reference: internal/task/initializer.go `GenerateFromGoal()`
+  > Tests: Add tests for each component in internal/tui/components/
+
+- [ ] UX-004: Seamless setup-to-loop transition
+  > Goal: After setup completes, immediately transition to the main loop TUI
+  > **Current behavior**: `ralph init` completes and exits, requiring separate `ralph run`
+  > **Desired behavior**: Setup TUI fades into loop TUI with tasks starting
+  > Implementation:
+  >   - Modify `runTUISetup()` in `cmd/ralph/cmd/run.go` to continue to loop after setup
+  >   - Instead of returning after `tui.RunSetupTUI()`, create the Loop and TUIRunner
+  >   - Show transition message: "Setup complete! Starting task loop..."
+  >   - Handle case where user explicitly ran `ralph init` (should still exit after setup)
+  >   - Add `--init-only` flag to `ralph run` for explicit "setup and exit" behavior
+  > Reference: cmd/ralph/cmd/run.go `runTUISetup()` and `runTUI()`
+  > Reference: internal/tui/setup.go `SetupCompleteMsg`
+  > Tests: Integration test for full flow from setup to loop execution
+
+- [ ] UX-005: Improve TUI welcome and onboarding
+  > Goal: Beautiful, informative welcome screen
+  > **Current state**: Simple "Press Enter to begin setup" message
+  > **Desired state**: Rich welcome with:
+  >   - Ralph ASCII art or logo
+  >   - Detected project info (name, type, languages found)
+  >   - What will happen: "Ralph will analyze your project, set up configuration, and help you manage tasks"
+  >   - Available agents status (which are installed/available)
+  >   - Quick start tips
+  > Implementation:
+  >   - Update `internal/tui/setup.go` `renderWelcome()` method
+  >   - Add project pre-scan before welcome (detect languages, project type quickly)
+  >   - Add agent availability check to show which agents can be used
+  >   - Use lipgloss for nice formatting
+  > Reference: internal/tui/styles package for consistent styling
+  > Reference: internal/agent/registry.go for agent availability checks
+
+- [ ] UX-006: Add keyboard shortcut hints throughout TUI
+  > Goal: Clear, contextual hints for available actions
+  > **Current state**: Some shortcuts shown in status bar, but not comprehensive
+  > **Desired state**: Each TUI phase shows relevant shortcuts
+  >   - Welcome: "Enter: Begin  Q: Quit  ?: Help"
+  >   - Analysis: "Tab: Navigate  Enter: Edit  C: Confirm  R: Re-analyze"
+  >   - Task Init: "↑↓: Select  Enter: Choose  Esc: Back"
+  >   - Main Loop: "P: Pause  S: Skip  A: Abort  L: Logs  H: Help"
+  > Implementation:
+  >   - Create standardized shortcut bar component
+  >   - Each TUI phase provides its context-specific shortcuts
+  >   - Use consistent styling from internal/tui/styles
+  > Reference: internal/tui/components/statusbar.go for existing implementation
+  > Reference: internal/tui/components/helpoverlay.go for help content
+
+- [ ] UX-007: Handle edge cases gracefully
+  > Goal: Graceful handling of common issues with clear recovery paths
+  > **Edge case 1**: No AI agents available
+  >   - Show friendly message explaining the issue
+  >   - Provide installation instructions for supported agents (Cursor, Auggie)
+  >   - Offer to continue in "manual mode" (no AI analysis, user provides config)
+  > **Edge case 2**: Legacy `.ralph/` directory (shell script version)
+  >   - Detect old format (has build.sh, ralph_loop.sh but no config.yaml)
+  >   - Offer migration: "Found legacy Ralph config. Migrate to new format?"
+  >   - Migration preserves TASKS.md, prompts, creates new config.yaml
+  > **Edge case 3**: Network/API errors during AI analysis
+  >   - Show clear error with retry option
+  >   - Offer to skip AI analysis and configure manually
+  >   - Save partial progress if possible
+  > **Edge case 4**: Ctrl+C during setup
+  >   - Clean partial `.ralph/` directory or offer to resume
+  >   - Store setup progress in temp file for resume
+  > Implementation:
+  >   - Add `internal/app/migration.go` for legacy detection and migration
+  >   - Update error handling in setup flow to offer alternatives
+  >   - Add "resume setup" capability using session state
+  > Reference: internal/errors package for error types
+  > Reference: Existing `.ralph/` directory structure in this repo (has old shell scripts)
+
+- [ ] UX-008: Add progress indicators and animations
+  > Goal: Visual feedback during long operations
+  > **Current state**: Static "Analyzing..." message
+  > **Desired state**: Animated progress with stage indicators
+  >   - Spinner animation during AI calls
+  >   - Progress bar for multi-step operations (setup has ~5 steps)
+  >   - Time elapsed indicator for long operations
+  >   - "This usually takes X seconds" hints
+  > Implementation:
+  >   - Use bubbletea/bubbles spinner component
+  >   - Track setup stages and show progress: "Step 2/5: Analyzing project..."
+  >   - Add estimated time based on project size
+  > Reference: github.com/charmbracelet/bubbles/spinner
+  > Reference: github.com/charmbracelet/bubbles/progress
+
+### Testing
+
+- [ ] TEST-008: Add end-to-end TUI flow tests
+  > Goal: Test the complete user journey from `ralph` to task execution
+  > Test scenarios:
+  >   - New project: no .ralph → setup flow → loop starts
+  >   - Existing project: has .ralph → loop starts immediately
+  >   - Legacy project: old .ralph → migration offered → setup → loop
+  >   - No agents: shows helpful error with instructions
+  >   - Setup interrupted: can resume from where left off
+  > Use Bubble Tea testing utilities for TUI testing
+  > Reference: internal/tui/app_test.go for testing patterns
+  > Reference: tea.Test() for Bubble Tea test utilities

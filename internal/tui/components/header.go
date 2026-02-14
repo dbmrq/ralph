@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/charmbracelet/lipgloss"
+
 	"github.com/wexinc/ralph/internal/tui/styles"
 )
 
