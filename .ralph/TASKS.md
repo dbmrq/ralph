@@ -613,10 +613,23 @@
   > - Integrated with internal/loop/recovery.go to use IsRetryable for retry logic
   > - Comprehensive tests in *_test.go files (53 test cases)
 
-- [ ] POLISH-003: Add logging system
+- [x] POLISH-003: Add logging system
   > Goal: Structured logging to .ralph/logs/
   > Log rotation and cleanup
   > Debug, info, error levels
+  > ---
+  > Implementation:
+  > - Created internal/logging/ package with structured logging using Go's log/slog
+  > - logger.go: Core Logger struct with Config, New(), NewNoop(), Close(), Rotate(), Cleanup()
+  > - global.go: Global logger API with InitGlobal(), CloseGlobal(), Debug/Info/Warn/Error functions
+  > - Features: Debug/Info/Warn/Error levels, timestamped log files in .ralph/logs/
+  > - Log rotation via Rotate(), automatic cleanup based on MaxLogFiles and MaxLogAge
+  > - Context support with WithSessionID/WithTaskID for tracing
+  > - io.Writer adapter for capturing agent output
+  > - JSON format option for structured output
+  > - Integrated with cmd/ralph/cmd/run.go (initialization with verbose flag)
+  > - Integrated with internal/loop/loop.go (session and task logging)
+  > - Comprehensive tests in logger_test.go and global_test.go (24 test cases)
 
 - [ ] POLISH-004: Performance optimization
   > Goal: Profile and optimize hot paths

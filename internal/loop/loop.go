@@ -14,6 +14,7 @@ import (
 	"github.com/wexinc/ralph/internal/build"
 	"github.com/wexinc/ralph/internal/config"
 	"github.com/wexinc/ralph/internal/hooks"
+	"github.com/wexinc/ralph/internal/logging"
 	"github.com/wexinc/ralph/internal/prompt"
 	"github.com/wexinc/ralph/internal/task"
 )
@@ -190,6 +191,9 @@ func (l *Loop) emit(eventType EventType, taskID, taskName string, iteration int,
 // 3. For each task: pre-hooks → agent → verify → post-hooks → state update
 // 4. Handle errors, pauses, and completions
 func (l *Loop) Run(ctx context.Context, sessionID string) error {
+	log := logging.Global().With("session_id", sessionID)
+	log.Info("Loop starting", "project_dir", l.projectDir, "agent", l.agent.Name())
+
 	// Setup signal handler for graceful shutdown
 	if l.recovery != nil {
 		cleanup := l.recovery.SetupSignalHandler()
@@ -202,6 +206,7 @@ func (l *Loop) Run(ctx context.Context, sessionID string) error {
 
 	// Transition to running
 	if err := l.context.Transition(StateRunning); err != nil {
+		log.Error("Failed to start loop", "error", err)
 		return fmt.Errorf("failed to start loop: %w", err)
 	}
 	l.emit(EventLoopStarted, "", "", 0, "Loop started", nil)
@@ -342,12 +347,16 @@ func (l *Loop) runAnalysis(ctx context.Context) error {
 // runTask executes a single task through all phases.
 // Returns the last agent result (may be nil if task was skipped) and any error.
 func (l *Loop) runTask(ctx context.Context, t *task.Task) (*agent.Result, error) {
+	log := logging.Global().With("task_id", t.ID, "task_name", t.Name)
+	log.Info("Task started")
+
 	l.context.SetCurrentTask(t.ID)
 	l.emit(EventTaskStarted, t.ID, t.Name, 0, "Starting task", nil)
 
 	var lastResult *agent.Result
 
 	for iteration := 1; iteration <= l.opts.MaxIterationsPerTask; iteration++ {
+		log.Debug("Iteration started", "iteration", iteration)
 		l.context.IncrementIteration()
 		l.emit(EventIterationStarted, t.ID, t.Name, iteration, fmt.Sprintf("Iteration %d", iteration), nil)
 

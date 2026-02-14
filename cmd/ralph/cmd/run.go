@@ -16,6 +16,7 @@ import (
 	"github.com/wexinc/ralph/internal/app"
 	"github.com/wexinc/ralph/internal/config"
 	"github.com/wexinc/ralph/internal/hooks"
+	"github.com/wexinc/ralph/internal/logging"
 	"github.com/wexinc/ralph/internal/loop"
 	"github.com/wexinc/ralph/internal/task"
 	"github.com/wexinc/ralph/internal/tui"
@@ -69,6 +70,27 @@ func runRun(cmd *cobra.Command, args []string) error {
 	projectDir, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("failed to get working directory: %w", err)
+	}
+
+	// Initialize logging
+	logLevel := logging.LevelInfo
+	if verbose {
+		logLevel = logging.LevelDebug
+	}
+	logConfig := &logging.Config{
+		Level:       logLevel,
+		LogDir:      filepath.Join(projectDir, ".ralph", "logs"),
+		MaxLogFiles: 10,
+		MaxLogAge:   7 * 24 * time.Hour,
+		Console:     false, // Don't mix console output with TUI
+		JSONFormat:  false,
+	}
+	if err := logging.InitGlobal(logConfig); err != nil {
+		// Non-fatal: warn but continue without file logging
+		fmt.Fprintf(cmd.ErrOrStderr(), "Warning: failed to initialize logging: %v\n", err)
+	} else {
+		defer logging.CloseGlobal()
+		logging.Info("Ralph starting", "version", Version, "verbose", verbose)
 	}
 
 	// Check if setup is needed (no .ralph directory)
