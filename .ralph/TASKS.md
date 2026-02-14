@@ -661,7 +661,7 @@
   > - Updated usage section with all commands including version, update, and completion
   > - Documented keyboard shortcuts, configuration, TDD mode, hooks, and project structure
 
-- [ ] POLISH-006: Clean-Up
+- [x] POLISH-006: Clean-Up
   > Goal: Leave the codebase that is clean, efficient and ready to publish
   > Go through the whole codebase and remove any dead or stale code and files
   > Simplify and optimize anything we can

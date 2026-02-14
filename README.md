@@ -367,7 +367,7 @@ Instructions are layered for flexibility:
 
 | Level | File | Purpose |
 |-------|------|---------|
-| 1. Global | `core/base_prompt.txt` | Ralph workflow instructions |
+| 1. Global | `.ralph/base_prompt.txt` | Ralph workflow instructions |
 | 2. Platform | `.ralph/platform_prompt.txt` | Platform-specific guidelines |
 | 3. Project | `.ralph/project_prompt.txt` | Your project's unique requirements |
 

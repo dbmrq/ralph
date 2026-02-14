@@ -251,29 +251,39 @@ func (m *SetupModel) handleTaskInitSelected(msg components.TaskInitSelectedMsg) 
 
 	switch msg.Mode {
 	case components.TaskInitModeFile:
-		// TODO: Show file path input
-		m.Phase = PhaseTaskDetection
-		m.statusMsg = "Enter path to task file..."
-		return m, nil
+		// File mode: Import from detected file if available, otherwise start empty
+		// Future enhancement: Add file picker or path input
+		if m.detection != nil && m.detection.Detected {
+			return m.importDetectedTasks()
+		}
+		// No file detected, start with empty task list
+		m.tasks = []*task.Task{}
+		return m.finalizeSetup()
 
 	case components.TaskInitModePaste:
-		// TODO: Show paste input
-		m.Phase = PhaseTaskDetection
-		m.statusMsg = "Paste your task list..."
-		return m, nil
+		// Paste mode: Not yet implemented, fall back to detected or empty
+		// Future enhancement: Add text input for pasting task list
+		if m.detection != nil && m.detection.Detected {
+			return m.importDetectedTasks()
+		}
+		m.tasks = []*task.Task{}
+		return m.finalizeSetup()
 
 	case components.TaskInitModeGenerate:
-		// TODO: Show goal input
-		m.Phase = PhaseTaskDetection
-		m.statusMsg = "Describe your goal..."
-		return m, nil
+		// Generate mode: Not yet implemented, fall back to detected or empty
+		// Future enhancement: Add goal input with AI task generation
+		if m.detection != nil && m.detection.Detected {
+			return m.importDetectedTasks()
+		}
+		m.tasks = []*task.Task{}
+		return m.finalizeSetup()
 
 	case components.TaskInitModeEmpty:
 		m.tasks = []*task.Task{}
 		return m.finalizeSetup()
 	}
 
-	// If we have detection and user pressed enter, import detected
+	// If we have detection and no specific mode, import detected tasks
 	if m.detection != nil && m.detection.Detected {
 		return m.importDetectedTasks()
 	}
