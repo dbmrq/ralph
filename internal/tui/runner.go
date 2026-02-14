@@ -175,6 +175,10 @@ func (h *TUIEventHandler) HandleEvent(event loop.Event) {
 
 // sendTasksUpdated sends a TasksUpdatedMsg with current task status.
 func (h *TUIEventHandler) sendTasksUpdated() {
+	if h.program == nil {
+		return
+	}
+
 	h.tasksMu.RLock()
 	defer h.tasksMu.RUnlock()
 

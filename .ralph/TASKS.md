@@ -516,7 +516,7 @@
   > - internal/tui/components/tasklistform_test.go: NEW - Full test coverage for TaskListForm component (analysis confirmation form)
   > Coverage improved: internal/tui 40.8%→58.8%, internal/tui/components 69.3%→88.6%
 
-- [ ] TEST-007: Add TUI-Loop integration tests
+- [x] TEST-007: Add TUI-Loop integration tests
   > Goal: Test the new TUI-Loop integration code
   > Test TUIEventHandler translates loop events to TUI messages correctly
   > Test TUIOutputWriter streams agent output to TUI
@@ -525,6 +525,7 @@
   > Test graceful shutdown when TUI quits during loop execution
   > Test concurrent execution of TUI and Loop
   > Can use mock tea.Program or test message types directly
+  > DONE: Added comprehensive tests in internal/tui/runner_test.go and internal/loop/loop_test.go
 
 ---
 

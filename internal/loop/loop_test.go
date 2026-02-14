@@ -1447,3 +1447,272 @@ func TestLoop_ResumeFromContext(t *testing.T) {
 		}
 	})
 }
+
+// ============================================
+// TEST-007: Skip and Abort Control Tests
+// ============================================
+
+func TestLoop_Skip(t *testing.T) {
+	projectDir := setupTestProjectDir(t)
+	mockAg := &mockAgent{name: "test"}
+	taskMgr := newTestManager(t)
+	cfg := newTestConfig()
+
+	t.Run("skip without context fails", func(t *testing.T) {
+		l := NewLoop(mockAg, taskMgr, nil, cfg, projectDir)
+		// context is nil
+		err := l.Skip("TASK-001")
+		if err == nil {
+			t.Error("Skip() should fail when loop has no context")
+		}
+		if !contains(err.Error(), "no context") {
+			t.Errorf("error = %v, should mention 'no context'", err)
+		}
+	})
+
+	t.Run("skip with empty taskID uses current task", func(t *testing.T) {
+		l := NewLoop(mockAg, taskMgr, nil, cfg, projectDir)
+		l.context = NewLoopContext("test-session", projectDir, "test")
+		// No current task running
+		err := l.Skip("")
+		if err == nil {
+			t.Error("Skip('') should fail when no task is running")
+		}
+		if !contains(err.Error(), "no task is currently running") {
+			t.Errorf("error = %v, should mention 'no task is currently running'", err)
+		}
+	})
+
+	t.Run("skip with non-existent task fails", func(t *testing.T) {
+		l := NewLoop(mockAg, taskMgr, nil, cfg, projectDir)
+		l.context = NewLoopContext("test-session", projectDir, "test")
+		err := l.Skip("NON-EXISTENT-TASK")
+		if err == nil {
+			t.Error("Skip() should fail for non-existent task")
+		}
+		if !contains(err.Error(), "not found") {
+			t.Errorf("error = %v, should mention 'not found'", err)
+		}
+	})
+
+	t.Run("skip valid task succeeds", func(t *testing.T) {
+		taskMgr := newTestManager(t)
+		tsk := task.NewTask("SKIP-001", "Test Task", "Description")
+		taskMgr.AddTask(tsk)
+
+		l := NewLoop(mockAg, taskMgr, nil, cfg, projectDir)
+		l.context = NewLoopContext("test-session", projectDir, "test")
+
+		err := l.Skip("SKIP-001")
+		if err != nil {
+			t.Errorf("Skip() error = %v, want nil", err)
+		}
+
+		// Verify skip request was recorded
+		if !l.checkSkip("SKIP-001") {
+			t.Error("skip request should be recorded")
+		}
+	})
+
+	t.Run("skip current task with empty ID", func(t *testing.T) {
+		taskMgr := newTestManager(t)
+		tsk := task.NewTask("CURRENT-001", "Current Task", "Description")
+		taskMgr.AddTask(tsk)
+
+		l := NewLoop(mockAg, taskMgr, nil, cfg, projectDir)
+		l.context = NewLoopContext("test-session", projectDir, "test")
+		l.context.CurrentTaskID = "CURRENT-001"
+
+		err := l.Skip("")
+		if err != nil {
+			t.Errorf("Skip('') error = %v, want nil", err)
+		}
+
+		// Verify skip request was recorded for current task
+		if !l.checkSkip("CURRENT-001") {
+			t.Error("skip request should be recorded for current task")
+		}
+	})
+}
+
+func TestLoop_Abort(t *testing.T) {
+	projectDir := setupTestProjectDir(t)
+	mockAg := &mockAgent{name: "test"}
+	taskMgr := newTestManager(t)
+	cfg := newTestConfig()
+
+	t.Run("abort without context fails", func(t *testing.T) {
+		l := NewLoop(mockAg, taskMgr, nil, cfg, projectDir)
+		// context is nil
+		err := l.Abort("test reason")
+		if err == nil {
+			t.Error("Abort() should fail when loop has no context")
+		}
+		if !contains(err.Error(), "no context") {
+			t.Errorf("error = %v, should mention 'no context'", err)
+		}
+	})
+
+	t.Run("abort with reason succeeds", func(t *testing.T) {
+		l := NewLoop(mockAg, taskMgr, nil, cfg, projectDir)
+		l.context = NewLoopContext("test-session", projectDir, "test")
+
+		err := l.Abort("user requested abort")
+		if err != nil {
+			t.Errorf("Abort() error = %v, want nil", err)
+		}
+
+		// Verify abort request was recorded
+		aborted, reason := l.checkAbort()
+		if !aborted {
+			t.Error("abort request should be recorded")
+		}
+		if reason != "user requested abort" {
+			t.Errorf("abort reason = %q, want 'user requested abort'", reason)
+		}
+	})
+
+	t.Run("abort with empty reason uses default", func(t *testing.T) {
+		l := NewLoop(mockAg, taskMgr, nil, cfg, projectDir)
+		l.context = NewLoopContext("test-session", projectDir, "test")
+
+		err := l.Abort("")
+		if err != nil {
+			t.Errorf("Abort('') error = %v, want nil", err)
+		}
+
+		aborted, reason := l.checkAbort()
+		if !aborted {
+			t.Error("abort request should be recorded")
+		}
+		if reason != "aborted by user" {
+			t.Errorf("abort reason = %q, want 'aborted by user'", reason)
+		}
+	})
+}
+
+func TestLoop_checkSkip(t *testing.T) {
+	projectDir := setupTestProjectDir(t)
+	mockAg := &mockAgent{name: "test"}
+	taskMgr := newTestManager(t)
+	cfg := newTestConfig()
+
+	l := NewLoop(mockAg, taskMgr, nil, cfg, projectDir)
+
+	t.Run("checkSkip returns false for no request", func(t *testing.T) {
+		if l.checkSkip("TASK-001") {
+			t.Error("checkSkip() should return false when no skip requested")
+		}
+	})
+
+	t.Run("checkSkip returns true and clears request", func(t *testing.T) {
+		l.controlMu.Lock()
+		l.skipRequests["TASK-002"] = true
+		l.controlMu.Unlock()
+
+		if !l.checkSkip("TASK-002") {
+			t.Error("checkSkip() should return true when skip requested")
+		}
+
+		// Second call should return false (request cleared)
+		if l.checkSkip("TASK-002") {
+			t.Error("checkSkip() should return false after clearing")
+		}
+	})
+}
+
+func TestLoop_clearSkipRequest(t *testing.T) {
+	projectDir := setupTestProjectDir(t)
+	mockAg := &mockAgent{name: "test"}
+	taskMgr := newTestManager(t)
+	cfg := newTestConfig()
+
+	l := NewLoop(mockAg, taskMgr, nil, cfg, projectDir)
+
+	// Add skip requests
+	l.controlMu.Lock()
+	l.skipRequests["TASK-001"] = true
+	l.skipRequests["TASK-002"] = true
+	l.controlMu.Unlock()
+
+	// Clear one
+	l.clearSkipRequest("TASK-001")
+
+	// Verify only TASK-001 was cleared
+	l.controlMu.Lock()
+	defer l.controlMu.Unlock()
+	if l.skipRequests["TASK-001"] {
+		t.Error("TASK-001 skip request should be cleared")
+	}
+	if !l.skipRequests["TASK-002"] {
+		t.Error("TASK-002 skip request should remain")
+	}
+}
+
+func TestLoop_checkAbort(t *testing.T) {
+	projectDir := setupTestProjectDir(t)
+	mockAg := &mockAgent{name: "test"}
+	taskMgr := newTestManager(t)
+	cfg := newTestConfig()
+
+	l := NewLoop(mockAg, taskMgr, nil, cfg, projectDir)
+
+	t.Run("checkAbort returns false for no request", func(t *testing.T) {
+		aborted, reason := l.checkAbort()
+		if aborted {
+			t.Error("checkAbort() should return false when no abort requested")
+		}
+		if reason != "" {
+			t.Errorf("reason = %q, want empty", reason)
+		}
+	})
+
+	t.Run("checkAbort returns true when requested", func(t *testing.T) {
+		l.controlMu.Lock()
+		l.abortRequest = true
+		l.abortReason = "emergency stop"
+		l.controlMu.Unlock()
+
+		aborted, reason := l.checkAbort()
+		if !aborted {
+			t.Error("checkAbort() should return true when abort requested")
+		}
+		if reason != "emergency stop" {
+			t.Errorf("reason = %q, want 'emergency stop'", reason)
+		}
+	})
+}
+
+func TestLoop_SkipAndAbort_Concurrent(t *testing.T) {
+	projectDir := setupTestProjectDir(t)
+	mockAg := &mockAgent{name: "test"}
+	taskMgr := newTestManager(t)
+	tsk := task.NewTask("TASK-001", "Test Task", "Description")
+	taskMgr.AddTask(tsk)
+	cfg := newTestConfig()
+
+	l := NewLoop(mockAg, taskMgr, nil, cfg, projectDir)
+	l.context = NewLoopContext("test-session", projectDir, "test")
+	l.context.CurrentTaskID = "TASK-001"
+
+	// Run concurrent skip and abort operations
+	done := make(chan bool)
+	for i := 0; i < 10; i++ {
+		go func() {
+			l.Skip("TASK-001")
+			l.checkSkip("TASK-001")
+			l.clearSkipRequest("TASK-001")
+			done <- true
+		}()
+		go func() {
+			l.Abort("test")
+			l.checkAbort()
+			done <- true
+		}()
+	}
+
+	for i := 0; i < 20; i++ {
+		<-done
+	}
+	// Test passes if no race condition or deadlock
+}
