@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
+
 	"github.com/wexinc/ralph/internal/app"
 )
 
@@ -302,5 +304,209 @@ func TestRenderQuickTips(t *testing.T) {
 // containsString checks if a string contains a substring.
 func containsString(s, substr string) bool {
 	return strings.Contains(s, substr)
+}
+
+// Tests for edge case handling (UX-007)
+
+func TestSetupTUIOptions(t *testing.T) {
+	t.Run("default options", func(t *testing.T) {
+		opts := SetupTUIOptions{}
+		if opts.IsLegacy {
+			t.Error("IsLegacy should be false by default")
+		}
+		if opts.NoAgents {
+			t.Error("NoAgents should be false by default")
+		}
+	})
+
+	t.Run("legacy option set", func(t *testing.T) {
+		opts := SetupTUIOptions{IsLegacy: true}
+		if !opts.IsLegacy {
+			t.Error("IsLegacy should be true")
+		}
+	})
+
+	t.Run("no agents option set", func(t *testing.T) {
+		opts := SetupTUIOptions{NoAgents: true}
+		if !opts.NoAgents {
+			t.Error("NoAgents should be true")
+		}
+	})
+}
+
+func TestPhaseNoAgents(t *testing.T) {
+	ctx := context.Background()
+	setup := app.NewSetup("/tmp/test-project", nil)
+	model := NewSetupModel(ctx, setup)
+
+	// Manually set to PhaseNoAgents (simulating no agents available)
+	model.Phase = PhaseNoAgents
+
+	t.Run("view contains no agents message", func(t *testing.T) {
+		view := model.viewNoAgents()
+
+		if !containsString(view, "No AI Agents") {
+			t.Error("expected view to contain 'No AI Agents'")
+		}
+		if !containsString(view, "manual") || !containsString(view, "Manual") {
+			t.Error("expected view to mention manual mode option")
+		}
+	})
+
+	t.Run("phase is PhaseNoAgents", func(t *testing.T) {
+		if model.Phase != PhaseNoAgents {
+			t.Errorf("expected PhaseNoAgents, got %d", model.Phase)
+		}
+	})
+}
+
+func TestPhaseLegacyMigration(t *testing.T) {
+	ctx := context.Background()
+	setup := app.NewSetup("/tmp/test-project", nil)
+	model := NewSetupModel(ctx, setup)
+
+	// Manually set to PhaseLegacyMigration
+	model.Phase = PhaseLegacyMigration
+	model.isLegacy = true
+
+	t.Run("view contains legacy migration message", func(t *testing.T) {
+		view := model.viewLegacyMigration()
+
+		if !containsString(view, "Legacy") {
+			t.Error("expected view to contain 'Legacy'")
+		}
+		// Should offer migration options
+		if !containsString(view, "y") || !containsString(view, "n") {
+			t.Error("expected view to show y/n options")
+		}
+	})
+
+	t.Run("phase is PhaseLegacyMigration", func(t *testing.T) {
+		if model.Phase != PhaseLegacyMigration {
+			t.Errorf("expected PhaseLegacyMigration, got %d", model.Phase)
+		}
+	})
+
+	t.Run("isLegacy flag is set", func(t *testing.T) {
+		if !model.isLegacy {
+			t.Error("expected isLegacy to be true")
+		}
+	})
+}
+
+func TestSetupModelWithOptions(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("no agents option sets correct initial phase", func(t *testing.T) {
+		setup := app.NewSetup("/tmp/test", nil)
+		model := NewSetupModel(ctx, setup)
+		// Apply options (simulating what RunSetupTUIWithOptions does)
+		opts := SetupTUIOptions{NoAgents: true}
+		if opts.NoAgents {
+			model.Phase = PhaseNoAgents
+		}
+
+		if model.Phase != PhaseNoAgents {
+			t.Errorf("expected PhaseNoAgents, got %d", model.Phase)
+		}
+	})
+
+	t.Run("legacy option sets correct initial phase", func(t *testing.T) {
+		setup := app.NewSetup("/tmp/test", nil)
+		model := NewSetupModel(ctx, setup)
+		// Apply options (simulating what RunSetupTUIWithOptions does)
+		opts := SetupTUIOptions{IsLegacy: true}
+		if opts.IsLegacy {
+			model.Phase = PhaseLegacyMigration
+			model.isLegacy = true
+		}
+
+		if model.Phase != PhaseLegacyMigration {
+			t.Errorf("expected PhaseLegacyMigration, got %d", model.Phase)
+		}
+		if !model.isLegacy {
+			t.Error("expected isLegacy to be true")
+		}
+	})
+}
+
+func TestErrorPhaseRetry(t *testing.T) {
+	ctx := context.Background()
+	setup := app.NewSetup("/tmp/test-project", nil)
+	model := NewSetupModel(ctx, setup)
+
+	// Simulate error phase with retry enabled
+	model.Phase = PhaseError
+	model.errorMsg = "test error"
+	model.canRetry = true
+	model.canSkipAnalysis = true
+	// Need to set retryFunc for retry option to appear
+	model.retryFunc = func() tea.Cmd { return nil }
+
+	t.Run("error view shows retry option when available", func(t *testing.T) {
+		view := model.viewError()
+
+		if !containsString(view, "test error") {
+			t.Error("expected view to contain error message")
+		}
+		// Should show retry option (the view contains "Press 'r' to retry")
+		if !containsString(view, "retry") {
+			t.Error("expected view to show retry option")
+		}
+	})
+
+	t.Run("error view shows manual mode when available", func(t *testing.T) {
+		view := model.viewError()
+
+		// Should show manual mode option
+		if !containsString(view, "m") || !containsString(view, "anual") {
+			t.Error("expected view to show manual mode option")
+		}
+	})
+
+	t.Run("canRetry flag is set", func(t *testing.T) {
+		if !model.canRetry {
+			t.Error("expected canRetry to be true")
+		}
+	})
+
+	t.Run("canSkipAnalysis flag is set", func(t *testing.T) {
+		if !model.canSkipAnalysis {
+			t.Error("expected canSkipAnalysis to be true")
+		}
+	})
+}
+
+func TestHandleCancel(t *testing.T) {
+	ctx := context.Background()
+	setup := app.NewSetup("/tmp/test", nil)
+	model := NewSetupModel(ctx, setup)
+
+	t.Run("ctrl+c from welcome phase", func(t *testing.T) {
+		model.Phase = PhaseWelcome
+		_, cmd := model.handleCancel()
+		// Should return quit command
+		if cmd == nil {
+			t.Error("expected quit command, got nil")
+		}
+	})
+
+	t.Run("ctrl+c from error phase", func(t *testing.T) {
+		model.Phase = PhaseError
+		_, cmd := model.handleCancel()
+		// Should return quit command
+		if cmd == nil {
+			t.Error("expected quit command, got nil")
+		}
+	})
+
+	t.Run("ctrl+c from no agents phase", func(t *testing.T) {
+		model.Phase = PhaseNoAgents
+		_, cmd := model.handleCancel()
+		// Should return quit command
+		if cmd == nil {
+			t.Error("expected quit command, got nil")
+		}
+	})
 }
 

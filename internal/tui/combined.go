@@ -59,12 +59,22 @@ type CombinedConfig struct {
 	ProjectDir  string
 	LoopFactory func(*app.SetupResult) (*loop.Loop, error)
 	OnComplete  func(*app.SetupResult)
+	// SetupOptions configures the initial setup phase.
+	SetupOptions SetupTUIOptions
 }
 
 // NewCombinedModel creates a new combined model that handles both setup and loop.
 func NewCombinedModel(cfg CombinedConfig) *CombinedModel {
 	setup := app.NewSetup(cfg.ProjectDir, cfg.Agent)
 	setupModel := NewSetupModel(cfg.Context, setup)
+
+	// Apply setup options
+	if cfg.SetupOptions.NoAgents {
+		setupModel.Phase = PhaseNoAgents
+	} else if cfg.SetupOptions.IsLegacy {
+		setupModel.Phase = PhaseLegacyMigration
+		setupModel.isLegacy = true
+	}
 
 	return &CombinedModel{
 		phase:       CombinedPhaseSetup,
@@ -217,12 +227,26 @@ func RunCombinedTUI(
 	sessionInfo SessionInfo,
 	loopRunner LoopRunnerFunc,
 ) (*CombinedResult, error) {
+	return RunCombinedTUIWithOptions(ctx, ag, projectDir, tasks, sessionInfo, loopRunner, SetupTUIOptions{})
+}
+
+// RunCombinedTUIWithOptions runs the combined setup-to-loop TUI with setup options.
+func RunCombinedTUIWithOptions(
+	ctx context.Context,
+	ag agent.Agent,
+	projectDir string,
+	tasks []*task.Task,
+	sessionInfo SessionInfo,
+	loopRunner LoopRunnerFunc,
+	setupOpts SetupTUIOptions,
+) (*CombinedResult, error) {
 	var setupResult *app.SetupResult
 
 	cfg := CombinedConfig{
-		Context:    ctx,
-		Agent:      ag,
-		ProjectDir: projectDir,
+		Context:      ctx,
+		Agent:        ag,
+		ProjectDir:   projectDir,
+		SetupOptions: setupOpts,
 		OnComplete: func(result *app.SetupResult) {
 			setupResult = result
 		},

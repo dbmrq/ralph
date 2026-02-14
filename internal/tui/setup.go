@@ -24,6 +24,8 @@ type SetupPhase int
 
 const (
 	PhaseWelcome SetupPhase = iota
+	PhaseNoAgents         // No AI agents available
+	PhaseLegacyMigration  // Legacy .ralph detected, offer migration
 	PhaseAnalyzing
 	PhaseAnalysisConfirm
 	PhaseTaskDetection
@@ -83,6 +85,16 @@ type SetupModel struct {
 	statusMsg   string
 	initMode    components.TaskInitMode
 	welcomeInfo *WelcomeInfo
+
+	// Error recovery
+	lastPhase       SetupPhase // Phase before error, for retry
+	retryFunc       func() tea.Cmd // Function to retry the failed operation
+	canRetry        bool           // Whether retry is available for this error
+	canSkipAnalysis bool           // Whether user can skip analysis and configure manually
+
+	// Legacy migration
+	isLegacy       bool // Whether legacy .ralph was detected
+	migrationDone  bool // Whether migration has been completed
 
 	// Window
 	width  int
@@ -287,8 +299,11 @@ func (m *SetupModel) updateCurrentPhase(msg tea.Msg) (tea.Model, tea.Cmd) {
 // handleKeyPress handles keyboard input.
 func (m *SetupModel) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "ctrl+c", "q":
-		if m.Phase == PhaseWelcome || m.Phase == PhaseError {
+	case "ctrl+c":
+		// Ctrl+C always quits, with cleanup for partial setup
+		return m.handleCancel()
+	case "q":
+		if m.Phase == PhaseWelcome || m.Phase == PhaseError || m.Phase == PhaseNoAgents || m.Phase == PhaseLegacyMigration {
 			return m, tea.Quit
 		}
 	case "enter":
@@ -299,8 +314,117 @@ func (m *SetupModel) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.Phase == PhaseError {
 			return m, tea.Quit
 		}
+	case "m":
+		// Manual mode - skip AI analysis
+		if m.Phase == PhaseNoAgents {
+			return m.startManualMode()
+		}
+		// Manual mode from error (if analysis failed)
+		if m.Phase == PhaseError && m.canSkipAnalysis {
+			return m.startManualMode()
+		}
+	case "y":
+		// Yes to migration
+		if m.Phase == PhaseLegacyMigration {
+			return m.handleMigration()
+		}
+	case "n":
+		// No to migration - start fresh
+		if m.Phase == PhaseLegacyMigration {
+			return m.skipMigration()
+		}
+	case "r":
+		// Retry on error
+		if m.Phase == PhaseError && m.canRetry && m.retryFunc != nil {
+			m.Phase = m.lastPhase
+			return m, m.retryFunc()
+		}
 	}
 	return m, nil
+}
+
+// startManualMode starts setup without AI analysis.
+// This allows users to configure Ralph manually when no agents are available.
+func (m *SetupModel) startManualMode() (tea.Model, tea.Cmd) {
+	// Create .ralph directory
+	if err := m.setup.CreateRalphDir(); err != nil {
+		m.Phase = PhaseError
+		m.errorMsg = fmt.Sprintf("Failed to create .ralph directory: %v", err)
+		return m, nil
+	}
+
+	// Skip analysis, use default analysis (fallback mode)
+	m.analysis = &build.ProjectAnalysis{
+		ProjectType:  "unknown",
+		Languages:    []string{},
+		IsGreenfield: true,
+	}
+	m.analysisForm.SetAnalysis(m.analysis)
+	m.Phase = PhaseAnalysisConfirm
+	m.canSkipAnalysis = true
+	return m, m.analysisForm.Focus()
+}
+
+// handleMigration performs the legacy migration.
+func (m *SetupModel) handleMigration() (tea.Model, tea.Cmd) {
+	result, err := app.MigrateFromLegacy(m.setup.ProjectDir)
+	if err != nil {
+		m.Phase = PhaseError
+		m.errorMsg = fmt.Sprintf("Migration failed: %v", err)
+		return m, nil
+	}
+
+	m.migrationDone = true
+
+	// Build status message
+	var msg string
+	if result.ConfigCreated {
+		msg = "✓ Created config.yaml"
+	}
+	if result.TasksPreserved {
+		msg += "\n✓ Preserved TASKS.md"
+	}
+	if len(result.PromptsPreserved) > 0 {
+		msg += fmt.Sprintf("\n✓ Preserved %d prompt files", len(result.PromptsPreserved))
+	}
+	if len(result.FilesRemoved) > 0 {
+		msg += fmt.Sprintf("\n✓ Removed %d legacy files", len(result.FilesRemoved))
+	}
+	m.statusMsg = msg
+
+	// Continue with normal setup
+	return m.startAnalysis()
+}
+
+// skipMigration skips migration and starts fresh.
+func (m *SetupModel) skipMigration() (tea.Model, tea.Cmd) {
+	// Create .ralph directory (will overwrite legacy files during setup)
+	return m.startSetup()
+}
+
+// handleCancel handles Ctrl+C cancellation with cleanup.
+func (m *SetupModel) handleCancel() (tea.Model, tea.Cmd) {
+	// If we're still in welcome phase, nothing to clean up
+	if m.Phase == PhaseWelcome {
+		return m, tea.Quit
+	}
+
+	// If we've completed, nothing to clean up
+	if m.Phase == PhaseComplete {
+		return m, tea.Quit
+	}
+
+	// If we're in error or no-agent phase, just quit
+	if m.Phase == PhaseError || m.Phase == PhaseNoAgents {
+		return m, tea.Quit
+	}
+
+	// For other phases (during setup), we could potentially clean up
+	// the partial .ralph directory, but for now we just quit and let
+	// the user run setup again if needed.
+	// Note: Partial .ralph directories are safe - they'll be detected
+	// and overwritten on next setup run.
+	return m, tea.Quit
 }
 
 // startSetup begins the setup flow.
@@ -330,8 +454,18 @@ func (m *SetupModel) startAnalysis() (tea.Model, tea.Cmd) {
 // handleAnalysisComplete handles analysis completion.
 func (m *SetupModel) handleAnalysisComplete(msg analysisCompleteMsg) (tea.Model, tea.Cmd) {
 	if msg.err != nil {
+		m.lastPhase = PhaseAnalyzing
 		m.Phase = PhaseError
 		m.errorMsg = fmt.Sprintf("Analysis failed: %v", msg.err)
+		// Enable retry for analysis failures (likely network/API errors)
+		m.canRetry = true
+		m.canSkipAnalysis = true
+		m.retryFunc = func() tea.Cmd {
+			return func() tea.Msg {
+				analysis, err := m.setup.RunAnalysis(m.ctx)
+				return analysisCompleteMsg{analysis: analysis, err: err}
+			}
+		}
 		return m, nil
 	}
 
@@ -513,6 +647,10 @@ func (m *SetupModel) View() string {
 	switch m.Phase {
 	case PhaseWelcome:
 		return m.viewWelcome()
+	case PhaseNoAgents:
+		return m.viewNoAgents()
+	case PhaseLegacyMigration:
+		return m.viewLegacyMigration()
 	case PhaseAnalyzing:
 		return m.viewAnalyzing()
 	case PhaseAnalysisConfirm:
@@ -782,6 +920,74 @@ func formatMarkers(markers []string) string {
 	return strings.Join(filtered, ", ")
 }
 
+// viewNoAgents renders the no-agents screen with installation instructions.
+func (m *SetupModel) viewNoAgents() string {
+	sectionStyle := lipgloss.NewStyle().Padding(1, 2)
+	titleStyle := lipgloss.NewStyle().Foreground(styles.Warning).Bold(true)
+	labelStyle := lipgloss.NewStyle().Foreground(styles.Muted)
+	cmdStyle := lipgloss.NewStyle().Foreground(styles.Secondary)
+
+	var sections []string
+
+	sections = append(sections, titleStyle.Render("⚠ No AI Agents Available"))
+	sections = append(sections, "")
+	sections = append(sections, labelStyle.Render("Ralph requires an AI coding agent to analyze your project and execute tasks."))
+	sections = append(sections, "")
+	sections = append(sections, labelStyle.Render("Install one of the following:"))
+	sections = append(sections, "")
+	sections = append(sections, "  "+cmdStyle.Render("Auggie (Anthropic)")+":")
+	sections = append(sections, "    "+labelStyle.Render("npm install -g @anthropic/auggie"))
+	sections = append(sections, "    "+labelStyle.Render("auggie login"))
+	sections = append(sections, "")
+	sections = append(sections, "  "+cmdStyle.Render("Cursor")+":")
+	sections = append(sections, "    "+labelStyle.Render("Install from https://cursor.com"))
+	sections = append(sections, "    "+labelStyle.Render("Ensure 'agent' command is in PATH"))
+	sections = append(sections, "")
+	sections = append(sections, labelStyle.Render("Or continue in manual mode (skip AI analysis):"))
+	sections = append(sections, "")
+
+	shortcutBar := components.NewShortcutBar(
+		components.ShortcutDef{Key: "m", Desc: "Manual Mode"},
+		components.ShortcutDef{Key: "q", Desc: "Quit"},
+	)
+	shortcutBar.SetWidth(m.width)
+	sections = append(sections, shortcutBar.View())
+
+	return sectionStyle.Render(strings.Join(sections, "\n"))
+}
+
+// viewLegacyMigration renders the legacy migration prompt.
+func (m *SetupModel) viewLegacyMigration() string {
+	sectionStyle := lipgloss.NewStyle().Padding(1, 2)
+	titleStyle := lipgloss.NewStyle().Foreground(styles.Warning).Bold(true)
+	labelStyle := lipgloss.NewStyle().Foreground(styles.Muted)
+	valueStyle := lipgloss.NewStyle().Foreground(styles.Foreground)
+
+	var sections []string
+
+	sections = append(sections, titleStyle.Render("📦 Legacy Ralph Configuration Detected"))
+	sections = append(sections, "")
+	sections = append(sections, labelStyle.Render("Your project has an older shell-based Ralph configuration."))
+	sections = append(sections, labelStyle.Render("Ralph can migrate it to the new Go format:"))
+	sections = append(sections, "")
+	sections = append(sections, "  "+valueStyle.Render("✓ Preserve TASKS.md and prompt files"))
+	sections = append(sections, "  "+valueStyle.Render("✓ Create new config.yaml"))
+	sections = append(sections, "  "+valueStyle.Render("✓ Remove legacy shell scripts"))
+	sections = append(sections, "")
+	sections = append(sections, labelStyle.Render("Would you like to migrate?"))
+	sections = append(sections, "")
+
+	shortcutBar := components.NewShortcutBar(
+		components.ShortcutDef{Key: "y", Desc: "Yes, Migrate"},
+		components.ShortcutDef{Key: "n", Desc: "No, Start Fresh"},
+		components.ShortcutDef{Key: "q", Desc: "Quit"},
+	)
+	shortcutBar.SetWidth(m.width)
+	sections = append(sections, shortcutBar.View())
+
+	return sectionStyle.Render(strings.Join(sections, "\n"))
+}
+
 // viewAnalyzing renders the analyzing screen.
 func (m *SetupModel) viewAnalyzing() string {
 	return fmt.Sprintf("🔍 %s", m.statusMsg)
@@ -837,24 +1043,67 @@ func (m *SetupModel) viewComplete() string {
 	return successStyle.Render("✓ Setup complete! Starting Ralph...")
 }
 
-// viewError renders the error screen.
+// viewError renders the error screen with recovery options.
 func (m *SetupModel) viewError() string {
-	errorStyle := lipgloss.NewStyle().
-		Foreground(styles.Error).
-		Bold(true).
-		Padding(1, 2)
+	sectionStyle := lipgloss.NewStyle().Padding(1, 2)
+	titleStyle := lipgloss.NewStyle().Foreground(styles.Error).Bold(true)
+	labelStyle := lipgloss.NewStyle().Foreground(styles.Muted)
 
-	return fmt.Sprintf(
-		"%s\n\n%s",
-		errorStyle.Render("✗ Setup failed"),
-		m.errorMsg,
-	)
+	var sections []string
+
+	sections = append(sections, titleStyle.Render("✗ Setup failed"))
+	sections = append(sections, "")
+	sections = append(sections, m.errorMsg)
+	sections = append(sections, "")
+
+	// Build shortcuts based on available options
+	shortcuts := []components.ShortcutDef{}
+
+	if m.canRetry && m.retryFunc != nil {
+		sections = append(sections, labelStyle.Render("Press 'r' to retry the last operation."))
+		shortcuts = append(shortcuts, components.ShortcutDef{Key: "r", Desc: "Retry"})
+	}
+
+	if m.canSkipAnalysis {
+		sections = append(sections, labelStyle.Render("Press 'm' to continue with manual configuration."))
+		shortcuts = append(shortcuts, components.ShortcutDef{Key: "m", Desc: "Manual Mode"})
+	}
+
+	shortcuts = append(shortcuts, components.ShortcutDef{Key: "q", Desc: "Quit"})
+	sections = append(sections, "")
+
+	shortcutBar := components.NewShortcutBar(shortcuts...)
+	shortcutBar.SetWidth(m.width)
+	sections = append(sections, shortcutBar.View())
+
+	return sectionStyle.Render(strings.Join(sections, "\n"))
+}
+
+// SetupTUIOptions configures the setup TUI behavior.
+type SetupTUIOptions struct {
+	// IsLegacy indicates a legacy .ralph directory was detected.
+	IsLegacy bool
+	// NoAgents indicates no AI agents are available.
+	NoAgents bool
 }
 
 // RunSetupTUI runs the setup flow TUI and returns the result.
 func RunSetupTUI(ctx context.Context, ag agent.Agent, projectDir string) (*app.SetupResult, error) {
+	return RunSetupTUIWithOptions(ctx, ag, projectDir, SetupTUIOptions{})
+}
+
+// RunSetupTUIWithOptions runs the setup flow TUI with configuration options.
+func RunSetupTUIWithOptions(ctx context.Context, ag agent.Agent, projectDir string, opts SetupTUIOptions) (*app.SetupResult, error) {
 	setup := app.NewSetup(projectDir, ag)
 	model := NewSetupModel(ctx, setup)
+
+	// Set initial phase based on options
+	if opts.NoAgents {
+		model.Phase = PhaseNoAgents
+	} else if opts.IsLegacy {
+		model.Phase = PhaseLegacyMigration
+		model.isLegacy = true
+	}
 
 	p := tea.NewProgram(model, tea.WithAltScreen())
 	finalModel, err := p.Run()

@@ -107,12 +107,15 @@ func runRun(cmd *cobra.Command, args []string) error {
 		logging.Info("Ralph starting", "version", Version, "verbose", verbose)
 	}
 
-	// Check if setup is needed (no .ralph directory)
-	if app.NeedsSetup(projectDir) {
+	// Check if setup is needed (no .ralph directory) or legacy .ralph detected
+	needsSetup := app.NeedsSetup(projectDir)
+	isLegacy := app.IsLegacyRalph(projectDir)
+
+	if needsSetup || isLegacy {
 		if headless {
 			return runHeadlessSetup(cmd, projectDir, outputFormat, tasksPath, verbose, initOnly)
 		}
-		return runTUISetup(cmd, projectDir, continueID, tasksPath, verbose, initOnly)
+		return runTUISetup(cmd, projectDir, continueID, tasksPath, verbose, initOnly, isLegacy)
 	}
 
 	// If --init-only was specified but setup already done, just exit
@@ -219,7 +222,8 @@ func runTUI(cmd *cobra.Command, projectDir, continueID, tasksPath string, verbos
 
 // runTUISetup runs the first-run setup flow in TUI mode with seamless transition to loop.
 // If initOnly is true, exits after setup without starting the task loop.
-func runTUISetup(cmd *cobra.Command, projectDir, continueID, tasksPath string, verbose, initOnly bool) error {
+// If isLegacy is true, shows the legacy migration screen first.
+func runTUISetup(cmd *cobra.Command, projectDir, continueID, tasksPath string, verbose, initOnly, isLegacy bool) error {
 	// Set up cancellation context
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -232,15 +236,19 @@ func runTUISetup(cmd *cobra.Command, projectDir, continueID, tasksPath string, v
 		cancel()
 	}()
 
-	// Initialize agent for setup
+	// Initialize agent for setup (may fail if no agents available)
 	selectedAgent, err := selectAgentForSetup()
-	if err != nil {
-		return fmt.Errorf("failed to select agent: %w", err)
+	noAgents := err != nil
+
+	// Build setup options based on detected edge cases
+	setupOpts := tui.SetupTUIOptions{
+		IsLegacy: isLegacy,
+		NoAgents: noAgents,
 	}
 
 	// If initOnly, use the standard setup TUI that exits after completion
 	if initOnly {
-		result, err := tui.RunSetupTUI(ctx, selectedAgent, projectDir)
+		result, err := tui.RunSetupTUIWithOptions(ctx, selectedAgent, projectDir, setupOpts)
 		if err != nil {
 			return fmt.Errorf("setup failed: %w", err)
 		}
@@ -262,14 +270,19 @@ func runTUISetup(cmd *cobra.Command, projectDir, continueID, tasksPath string, v
 	var loopController *LoopControllerAdapter
 
 	// Session info will be populated after setup
+	// Agent name may be empty if no agents are available
+	agentName := ""
+	if selectedAgent != nil {
+		agentName = selectedAgent.Name()
+	}
 	sessionInfo := tui.SessionInfo{
 		ProjectName: filepath.Base(projectDir),
-		AgentName:   selectedAgent.Name(),
+		AgentName:   agentName,
 		SessionID:   sessionID,
 	}
 
 	// Run combined setup-to-loop TUI
-	result, err := tui.RunCombinedTUI(
+	result, err := tui.RunCombinedTUIWithOptions(
 		ctx,
 		selectedAgent,
 		projectDir,
@@ -286,10 +299,14 @@ func runTUISetup(cmd *cobra.Command, projectDir, continueID, tasksPath string, v
 			// Use the config from setup result
 			cfg := setupResult.Config
 
-			// Update session info with model from config
+			// Update session info with model from config (agent may have been selected during setup)
+			agentNameForLoop := agentName
+			if selectedAgent != nil {
+				agentNameForLoop = selectedAgent.Name()
+			}
 			loopModel.SetSessionInfo(
 				sessionInfo.ProjectName,
-				selectedAgent.Name(),
+				agentNameForLoop,
 				cfg.Agent.Model,
 				sessionID,
 			)
@@ -343,6 +360,7 @@ func runTUISetup(cmd *cobra.Command, projectDir, continueID, tasksPath string, v
 			}
 			return mainLoop.Run(ctx, sessionID)
 		},
+		setupOpts,
 	)
 
 	if err != nil {
