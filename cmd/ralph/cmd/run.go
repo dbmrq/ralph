@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/wexinc/ralph/internal/agent"
@@ -18,6 +19,7 @@ import (
 	"github.com/wexinc/ralph/internal/loop"
 	"github.com/wexinc/ralph/internal/task"
 	"github.com/wexinc/ralph/internal/tui"
+	"github.com/wexinc/ralph/internal/version"
 )
 
 // runCmd represents the run command.
@@ -59,6 +61,9 @@ func runRun(cmd *cobra.Command, args []string) error {
 	if outputFormat != "" && !headless {
 		return fmt.Errorf("--output flag requires --headless mode")
 	}
+
+	// Check for updates in the background (non-blocking)
+	go checkUpdateBackground(cmd)
 
 	// Get the current working directory as project dir
 	projectDir, err := os.Getwd()
@@ -434,3 +439,28 @@ func importTasks(mgr *task.Manager, path string) error {
 	return mgr.Save()
 }
 
+// checkUpdateBackground checks for updates in the background and displays a notification.
+// This is non-blocking and runs in a goroutine.
+func checkUpdateBackground(cmd *cobra.Command) {
+	// Use a short timeout for background check
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Skip if we're in dev mode
+	if Version == "dev" {
+		return
+	}
+
+	checker := version.NewChecker()
+	release, err := checker.CheckForUpdate(ctx, Version)
+	if err != nil {
+		// Silently ignore errors in background check
+		return
+	}
+
+	if release != nil {
+		// Print update notification (non-blocking, happens async)
+		fmt.Fprintf(cmd.ErrOrStderr(), "\n💡 Update available: %s → %s (run 'ralph update')\n\n",
+			Version, release.TagName)
+	}
+}

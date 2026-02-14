@@ -82,6 +82,27 @@ completing tasks from a task list using AI agents.`,
 	agentAddC.Flags().String("default-model", "", "Default model for the agent")
 	agentC.AddCommand(agentAddC)
 
+	// Add version command
+	versionC := &cobra.Command{
+		Use:   "version",
+		Short: "Show version information",
+		Long:  "Show detailed version information for ralph.",
+		RunE:  runVersion,
+	}
+	versionC.Flags().BoolP("check", "c", false, "Check for available updates")
+	root.AddCommand(versionC)
+
+	// Add update command
+	updateC := &cobra.Command{
+		Use:   "update",
+		Short: "Update ralph to the latest version",
+		Long:  "Update ralph to the latest version.",
+		RunE:  runUpdate,
+	}
+	updateC.Flags().BoolP("check", "c", false, "Only check for updates, don't install")
+	updateC.Flags().BoolP("yes", "y", false, "Don't prompt for confirmation")
+	root.AddCommand(updateC)
+
 	return root
 }
 
@@ -564,5 +585,95 @@ func TestRegisterCustomAgentsFromConfig(t *testing.T) {
 
 	if !a.IsAvailable() {
 		t.Error("agent should be available (detection method is 'always')")
+	}
+}
+
+func TestVersionCommand(t *testing.T) {
+	tests := []struct {
+		name       string
+		args       []string
+		wantErr    bool
+		wantOutput string
+	}{
+		{
+			name:       "version shows info",
+			args:       []string{"version"},
+			wantErr:    false,
+			wantOutput: "ralph",
+		},
+		{
+			name:       "version help",
+			args:       []string{"version", "--help"},
+			wantErr:    false,
+			wantOutput: "--check",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buf := new(bytes.Buffer)
+			cmd := newTestRoot()
+			cmd.SetOut(buf)
+			cmd.SetErr(buf)
+			cmd.SetArgs(tt.args)
+
+			err := cmd.Execute()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Execute() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if tt.wantOutput != "" && !bytes.Contains(buf.Bytes(), []byte(tt.wantOutput)) {
+				t.Errorf("Output = %q, want to contain %q", buf.String(), tt.wantOutput)
+			}
+		})
+	}
+}
+
+func TestUpdateCommand(t *testing.T) {
+	tests := []struct {
+		name       string
+		args       []string
+		wantErr    bool
+		wantOutput string
+	}{
+		{
+			name:       "update help",
+			args:       []string{"update", "--help"},
+			wantErr:    false,
+			wantOutput: "Update ralph to the latest version",
+		},
+		{
+			name:       "update help shows check flag",
+			args:       []string{"update", "--help"},
+			wantErr:    false,
+			wantOutput: "--check",
+		},
+		{
+			name:       "update help shows yes flag",
+			args:       []string{"update", "--help"},
+			wantErr:    false,
+			wantOutput: "--yes",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buf := new(bytes.Buffer)
+			cmd := newTestRoot()
+			cmd.SetOut(buf)
+			cmd.SetErr(buf)
+			cmd.SetArgs(tt.args)
+
+			err := cmd.Execute()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Execute() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if tt.wantOutput != "" && !bytes.Contains(buf.Bytes(), []byte(tt.wantOutput)) {
+				t.Errorf("Output = %q, want to contain %q", buf.String(), tt.wantOutput)
+			}
+		})
 	}
 }

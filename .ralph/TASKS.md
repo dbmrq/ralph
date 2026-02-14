@@ -506,12 +506,21 @@
   > - Rewrote README.md for Go version with installation, usage, configuration docs
   > - Homebrew support configured via goreleaser brews section
 
-- [ ] INSTALL-004: Add update and version management
+- [x] INSTALL-004: Add update and version management
   > Goal: Easy updates and version checking
   > `ralph version` - show current version
   > `ralph update` - check for and install updates (if installed via our script)
   > `ralph run` shows update notification if new version available (non-blocking)
   > Store version info in `.ralph/version.json` for compatibility checks
+  > **Completed:**
+  > - Created internal/version package with Info, Checker, Updater, and ProjectVersion types
+  > - Implemented `ralph version` command with detailed version info and `--check` flag
+  > - Implemented `ralph update` command with download, extract, and install functionality
+  > - Added non-blocking update notification in `ralph run` (background goroutine)
+  > - Added ProjectVersion struct for .ralph/version.json with UpdateLastRun function
+  > - Supports tar.gz and zip archives for all platforms (darwin, linux, windows)
+  > - Comprehensive tests in version_test.go and updater_test.go
+  > - Added version and update command tests in cmd_test.go
 
 - [ ] POLISH-001: Add comprehensive error messages
   > Goal: Clear, actionable error messages
