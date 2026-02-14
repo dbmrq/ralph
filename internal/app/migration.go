@@ -303,4 +303,3 @@ func loadSetupStateFromFile(path string) (*SetupState, error) {
 	}
 	return &state, nil
 }
-

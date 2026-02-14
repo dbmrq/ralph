@@ -458,8 +458,8 @@ func TestErrorPhaseRetry(t *testing.T) {
 	t.Run("error view shows manual mode when available", func(t *testing.T) {
 		view := model.viewError()
 
-		// Should show manual mode option
-		if !containsString(view, "m") || !containsString(view, "anual") {
+		// Should show manual mode option (check for "Manual" or "manual")
+		if !containsString(view, "m") || (!containsString(view, "Manual") && !containsString(view, "manual")) {
 			t.Error("expected view to show manual mode option")
 		}
 	})

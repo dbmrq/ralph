@@ -808,7 +808,10 @@ func detectOrSelectProject(cmd *cobra.Command, currentDir string) (string, error
 		return "", fmt.Errorf("directory picker error: %w", err)
 	}
 
-	result := finalModel.(*dirPickerModel)
+	result, ok := finalModel.(*dirPickerModel)
+	if !ok {
+		return "", fmt.Errorf("unexpected model type from directory picker")
+	}
 	if result.canceled {
 		return "", fmt.Errorf("directory selection canceled")
 	}

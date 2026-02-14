@@ -173,7 +173,8 @@ func TestDirPicker_ManualMode(t *testing.T) {
 	d.textInput.SetValue(tmpDir)
 
 	// Submit
-	d, cmd := d.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	d2, cmd := d.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	_ = d2 // Suppress unused variable warning
 	if cmd == nil {
 		t.Fatal("expected command from manual submission")
 	}
@@ -322,7 +323,8 @@ func TestDirPicker_TildeExpansion(t *testing.T) {
 	d.mode = DirPickerModeManual
 	d.textInput.SetValue("~")
 
-	d, cmd := d.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	d2, cmd := d.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	_ = d2 // Suppress unused variable warning
 	if cmd == nil {
 		t.Fatal("expected command")
 	}

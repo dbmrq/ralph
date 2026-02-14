@@ -204,4 +204,3 @@ func (d *Detector) ShouldPromptForDirectory(dir string) bool {
 	// Check if this looks like a project
 	return !d.IsProjectDirectory(dir)
 }
-

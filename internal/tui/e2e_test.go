@@ -207,10 +207,12 @@ func TestE2E_NewProject_EnterStartsAnalysis(t *testing.T) {
 
 	// Should have created .ralph directory and started analysis
 	// (in a real scenario, this would trigger async analysis)
-	if m.Phase != PhaseAnalyzing && m.Phase != PhaseError && m.Phase != PhaseWelcome {
-		// Accept PhaseWelcome if .ralph creation failed in temp dir
-		// Accept PhaseError if there's an issue (no agent, etc)
-		// Normal flow goes to PhaseAnalyzing
+	// Accept PhaseWelcome if .ralph creation failed in temp dir
+	// Accept PhaseError if there's an issue (no agent, etc)
+	// Normal flow goes to PhaseAnalyzing
+	validPhases := m.Phase == PhaseAnalyzing || m.Phase == PhaseError || m.Phase == PhaseWelcome
+	if !validPhases {
+		t.Errorf("unexpected phase %v, expected PhaseAnalyzing, PhaseError, or PhaseWelcome", m.Phase)
 	}
 }
 
