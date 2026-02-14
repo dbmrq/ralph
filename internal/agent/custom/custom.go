@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wexinc/ralph/internal/agent"
-	"github.com/wexinc/ralph/internal/config"
+	"github.com/dbmrq/ralph/internal/agent"
+	"github.com/dbmrq/ralph/internal/config"
 )
 
 // Agent implements the agent.Agent interface for custom user-defined agents.

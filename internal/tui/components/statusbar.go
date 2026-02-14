@@ -8,7 +8,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/wexinc/ralph/internal/tui/styles"
+	"github.com/dbmrq/ralph/internal/tui/styles"
 )
 
 // StatusBarData contains the data to display in the status bar.

@@ -7,8 +7,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/wexinc/ralph/internal/agent"
-	"github.com/wexinc/ralph/internal/tui/styles"
+	"github.com/dbmrq/ralph/internal/agent"
+	"github.com/dbmrq/ralph/internal/tui/styles"
 )
 
 // ModelPicker is a component for selecting AI models.

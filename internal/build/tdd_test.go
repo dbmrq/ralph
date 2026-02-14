@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wexinc/ralph/internal/config"
+	"github.com/dbmrq/ralph/internal/config"
 )
 
 func TestTDDManager_BaselinePath(t *testing.T) {

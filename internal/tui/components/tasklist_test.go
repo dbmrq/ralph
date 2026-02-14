@@ -6,7 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/wexinc/ralph/internal/task"
+	"github.com/dbmrq/ralph/internal/task"
 )
 
 func TestNewTaskList(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"sort"
 	"sync"
 
-	ralpherrors "github.com/wexinc/ralph/internal/errors"
+	ralpherrors "github.com/dbmrq/ralph/internal/errors"
 )
 
 // ErrNoAgentsAvailable is returned when no agents are available.

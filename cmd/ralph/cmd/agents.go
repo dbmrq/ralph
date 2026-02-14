@@ -1,11 +1,11 @@
 package cmd
 
 import (
-	"github.com/wexinc/ralph/internal/agent"
-	"github.com/wexinc/ralph/internal/agent/auggie"
-	"github.com/wexinc/ralph/internal/agent/cursor"
-	"github.com/wexinc/ralph/internal/agent/custom"
-	"github.com/wexinc/ralph/internal/config"
+	"github.com/dbmrq/ralph/internal/agent"
+	"github.com/dbmrq/ralph/internal/agent/auggie"
+	"github.com/dbmrq/ralph/internal/agent/cursor"
+	"github.com/dbmrq/ralph/internal/agent/custom"
+	"github.com/dbmrq/ralph/internal/config"
 )
 
 // DefaultRegistry is the global registry containing all built-in agents.

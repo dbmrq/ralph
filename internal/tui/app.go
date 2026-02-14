@@ -8,10 +8,10 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/wexinc/ralph/internal/loop"
-	"github.com/wexinc/ralph/internal/task"
-	"github.com/wexinc/ralph/internal/tui/components"
-	"github.com/wexinc/ralph/internal/tui/styles"
+	"github.com/dbmrq/ralph/internal/loop"
+	"github.com/dbmrq/ralph/internal/task"
+	"github.com/dbmrq/ralph/internal/tui/components"
+	"github.com/dbmrq/ralph/internal/tui/styles"
 )
 
 // LoopState is an alias for loop.State for convenience within the TUI package.

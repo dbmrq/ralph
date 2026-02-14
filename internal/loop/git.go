@@ -9,8 +9,8 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/wexinc/ralph/internal/config"
-	"github.com/wexinc/ralph/internal/task"
+	"github.com/dbmrq/ralph/internal/config"
+	"github.com/dbmrq/ralph/internal/task"
 )
 
 // GitOperations handles git operations for automatic commits.

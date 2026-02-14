@@ -6,7 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/wexinc/ralph/internal/build"
+	"github.com/dbmrq/ralph/internal/build"
 )
 
 func TestNewAnalysisForm(t *testing.T) {

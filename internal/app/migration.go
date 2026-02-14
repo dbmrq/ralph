@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/wexinc/ralph/internal/config"
+	"github.com/dbmrq/ralph/internal/config"
 )
 
 // LegacyMarkers are files that indicate a legacy shell-based .ralph directory.

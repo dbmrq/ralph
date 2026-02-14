@@ -10,13 +10,13 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/wexinc/ralph/internal/agent"
-	"github.com/wexinc/ralph/internal/app"
-	"github.com/wexinc/ralph/internal/build"
-	"github.com/wexinc/ralph/internal/project"
-	"github.com/wexinc/ralph/internal/task"
-	"github.com/wexinc/ralph/internal/tui/components"
-	"github.com/wexinc/ralph/internal/tui/styles"
+	"github.com/dbmrq/ralph/internal/agent"
+	"github.com/dbmrq/ralph/internal/app"
+	"github.com/dbmrq/ralph/internal/build"
+	"github.com/dbmrq/ralph/internal/project"
+	"github.com/dbmrq/ralph/internal/task"
+	"github.com/dbmrq/ralph/internal/tui/components"
+	"github.com/dbmrq/ralph/internal/tui/styles"
 )
 
 // SetupPhase represents the current phase of the setup flow.

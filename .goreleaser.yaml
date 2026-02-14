@@ -69,7 +69,7 @@ changelog:
 
 release:
   github:
-    owner: wexinc
+    owner: dbmrq
     name: ralph
   prerelease: auto
   draft: false
@@ -79,12 +79,12 @@ release:
 
     ### Homebrew (macOS/Linux)
     ```bash
-    brew install wexinc/tap/ralph
+    brew install dbmrq/tap/ralph
     ```
 
     ### Go Install
     ```bash
-    go install github.com/wexinc/ralph/cmd/ralph@{{.Tag}}
+    go install github.com/dbmrq/ralph/cmd/ralph@{{.Tag}}
     ```
 
     ### Binary Download
@@ -95,11 +95,11 @@ release:
 brews:
   - name: ralph
     repository:
-      owner: wexinc
+      owner: dbmrq
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     directory: Formula
-    homepage: "https://github.com/wexinc/ralph"
+    homepage: "https://github.com/dbmrq/ralph"
     description: "AI-powered task automation tool"
     license: "MIT"
     test: |

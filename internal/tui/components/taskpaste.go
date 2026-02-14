@@ -9,8 +9,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/wexinc/ralph/internal/task"
-	"github.com/wexinc/ralph/internal/tui/styles"
+	"github.com/dbmrq/ralph/internal/task"
+	"github.com/dbmrq/ralph/internal/tui/styles"
 )
 
 // TaskPasteSubmittedMsg is sent when user submits the pasted task list.

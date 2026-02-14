@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/wexinc/ralph/internal/agent"
-	"github.com/wexinc/ralph/internal/build"
+	"github.com/dbmrq/ralph/internal/agent"
+	"github.com/dbmrq/ralph/internal/build"
 )
 
 // mockAgent implements agent.Agent for testing.

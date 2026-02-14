@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wexinc/ralph/internal/task"
+	"github.com/dbmrq/ralph/internal/task"
 )
 
 func TestState_IsValid(t *testing.T) {

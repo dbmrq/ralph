@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wexinc/ralph/internal/agent"
+	"github.com/dbmrq/ralph/internal/agent"
 )
 
 // mockAgent is a test double for agent.Agent.

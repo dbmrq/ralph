@@ -12,10 +12,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/wexinc/ralph/internal/agent"
-	"github.com/wexinc/ralph/internal/build"
-	ralpherrors "github.com/wexinc/ralph/internal/errors"
-	"github.com/wexinc/ralph/internal/task"
+	"github.com/dbmrq/ralph/internal/agent"
+	"github.com/dbmrq/ralph/internal/build"
+	ralpherrors "github.com/dbmrq/ralph/internal/errors"
+	"github.com/dbmrq/ralph/internal/task"
 )
 
 // RecoveryConfig configures error recovery behavior.

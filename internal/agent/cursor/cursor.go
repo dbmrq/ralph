@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wexinc/ralph/internal/agent"
+	"github.com/dbmrq/ralph/internal/agent"
 )
 
 // DefaultModel is the default model for Cursor.

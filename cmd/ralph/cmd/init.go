@@ -12,12 +12,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/wexinc/ralph/internal/agent"
-	"github.com/wexinc/ralph/internal/agent/auggie"
-	"github.com/wexinc/ralph/internal/agent/cursor"
-	"github.com/wexinc/ralph/internal/app"
-	"github.com/wexinc/ralph/internal/config"
-	"github.com/wexinc/ralph/internal/tui"
+	"github.com/dbmrq/ralph/internal/agent"
+	"github.com/dbmrq/ralph/internal/agent/auggie"
+	"github.com/dbmrq/ralph/internal/agent/cursor"
+	"github.com/dbmrq/ralph/internal/app"
+	"github.com/dbmrq/ralph/internal/config"
+	"github.com/dbmrq/ralph/internal/tui"
 )
 
 // initCmd represents the init command.

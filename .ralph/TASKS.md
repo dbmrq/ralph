@@ -566,7 +566,7 @@
 
 - [x] INSTALL-003: Add installation documentation and distribution
   > Goal: Make ralph easy to install globally
-  > Support `go install github.com/wexinc/ralph@latest`
+  > Support `go install github.com/dbmrq/ralph@latest`
   > Create GitHub releases with pre-built binaries (goreleaser)
   > Add install instructions to README:
   >   - macOS: `brew install ralph` (if we publish to homebrew)

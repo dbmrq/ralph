@@ -7,8 +7,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/wexinc/ralph/internal/build"
-	"github.com/wexinc/ralph/internal/tui/styles"
+	"github.com/dbmrq/ralph/internal/build"
+	"github.com/dbmrq/ralph/internal/tui/styles"
 )
 
 // AnalysisConfirmedMsg is sent when the user confirms the analysis.

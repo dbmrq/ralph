@@ -9,23 +9,23 @@ Ralph is an AI-powered task automation tool that runs in a loop, completing task
 ### Homebrew (macOS/Linux)
 
 ```bash
-brew install wexinc/tap/ralph
+brew install dbmrq/tap/ralph
 ```
 
 ### Go Install
 
 ```bash
-go install github.com/wexinc/ralph/cmd/ralph@latest
+go install github.com/dbmrq/ralph/cmd/ralph@latest
 ```
 
 ### Binary Download
 
-Download pre-built binaries from the [releases page](https://github.com/wexinc/ralph/releases).
+Download pre-built binaries from the [releases page](https://github.com/dbmrq/ralph/releases).
 
 Or use the install script:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/wexinc/ralph/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/dbmrq/ralph/main/scripts/install.sh | bash
 ```
 
 ## 🎯 Quick Start
@@ -299,7 +299,7 @@ jobs:
           go-version: '1.21'
 
       - name: Install Ralph
-        run: go install github.com/wexinc/ralph/cmd/ralph@latest
+        run: go install github.com/dbmrq/ralph/cmd/ralph@latest
 
       - name: Run Ralph
         env:
@@ -377,7 +377,7 @@ Instructions are layered for flexibility:
 
 ```bash
 # Clone the repository
-git clone https://github.com/wexinc/ralph.git
+git clone https://github.com/dbmrq/ralph.git
 cd ralph
 
 # Build

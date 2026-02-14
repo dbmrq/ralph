@@ -9,8 +9,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/wexinc/ralph/internal/config"
-	"github.com/wexinc/ralph/internal/task"
+	"github.com/dbmrq/ralph/internal/config"
+	"github.com/dbmrq/ralph/internal/task"
 )
 
 // GateStatus represents the overall result of gate verification.

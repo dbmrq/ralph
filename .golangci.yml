@@ -35,7 +35,7 @@ linters-settings:
   gofmt:
     simplify: true
   goimports:
-    local-prefixes: github.com/wexinc/ralph
+    local-prefixes: github.com/dbmrq/ralph
   misspell:
     locale: US
 

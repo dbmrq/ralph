@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/wexinc/ralph/internal/agent"
-	"github.com/wexinc/ralph/internal/config"
+	"github.com/dbmrq/ralph/internal/agent"
+	"github.com/dbmrq/ralph/internal/config"
 )
 
 func TestAgent_Name(t *testing.T) {

@@ -28,7 +28,7 @@ func ConfigNotFound(configPath string) *RalphError {
   Option 3: Create config manually
     mkdir -p .ralph
     touch .ralph/config.yaml`,
-		DocLink: "https://github.com/wexinc/ralph#configuration",
+		DocLink: "https://github.com/dbmrq/ralph#configuration",
 	}
 }
 

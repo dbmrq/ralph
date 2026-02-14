@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/wexinc/ralph/internal/config"
+	"github.com/dbmrq/ralph/internal/config"
 )
 
 func TestProjectAnalysis_ToBootstrapState(t *testing.T) {

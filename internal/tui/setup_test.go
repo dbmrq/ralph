@@ -8,7 +8,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/wexinc/ralph/internal/app"
+	"github.com/dbmrq/ralph/internal/app"
 )
 
 // mockAgent is a minimal agent for testing.

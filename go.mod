@@ -1,4 +1,4 @@
-module github.com/wexinc/ralph
+module github.com/dbmrq/ralph
 
 go 1.24.2
 

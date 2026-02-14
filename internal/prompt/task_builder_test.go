@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/wexinc/ralph/internal/build"
-	"github.com/wexinc/ralph/internal/task"
+	"github.com/dbmrq/ralph/internal/build"
+	"github.com/dbmrq/ralph/internal/task"
 )
 
 func TestNewTaskPromptBuilder(t *testing.T) {

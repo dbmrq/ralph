@@ -10,8 +10,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/wexinc/ralph/internal/loop"
-	"github.com/wexinc/ralph/internal/task"
+	"github.com/dbmrq/ralph/internal/loop"
+	"github.com/dbmrq/ralph/internal/task"
 )
 
 // TUIEventHandler translates loop events to TUI messages.

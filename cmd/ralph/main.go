@@ -2,7 +2,7 @@
 package main
 
 import (
-	"github.com/wexinc/ralph/cmd/ralph/cmd"
+	"github.com/dbmrq/ralph/cmd/ralph/cmd"
 )
 
 // Version information - set via ldflags at build time.

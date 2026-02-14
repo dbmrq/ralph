@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/wexinc/ralph/internal/config"
-	"github.com/wexinc/ralph/internal/task"
+	"github.com/dbmrq/ralph/internal/config"
+	"github.com/dbmrq/ralph/internal/task"
 )
 
 // setupTestRepo creates a temporary git repository for testing.

@@ -64,7 +64,7 @@ func NoAgentsAvailable() *RalphError {
            - name: my-agent
              command: my-agent-cli
              detection_method: command`,
-		DocLink: "https://github.com/wexinc/ralph#agents",
+		DocLink: "https://github.com/dbmrq/ralph#agents",
 	}
 }
 

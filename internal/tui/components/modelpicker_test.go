@@ -6,7 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/wexinc/ralph/internal/agent"
+	"github.com/dbmrq/ralph/internal/agent"
 )
 
 func TestNewModelPicker(t *testing.T) {

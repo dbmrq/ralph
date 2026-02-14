@@ -5,7 +5,7 @@
 # This script downloads and installs the ralph binary from GitHub releases.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/wexinc/ralph/main/scripts/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/dbmrq/ralph/main/scripts/install.sh | bash
 #
 # Options:
 #   RALPH_VERSION=v1.0.0  Install a specific version
@@ -15,7 +15,7 @@
 set -e
 
 # Configuration
-REPO="wexinc/ralph"
+REPO="dbmrq/ralph"
 BINARY_NAME="ralph"
 INSTALL_DIR="${RALPH_INSTALL_DIR:-/usr/local/bin}"
 

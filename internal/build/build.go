@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wexinc/ralph/internal/config"
+	"github.com/dbmrq/ralph/internal/config"
 )
 
 // BuildResult contains the result of a build verification.

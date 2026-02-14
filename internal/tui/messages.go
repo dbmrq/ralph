@@ -4,8 +4,8 @@ package tui
 import (
 	"time"
 
-	"github.com/wexinc/ralph/internal/task"
-	"github.com/wexinc/ralph/internal/tui/components"
+	"github.com/dbmrq/ralph/internal/task"
+	"github.com/dbmrq/ralph/internal/tui/components"
 )
 
 // Message types for TUI state updates.

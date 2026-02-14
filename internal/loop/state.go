@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/wexinc/ralph/internal/task"
+	"github.com/dbmrq/ralph/internal/task"
 )
 
 // State represents the current state of the Ralph loop.

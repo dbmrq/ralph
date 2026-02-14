@@ -8,7 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/wexinc/ralph/internal/version"
+	"github.com/dbmrq/ralph/internal/version"
 )
 
 // updateCmd represents the update command.

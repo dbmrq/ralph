@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/wexinc/ralph/internal/build"
-	"github.com/wexinc/ralph/internal/task"
+	"github.com/dbmrq/ralph/internal/build"
+	"github.com/dbmrq/ralph/internal/task"
 )
 
 // TaskPromptBuilder builds complete prompts for task execution.

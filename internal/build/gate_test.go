@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/wexinc/ralph/internal/config"
-	"github.com/wexinc/ralph/internal/task"
+	"github.com/dbmrq/ralph/internal/config"
+	"github.com/dbmrq/ralph/internal/task"
 )
 
 // TestParseTaskGateOverride tests the parsing of gate overrides from task metadata.

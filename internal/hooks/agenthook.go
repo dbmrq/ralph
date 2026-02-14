@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wexinc/ralph/internal/agent"
-	"github.com/wexinc/ralph/internal/config"
+	"github.com/dbmrq/ralph/internal/agent"
+	"github.com/dbmrq/ralph/internal/config"
 )
 
 // AgentHookConfig provides configuration for agent hook execution.

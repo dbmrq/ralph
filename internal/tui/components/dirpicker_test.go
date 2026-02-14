@@ -8,7 +8,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/wexinc/ralph/internal/project"
+	"github.com/dbmrq/ralph/internal/project"
 )
 
 func TestNewDirPicker(t *testing.T) {

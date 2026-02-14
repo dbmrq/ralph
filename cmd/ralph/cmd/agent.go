@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/wexinc/ralph/internal/agent/custom"
-	"github.com/wexinc/ralph/internal/config"
+	"github.com/dbmrq/ralph/internal/agent/custom"
+	"github.com/dbmrq/ralph/internal/config"
 )
 
 // agentCmd represents the agent command group.

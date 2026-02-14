@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wexinc/ralph/internal/config"
+	"github.com/dbmrq/ralph/internal/config"
 )
 
 func TestBuildVerifier_Verify_GreenfieldProject(t *testing.T) {

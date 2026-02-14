@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/wexinc/ralph/internal/agent"
+	"github.com/dbmrq/ralph/internal/agent"
 )
 
 // CacheFile is the default path for cached project analysis.

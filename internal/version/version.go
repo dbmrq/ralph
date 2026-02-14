@@ -15,7 +15,7 @@ import (
 )
 
 // GitHubRepo is the GitHub repository for ralph.
-const GitHubRepo = "wexinc/ralph"
+const GitHubRepo = "dbmrq/ralph"
 
 // ReleaseAPIURL is the GitHub API URL for latest release.
 const ReleaseAPIURL = "https://api.github.com/repos/%s/releases/latest"

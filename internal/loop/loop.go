@@ -10,13 +10,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/wexinc/ralph/internal/agent"
-	"github.com/wexinc/ralph/internal/build"
-	"github.com/wexinc/ralph/internal/config"
-	"github.com/wexinc/ralph/internal/hooks"
-	"github.com/wexinc/ralph/internal/logging"
-	"github.com/wexinc/ralph/internal/prompt"
-	"github.com/wexinc/ralph/internal/task"
+	"github.com/dbmrq/ralph/internal/agent"
+	"github.com/dbmrq/ralph/internal/build"
+	"github.com/dbmrq/ralph/internal/config"
+	"github.com/dbmrq/ralph/internal/hooks"
+	"github.com/dbmrq/ralph/internal/logging"
+	"github.com/dbmrq/ralph/internal/prompt"
+	"github.com/dbmrq/ralph/internal/task"
 )
 
 // DefaultMaxIterations is the default maximum iterations per task.

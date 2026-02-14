@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/wexinc/ralph/internal/agent"
+	"github.com/dbmrq/ralph/internal/agent"
 )
 
 // InitMode represents how the task list should be initialized.
