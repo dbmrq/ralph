@@ -1,0 +1,115 @@
+# GoReleaser configuration for Ralph
+# https://goreleaser.com
+
+version: 2
+
+# This is an example .goreleaser.yml file with some sensible defaults.
+# Make sure to check the documentation at https://goreleaser.com
+
+project_name: ralph
+
+before:
+  hooks:
+    - go mod tidy
+    - go generate ./...
+
+builds:
+  - id: ralph
+    main: ./cmd/ralph
+    binary: ralph
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+
+archives:
+  - id: default
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+    files:
+      - README.md
+      - LICENSE*
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^ci:'
+      - Merge pull request
+      - Merge branch
+
+release:
+  github:
+    owner: wexinc
+    name: ralph
+  prerelease: auto
+  draft: false
+  name_template: "Ralph {{.Version}}"
+  header: |
+    ## Installation
+
+    ### Homebrew (macOS/Linux)
+    ```bash
+    brew install wexinc/tap/ralph
+    ```
+
+    ### Go Install
+    ```bash
+    go install github.com/wexinc/ralph/cmd/ralph@{{.Tag}}
+    ```
+
+    ### Binary Download
+    Download the appropriate archive for your platform below, extract, and add to your PATH.
+
+    ## What's Changed
+
+brews:
+  - name: ralph
+    repository:
+      owner: wexinc
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Formula
+    homepage: "https://github.com/wexinc/ralph"
+    description: "AI-powered task automation tool"
+    license: "MIT"
+    test: |
+      system "#{bin}/ralph", "--version"
+    install: |
+      bin.install "ralph"
+
+# Optionally generate an install script
+# TODO: Enable this once we have a domain for hosting
+# scripts:
+#   - name: install.sh
+#     source: scripts/install.sh.gotmpl
+

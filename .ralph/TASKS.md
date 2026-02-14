@@ -488,7 +488,7 @@
   > - Existing .ralph detection with reconfigure prompt
   > - Tests in cmd_test.go: TestInitCommand, TestInitCommandWithConfig, TestInitCommandExistingRalph
 
-- [ ] INSTALL-003: Add installation documentation and distribution
+- [x] INSTALL-003: Add installation documentation and distribution
   > Goal: Make ralph easy to install globally
   > Support `go install github.com/wexinc/ralph@latest`
   > Create GitHub releases with pre-built binaries (goreleaser)
@@ -498,6 +498,13 @@
   >   - Go users: `go install`
   > Create install script for curl-based install:
   >   `curl -fsSL https://ralph.dev/install.sh | sh`
+  > **Completed:**
+  > - Created .goreleaser.yaml with multi-platform builds (darwin/linux/windows, amd64/arm64)
+  > - Created scripts/install.sh for curl-based binary installation
+  > - Created Makefile with build, test, lint, release targets
+  > - Fixed version info injection via ldflags (moved version setting to Execute())
+  > - Rewrote README.md for Go version with installation, usage, configuration docs
+  > - Homebrew support configured via goreleaser brews section
 
 - [ ] INSTALL-004: Add update and version management
   > Goal: Easy updates and version checking

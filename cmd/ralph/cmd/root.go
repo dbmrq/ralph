@@ -8,7 +8,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Version information - set via ldflags at build time.
+// Version information - set via ldflags at build time in main.go.
+// These are exported so main.go can set them before Execute().
 var (
 	Version = "dev"
 	Commit  = "none"
@@ -30,15 +31,13 @@ hooks, and TDD support.`,
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
+	// Set version info here after main.go has set the variables.
+	rootCmd.Version = fmt.Sprintf("%s (commit: %s, built: %s)", Version, Commit, Date)
+	rootCmd.SetVersionTemplate("ralph {{.Version}}\n")
+
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
-}
-
-func init() {
-	// Add --version flag that prints version info and exits.
-	rootCmd.Version = fmt.Sprintf("%s (commit: %s, built: %s)", Version, Commit, Date)
-	rootCmd.SetVersionTemplate("ralph {{.Version}}\n")
 }
 
 // Root returns the root command for testing purposes.
