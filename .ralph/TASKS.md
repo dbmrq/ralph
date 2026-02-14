@@ -378,7 +378,7 @@
   > Reference: See internal/tui/messages.go for all TUI message types
   > Reference: See internal/loop/headless.go for event handling pattern (HeadlessRunner.HandleEvent)
 
-- [ ] TUI-008: Implement LoopController adapter
+- [x] TUI-008: Implement LoopController adapter
   > Goal: Bridge the TUI's LoopController interface to actual Loop methods
   > Create adapter struct in cmd/ralph/cmd/run.go or internal/tui/controller.go
   > Implement tui.LoopController interface:
@@ -388,6 +388,12 @@
   >   - Abort() → call Loop.Abort() (needs to be added to Loop)
   > Pass adapter to tui.Model via SetLoopController()
   > Reference: internal/tui/app.go lines 78-84 define the interface
+  > **Completed:** LoopControllerAdapter in cmd/ralph/cmd/run.go
+  > - Pause() calls loop.Pause()
+  > - Resume() transitions context from StatePaused to StateRunning
+  > - Skip() returns "not yet implemented" (LOOP-007 will add Loop.Skip())
+  > - Abort() calls cancelFunc (LOOP-007 will add proper Loop.Abort())
+  > - Tests added in cmd_test.go
 
 - [ ] LOOP-007: Add Skip and Abort methods to Loop
   > Goal: Implement missing control methods in internal/loop/loop.go

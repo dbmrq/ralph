@@ -651,10 +651,14 @@ func (a *LoopControllerAdapter) Pause() error {
 
 // Resume resumes a paused loop.
 func (a *LoopControllerAdapter) Resume() error {
-	// Resume needs to be handled differently since it needs context
-	// For TUI mode, we typically just continue the current session
-	// The loop will handle the actual resume logic
-	return nil // Resume is handled by loop state transition
+	ctx := a.loop.Context()
+	if ctx == nil {
+		return fmt.Errorf("loop has no context")
+	}
+	if ctx.State != loop.StatePaused {
+		return fmt.Errorf("loop is not paused (current state: %s)", ctx.State)
+	}
+	return ctx.Transition(loop.StateRunning)
 }
 
 // Skip skips the current task.

@@ -663,3 +663,45 @@ func TestUpdateCommand(t *testing.T) {
 		})
 	}
 }
+
+// TestLoopControllerAdapter tests the LoopControllerAdapter.
+func TestLoopControllerAdapter(t *testing.T) {
+	t.Run("NewLoopControllerAdapter", func(t *testing.T) {
+		adapter := NewLoopControllerAdapter(nil, nil)
+		if adapter == nil {
+			t.Fatal("NewLoopControllerAdapter returned nil")
+		}
+	})
+
+	t.Run("Skip returns not implemented", func(t *testing.T) {
+		adapter := NewLoopControllerAdapter(nil, nil)
+		err := adapter.Skip("task-1")
+		if err == nil {
+			t.Error("Skip() should return error (not yet implemented)")
+		}
+		if err.Error() != "skip not yet implemented" {
+			t.Errorf("Skip() error = %q, want %q", err.Error(), "skip not yet implemented")
+		}
+	})
+
+	t.Run("Abort with nil cancelFunc", func(t *testing.T) {
+		adapter := NewLoopControllerAdapter(nil, nil)
+		err := adapter.Abort()
+		if err != nil {
+			t.Errorf("Abort() error = %v, want nil", err)
+		}
+	})
+
+	t.Run("Abort calls cancelFunc", func(t *testing.T) {
+		cancelled := false
+		cancelFunc := func() { cancelled = true }
+		adapter := NewLoopControllerAdapter(nil, cancelFunc)
+		err := adapter.Abort()
+		if err != nil {
+			t.Errorf("Abort() error = %v, want nil", err)
+		}
+		if !cancelled {
+			t.Error("Abort() did not call cancelFunc")
+		}
+	})
+}
